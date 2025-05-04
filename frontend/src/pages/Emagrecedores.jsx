@@ -5,6 +5,7 @@ import depo2 from '../assets/ozenfitdepoimento2.jpg';
 import ozenfitProduto from '../assets/Ozenfit-8-2.png';
 import liftDepo from '../assets/Img-Mulher-Detox-1.png';
 import liftProduto from '../assets/Lift-Home-1.png';
+import { event } from '../utils/gtag'; // ajuste o caminho conforme necessário
 
 export default function Emagrecedores() {
   return (
@@ -59,8 +60,36 @@ export default function Emagrecedores() {
             <img src={depo2} alt="Depoimento Ozenfit 2" className="depoimento-img pequeno" />
           </div>
           <img src={ozenfitProduto} alt="Produto Ozenfit" className="produto-img pequeno" />
-          <a href="https://pay.braip.co/checkout/pla0wely/cheqx91d?pl=pla0wely&ck=cheqx91d&af=afi7g3pl7x&currency=BRL" className="btn-comprar" target="_blank" rel="noopener noreferrer">OZEN FIT CAPS 1 UNIDADE</a>
-          <a href="https://pay.braip.co/ref?pl=plamln1r&ck=cheqx91d&af=afi7g3pl7x" className="btn-comprar" target="_blank" rel="noopener noreferrer">OZEN FIT CAPS 3 UNIDADES</a>
+          <a
+            href="https://pay.braip.co/checkout/pla0wely/cheqx91d?pl=pla0wely&ck=cheqx91d&af=afi7g3pl7x&currency=BRL"
+            className="btn-comprar"
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() =>
+              event({
+                action: 'compra_ozenfit_1un',
+                category: 'compra',
+                label: 'Ozenfit - 1 Unidade',
+              })
+            }
+          >
+            OZEN FIT CAPS 1 UNIDADE
+          </a>
+          <a
+            href="https://pay.braip.co/ref?pl=plamln1r&ck=cheqx91d&af=afi7g3pl7x"
+            className="btn-comprar"
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() =>
+              event({
+                action: 'compra_ozenfit_3un',
+                category: 'compra',
+                label: 'Ozenfit - 3 Unidades',
+              })
+            }
+          >
+            OZEN FIT CAPS 3 UNIDADES
+          </a>
         </div>
 
         <div className="produto">
@@ -68,8 +97,36 @@ export default function Emagrecedores() {
             <iframe width="100%" height="215" src="https://www.youtube.com/embed/i9274HarmVg" title="Depoimento Emagrecimento" frameBorder="0" allowFullScreen></iframe>
           </div>
           <img src={liftProduto} alt="Produto Lift Detox" className="produto-img pequeno" />
-          <a href="https://pay.braip.co/ref?pl=plag8o2v&ck=chew8wl8&af=afine79g1o" className="btn-comprar" target="_blank" rel="noopener noreferrer">1 POTE POR R$ 137,00</a>
-          <a href="https://pay.braip.co/ref?pl=pla62g2l&ck=chew8wl8&af=afine79g1o" className="btn-comprar" target="_blank" rel="noopener noreferrer">COMPRE 2 LEVE 3 POR R$ 187,00</a>
+          <a
+            href="https://pay.braip.co/ref?pl=plag8o2v&ck=chew8wl8&af=afine79g1o"
+            className="btn-comprar"
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() =>
+              event({
+                action: 'compra_lift_1un',
+                category: 'compra',
+                label: 'Lift Detox - 1 Unidade',
+              })
+            }
+          >
+            1 POTE POR R$ 137,00
+          </a>
+          <a
+            href="https://pay.braip.co/ref?pl=pla62g2l&ck=chew8wl8&af=afine79g1o"
+            className="btn-comprar"
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() =>
+              event({
+                action: 'compra_lift_3un',
+                category: 'compra',
+                label: 'Lift Detox - 3 Unidades',
+              })
+            }
+          >
+            COMPRE 2 LEVE 3 POR R$ 187,00
+          </a>
         </div>
       </section>
 
@@ -83,13 +140,20 @@ export default function Emagrecedores() {
         <p style={{ fontSize: '1.2rem', fontWeight: '500' }}>
           Clique abaixo para agilizar seu treino personalizado com nosso time de especialistas.
         </p>
-       
+
         {/* Botão do WhatsApp */}
-        <a 
-          href="https://wa.me/5521987708652" 
-          className="btn-whatsapp" 
-          target="_blank" 
+        <a
+          href="https://wa.me/5521987708652"
+          className="btn-whatsapp"
+          target="_blank"
           rel="noopener noreferrer"
+          onClick={() =>
+            event({
+              action: 'clique_whatsapp',
+              category: 'contato',
+              label: 'Botão WhatsApp - Emagrecedores',
+            })
+          }
           style={{
             display: 'inline-block',
             marginTop: '20px',
