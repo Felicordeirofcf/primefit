@@ -1,0 +1,121 @@
+/* src/pages/Consultoria.css */
+
+.consultoria-page {
+    font-family: 'Segoe UI', sans-serif;
+    padding: 2rem;
+    background-color: #f8f9fa;
+    color: #333;
+  }
+  
+  .consultoria-hero {
+    text-align: center;
+    background: linear-gradient(135deg, #00bfa6, #00c853);
+    color: white;
+    padding: 3rem 1rem;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  }
+  
+  .consultoria-hero h1 {
+    font-size: 2.5rem;
+    margin-bottom: 0.5rem;
+  }
+  
+  .consultoria-hero p {
+    font-size: 1.2rem;
+    max-width: 700px;
+    margin: 0 auto;
+  }
+  
+  .beneficios-section,
+  .plataformas-section {
+    margin-top: 3rem;
+    background-color: #ffffff;
+    padding: 2rem;
+    border-radius: 10px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+  }
+  
+  .beneficios-section h2,
+  .plataformas-section h2 {
+    color: #009688;
+    margin-bottom: 1rem;
+  }
+  
+  .beneficios-section ul,
+  .plataformas-section ul {
+    list-style: disc;
+    padding-left: 1.5rem;
+  }
+  
+  .cta-section {
+    margin-top: 3rem;
+    background-color: #e8f5e9;
+    padding: 2rem;
+    border-radius: 10px;
+    text-align: center;
+    border-left: 5px solid #4caf50;
+  }
+  
+  .cta-section h3 {
+    color: #2e7d32;
+    margin-bottom: 1rem;
+  }
+  
+  .cta-section p {
+    margin-bottom: 1.5rem;
+  }
+  
+  .btn-avaliacao {
+    display: inline-block;
+    background-color: #43a047;
+    color: white;
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    font-weight: bold;
+    text-decoration: none;
+    transition: background 0.3s ease;
+  }
+  
+  .btn-avaliacao:hover {
+    background-color: #388e3c;
+  }
+  .btn-whatsapp-flutuante {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background-color: #25D366;
+    color: white;
+    padding: 14px 22px;
+    font-size: 1rem;
+    font-weight: bold;
+    border-radius: 30px;
+    text-decoration: none;
+    box-shadow: 0 0 12px rgba(0, 0, 0, 0.4);
+    z-index: 9999;
+    transition: background 0.3s ease;
+  }
+  
+  .btn-whatsapp-flutuante:hover {
+    background-color: #1ebe5d;
+  }
+  
+  .btn-whatsapp-flutuante {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background-color: #25d366;
+    color: white;
+    padding: 10px 16px;
+    border-radius: 50px;
+    font-weight: bold;
+    text-decoration: none;
+    box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2);
+    z-index: 999;
+    transition: background-color 0.3s;
+  }
+  
+  .btn-whatsapp-flutuante:hover {
+    background-color: #128c7e;
+  }
+  

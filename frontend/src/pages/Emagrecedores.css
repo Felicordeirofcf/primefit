@@ -1,0 +1,342 @@
+/* Estrutura geral */
+.consultoria-page {
+  background: linear-gradient(to right, #0f2027, #203a43, #2c5364);
+  color: #fff;
+  font-family: 'Segoe UI', sans-serif;
+  padding: 2rem;
+}
+
+/* Cabeçalho hero */
+.consultoria-hero {
+  text-align: center;
+  background-color: #00c779;
+  color: #fff;
+  padding: 2rem;
+  border-radius: 10px;
+  margin-bottom: 2rem;
+}
+
+.consultoria-hero h1 {
+  margin: 0;
+  font-size: 2rem;
+}
+
+.beneficios-section {
+  display: flex;
+  justify-content: space-around;
+  flex-wrap: wrap;
+  margin-bottom: 2rem;
+}
+
+.beneficio-box {
+  background: #111;
+  padding: 1.5rem;
+  border-radius: 10px;
+  width: 300px;
+  margin: 10px;
+}
+
+.beneficio-box h2 {
+  color: #00ff9c;
+  margin-bottom: 1rem;
+}
+
+.comparativo-section {
+  background-color: #ffeef0;
+  color: #000;
+  padding: 1rem;
+  border-radius: 10px;
+  margin-bottom: 2rem;
+}
+
+/* Produtos */
+.produto-section {
+  display: flex;
+  justify-content: space-around;
+  flex-wrap: wrap;
+  gap: 2rem;
+  margin-bottom: 2rem;
+}
+
+.produto {
+  background: #111;
+  padding: 1.5rem;
+  border-radius: 10px;
+  max-width: 320px;
+  text-align: center;
+}
+
+.produto-img.pequeno {
+  width: 100%;
+  max-width: 200px;
+  margin: 1rem auto;
+}
+
+.depoimentos.lado-a-lado {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 1rem;
+}
+
+.depoimento-img.pequeno {
+  width: 100px;
+  border-radius: 8px;
+}
+
+/* Vídeo responsivo */
+.video-wrapper.pequeno {
+  position: relative;
+  padding-bottom: 56.25%;
+  height: 0;
+  overflow: hidden;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+}
+
+.video-wrapper.pequeno iframe {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
+/* Botões */
+.btn-comprar {
+  display: block;
+  margin: 0.5rem auto;
+  background: #00e676;
+  color: #000;
+  font-weight: bold;
+  padding: 0.6rem 1.2rem;
+  text-decoration: none;
+  border-radius: 8px;
+  transition: 0.3s ease;
+}
+
+.btn-comprar:hover {
+  background: #1bff96;
+  transform: scale(1.05);
+}
+
+/* Bônus animado */
+.bonus-animado {
+  margin: 2rem auto;
+  background: #ffc107;
+  padding: 1rem;
+  border-radius: 10px;
+  color: #000;
+  font-weight: bold;
+  text-align: center;
+  animation: pulse 2s infinite;
+  max-width: 600px;
+}
+
+@keyframes pulse {
+  0% { box-shadow: 0 0 0 0 rgba(255,193,7, 0.7); }
+  70% { box-shadow: 0 0 0 15px rgba(255,193,7, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(255,193,7, 0); }
+}
+
+/* Chamada final */
+.cta-section {
+  text-align: center;
+  margin-top: 3rem;
+}
+
+.btn-avaliacao {
+  display: inline-block;
+  margin-top: 1rem;
+  padding: 0.8rem 1.5rem;
+  background: #00e5ff;
+  color: #000;
+  border-radius: 8px;
+  text-decoration: none;
+  font-weight: bold;
+  transition: 0.3s ease;
+}
+
+.btn-avaliacao:hover {
+  background: #33f6ff;
+  transform: scale(1.05);
+}
+
+.comparativo-section {
+  background: #fefefe;
+  border-left: 6px solid #00c853;
+  padding: 1.5rem;
+  border-radius: 8px;
+  margin: 2rem auto;
+  max-width: 960px;
+  color: #222;
+  box-shadow: 0 0 12px rgba(0, 0, 0, 0.1);
+}
+
+.comparativo-section h2 {
+  font-size: 1.6rem;
+  color: #2e7d32;
+  margin-bottom: 1rem;
+  font-weight: bold;
+}
+
+.comparativo-section ul {
+  padding-left: 1.2rem;
+  margin-top: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.comparativo-section li {
+  margin-bottom: 0.4rem;
+  font-size: 1rem;
+}
+
+.comparativo-section p {
+  font-size: 1rem;
+  margin-top: 0.7rem;
+}
+
+.comparativo-section .bonus-text {
+  background: linear-gradient(135deg, #ffea00, #ffd600);
+  padding: 1rem;
+  font-weight: bold;
+  font-size: 1.1rem;
+  border-radius: 8px;
+  box-shadow: inset 0 0 10px rgba(0,0,0,0.1);
+  margin-top: 1.5rem;
+  text-align: center;
+  animation: pulseBonus 2s infinite;
+  color: #222;
+}
+
+@keyframes pulseBonus {
+  0% { transform: scale(1); background-color: #fff176; }
+  50% { transform: scale(1.02); background-color: #ffee58; }
+  100% { transform: scale(1); background-color: #fff176; }
+}
+
+/* Ajuste geral para área de produtos */
+.produto-section {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 2rem;
+  margin: 2rem 0;
+}
+
+/* Cartão de produto */
+.produto {
+  background: #111;
+  border-radius: 10px;
+  padding: 1.5rem;
+  max-width: 360px;
+  flex: 1 1 300px;
+  text-align: center;
+  color: #fff;
+}
+
+/* Imagens de produto */
+.produto-img.pequeno {
+  width: 180px;
+  margin: 1rem auto;
+  border-radius: 8px;
+}
+
+/* Depoimentos lado a lado */
+.depoimentos.lado-a-lado {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 1rem;
+}
+
+.depoimento-img.pequeno {
+  width: 80px;
+  height: auto;
+  border-radius: 6px;
+}
+
+/* Vídeo responsivo */
+.video-wrapper.pequeno {
+  position: relative;
+  padding-bottom: 56.25%;
+  height: 0;
+  overflow: hidden;
+  border-radius: 10px;
+  margin-bottom: 1rem;
+}
+
+.video-wrapper.pequeno iframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
+/* Botões de compra */
+.btn-comprar {
+  display: block;
+  margin: 0.5rem auto;
+  background: #00e676;
+  color: #000;
+  font-weight: bold;
+  padding: 0.6rem 1rem;
+  border-radius: 8px;
+  text-decoration: none;
+  transition: all 0.3s ease;
+}
+
+.btn-comprar:hover {
+  background-color: #1bff96;
+  transform: scale(1.05);
+}
+
+/* Bônus animado */
+.bonus-animado {
+  margin: 3rem auto;
+  padding: 1.2rem;
+  background: linear-gradient(45deg, #ffeb3b, #ffc107);
+  border-radius: 12px;
+  text-align: center;
+  font-size: 1.25rem;
+  font-weight: bold;
+  animation: pulseBonus 2s infinite;
+  color: #222;
+  max-width: 700px;
+  box-shadow: 0 0 15px rgba(0,0,0,0.1);
+}
+
+@keyframes pulseBonus {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.02); }
+  100% { transform: scale(1); }
+}
+.carrossel-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 2rem 0;
+}
+
+.img-carrossel {
+  width: 300px;
+  height: auto;
+  border-radius: 10px;
+  margin-bottom: 1rem;
+  box-shadow: 0 0 12px rgba(0, 0, 0, 0.4);
+}
+
+.btn-emagrecedores {
+  background-color: #ffcc00;
+  padding: 12px 24px;
+  font-weight: bold;
+  color: #000;
+  border-radius: 8px;
+  text-decoration: none;
+  transition: 0.3s ease;
+}
+
+.btn-emagrecedores:hover {
+  background-color: #f4b400;
+}

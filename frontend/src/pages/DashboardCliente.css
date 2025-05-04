@@ -1,0 +1,249 @@
+/* Estilo base (modo claro) */
+.dashboard-cliente {
+  max-width: 1000px;
+  margin: 40px auto;
+  padding: 2rem;
+  background-color: #f9f9f9;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  font-family: 'Segoe UI', sans-serif;
+  color: #1a1a1a;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.dashboard-cliente h2 {
+  text-align: center;
+  color: #333;
+  margin-bottom: 30px;
+}
+
+.dashboard-cliente h3 {
+  margin-top: 30px;
+  color: #111;
+  font-weight: 600;
+  border-bottom: 1px solid #ddd;
+  padding-bottom: 8px;
+  margin-bottom: 15px;
+}
+
+.card,
+.upload-docs,
+.acoes,
+.progresso,
+.historico,
+.treinos-enviados,
+.eventos,
+.contato {
+  background-color: #fff;
+  padding: 20px;
+  border-radius: 10px;
+  margin-bottom: 30px;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.05);
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.card p,
+.upload-docs p,
+.progresso p,
+.historico p,
+.eventos p,
+.contato p {
+  margin: 5px 0;
+  color: #444;
+}
+
+.botao-compra {
+  display: inline-block;
+  margin: 0.5rem 1rem 0.5rem 0;
+  padding: 0.6rem 1.2rem;
+  background-color: #007bff;
+  color: white;
+  border-radius: 8px;
+  text-decoration: none;
+  font-weight: 600;
+  transition: background-color 0.3s ease;
+}
+
+.botao-compra:hover {
+  background-color: #005dc5;
+}
+
+.logout-btn {
+  margin-top: 2rem;
+  background: #dc3545;
+  color: white;
+  border: none;
+  padding: 0.8rem 1.4rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: background-color 0.3s ease;
+}
+
+.logout-btn:hover {
+  background: #b52f39;
+}
+
+input[type="file"] {
+  display: block;
+  margin-top: 10px;
+}
+
+.whatsapp-link {
+  display: inline-block;
+  margin-top: 20px;
+  color: #25d366;
+  font-weight: bold;
+  text-decoration: none;
+}
+
+.whatsapp-link:hover {
+  text-decoration: underline;
+}
+
+.historico-lista {
+  background-color: #fcfcfc;
+  border: 1px solid #eee;
+  border-radius: 8px;
+  padding: 15px;
+  margin-top: 10px;
+}
+
+.historico-lista ul,
+.treinos-enviados ul,
+.eventos ul {
+  list-style-type: disc;
+  padding-left: 20px;
+  color: #555;
+}
+
+.treinos-enviados li,
+.historico-lista li,
+.eventos li {
+  margin-bottom: 8px;
+}
+
+/* Responsividade */
+@media (max-width: 600px) {
+  .dashboard-cliente {
+    margin: 20px 10px;
+    padding: 1rem;
+  }
+
+  .botao-compra,
+  .logout-btn {
+    width: 100%;
+    margin: 10px 0;
+    text-align: center;
+  }
+
+  .navbar-container {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+}
+
+/* 🌙 Dark Mode */
+@media (prefers-color-scheme: dark) {
+  .dashboard-cliente {
+    background-color: #1e1e1e;
+    color: #f0f0f0;
+  }
+
+  .dashboard-cliente h2,
+  .dashboard-cliente h3 {
+    color: #ffffff;
+    border-color: #444;
+  }
+
+  .card,
+  .upload-docs,
+  .acoes,
+  .progresso,
+  .historico,
+  .treinos-enviados,
+  .eventos,
+  .contato {
+    background-color: #2a2a2a;
+    box-shadow: 0 0 10px rgba(255, 255, 255, 0.05);
+  }
+
+  .card p,
+  .upload-docs p,
+  .progresso p,
+  .historico p,
+  .eventos p,
+  .contato p {
+    color: #ccc;
+  }
+
+  .botao-compra {
+    background-color: #3391ff;
+  }
+
+  .botao-compra:hover {
+    background-color: #2676d1;
+  }
+
+  .logout-btn {
+    background-color: #e74c3c;
+  }
+
+  .logout-btn:hover {
+    background-color: #c0392b;
+  }
+
+  .historico-lista,
+  .treinos-enviados ul,
+  .eventos ul {
+    background-color: #2d2d2d;
+    border-color: #444;
+    color: #ccc;
+  }
+
+  .treinos-enviados li,
+  .historico-lista li,
+  .eventos li {
+    color: #ddd;
+  }
+}
+
+/* 🌙 Navbar escura */
+.navbar-dark {
+  background-color: #121212;
+  padding: 1rem 2rem;
+  color: #ffffff;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.navbar-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+.logo {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: #ffffff;
+}
+
+.navbar-dark .logout-btn {
+  background-color: #e74c3c;
+  border: none;
+  padding: 0.6rem 1rem;
+  border-radius: 6px;
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.navbar-dark .logout-btn:hover {
+  background-color: #c0392b;
+}
