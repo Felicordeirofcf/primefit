@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import ReactDOM from 'react-dom/client';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 
 // 🌐 Páginas públicas
 import Home from './pages/Home';
@@ -19,16 +19,58 @@ import PainelAdmin from './pages/PainelAdmin';
 import Navbar from './components/Navbar';
 import './styles.css'; // CSS global
 
+// 📊 GA4 Measurement ID
+const GA_MEASUREMENT_ID = 'G-JZSPT4951W';
+
+// 🚀 Carrega o script do gtag.js
+function loadGtagScript() {
+  const script1 = document.createElement('script');
+  script1.async = true;
+  script1.src = `https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`;
+  document.head.appendChild(script1);
+
+  const script2 = document.createElement('script');
+  script2.innerHTML = `
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', '${GA_MEASUREMENT_ID}');
+  `;
+  document.head.appendChild(script2);
+}
+
+// 🎯 Rastreia cada mudança de rota como pageview
+function Analytics() {
+  const location = useLocation();
+
+  useEffect(() => {
+    if (window.gtag) {
+      window.gtag('config', GA_MEASUREMENT_ID, {
+        page_path: location.pathname + location.search,
+      });
+    }
+  }, [location]);
+
+  return null;
+}
+
 // 🧩 Página de fallback (opcional)
 function NotFound() {
   return <h2 style={{ textAlign: 'center', marginTop: '2rem' }}>Página não encontrada</h2>;
 }
 
-const root = ReactDOM.createRoot(document.getElementById("root"));
+// 🚀 Início da aplicação
+const root = ReactDOM.createRoot(document.getElementById('root'));
+
+// Carrega o GA ao iniciar
+loadGtagScript();
 
 root.render(
   <React.StrictMode>
     <BrowserRouter>
+      {/* 🎯 Ativa rastreamento GA4 */}
+      <Analytics />
+
       <Navbar />
 
       <Routes>
