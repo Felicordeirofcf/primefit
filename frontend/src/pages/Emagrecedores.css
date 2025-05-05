@@ -340,3 +340,55 @@
 .btn-emagrecedores:hover {
   background-color: #f4b400;
 }
+
+@media (max-width: 768px) {
+  .consultoria-page {
+    padding: 10px;
+  }
+
+  .consultoria-hero h1 {
+    font-size: 1.5rem;
+    text-align: center;
+  }
+
+  .consultoria-hero p {
+    font-size: 1rem;
+    text-align: center;
+    line-height: 1.4;
+  }
+
+  .beneficios-section {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .beneficio-box, .carrossel-box, .produto, .comparativo-section {
+    width: 100%;
+    margin: 0 auto;
+    padding: 10px;
+  }
+
+  .img-carrossel {
+    width: 100%;
+    height: auto;
+    border-radius: 8px;
+  }
+
+  .produto-section {
+    flex-direction: column;
+    gap: 20px;
+    padding: 10px;
+  }
+
+  .produto {
+    width: 100%;
+    text-align: center;
+  }
+
+  .comparativo-section blockquote {
+    font-size: 0.95rem;
+    padding: 10px;
+    margin: 10px 0;
+  }
+}
