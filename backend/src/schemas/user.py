@@ -6,13 +6,13 @@ from datetime import datetime
 class UserCreate(BaseModel):
     email: EmailStr
     password: str
-    name: str
+    full_name: str # Corrigido de name para full_name
 
 # Modelo para resposta de usuário (sem senha)
 class UserResponse(BaseModel):
     id: str
     email: EmailStr
-    name: str
+    full_name: str # Corrigido de name para full_name
     role: str
     created_at: datetime
     
