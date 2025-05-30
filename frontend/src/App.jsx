@@ -1,5 +1,5 @@
-import React from 'react'
-import { Routes, Route } from 'react-router-dom'
+import React, { useEffect } from 'react'
+import { Routes, Route, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from './hooks/useAuth'
 
 // Layouts
@@ -16,6 +16,7 @@ import ContactPage from './pages/ContactPage'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 import WeightLossPage from './pages/WeightLossPage'
+import CompletarPerfil from './pages/CompletarPerfil'
 
 // Páginas do dashboard
 import DashboardHome from './pages/dashboard/DashboardHome'
@@ -27,7 +28,20 @@ import Messages from './pages/dashboard/Messages'
 
 // Componente de proteção de rotas
 const ProtectedRoute = ({ children }) => {
-  const { isAuthenticated, isLoading } = useAuth()
+  const { isAuthenticated, isLoading, isProfileComplete } = useAuth()
+  const navigate = useNavigate()
+  const location = useLocation()
+  
+  useEffect(() => {
+    if (!isLoading) {
+      if (!isAuthenticated) {
+        navigate('/login?redirect=' + encodeURIComponent(location.pathname))
+      } else if (!isProfileComplete && location.pathname !== '/completar-perfil') {
+        // Redirecionar para completar perfil se não estiver completo
+        navigate('/completar-perfil')
+      }
+    }
+  }, [isLoading, isAuthenticated, isProfileComplete, navigate, location.pathname])
   
   if (isLoading) {
     return <div className="flex items-center justify-center min-h-screen">
@@ -36,7 +50,11 @@ const ProtectedRoute = ({ children }) => {
   }
   
   if (!isAuthenticated) {
-    window.location.href = '/login?redirect=' + encodeURIComponent(window.location.pathname)
+    return null
+  }
+  
+  // Se o perfil não estiver completo e não estiver na página de completar perfil
+  if (!isProfileComplete && location.pathname !== '/completar-perfil') {
     return null
   }
   
@@ -57,6 +75,13 @@ function App() {
         <Route path="login" element={<LoginPage />} />
         <Route path="cadastro" element={<RegisterPage />} />
         <Route path="emagrecimento" element={<WeightLossPage />} />
+        
+        {/* Rota protegida para completar perfil */}
+        <Route path="completar-perfil" element={
+          <ProtectedRoute>
+            <CompletarPerfil />
+          </ProtectedRoute>
+        } />
       </Route>
       
       {/* Rotas do dashboard (protegidas) */}
