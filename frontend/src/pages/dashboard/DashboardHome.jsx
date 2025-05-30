@@ -31,8 +31,8 @@ ChartJS.register(
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
 const DashboardHome = () => {
-  const { user, token } = useAuth()
-  const [isLoading, setIsLoading] = useState(true)
+  const { user, isLoading: isAuthLoading } = useAuth()
+  const [isDataLoading, setIsDataLoading] = useState(false)
   const [stats, setStats] = useState({
     weightData: [],
     completedWorkouts: 0,
@@ -43,10 +43,19 @@ const DashboardHome = () => {
   })
   
   useEffect(() => {
+    // Só busca dados quando a autenticação estiver completa e o usuário existir
+    if (isAuthLoading || !user) return;
+    
     const fetchDashboardData = async () => {
-      if (!token) return
+      // Verifica se o token está disponível no localStorage
+      const token = localStorage.getItem('token');
+      if (!token) {
+        console.error('Token não encontrado');
+        toast.error('Sessão expirada. Por favor, faça login novamente.');
+        return;
+      }
       
-      setIsLoading(true)
+      setIsDataLoading(true);
       
       try {
         // Configuração para requisições autenticadas
@@ -100,12 +109,12 @@ const DashboardHome = () => {
         console.error('Erro ao buscar dados do dashboard:', error)
         toast.error('Erro ao carregar dados do dashboard')
       } finally {
-        setIsLoading(false)
+        setIsDataLoading(false)
       }
     }
     
     fetchDashboardData()
-  }, [token])
+  }, [user, isAuthLoading]) // Dependências atualizadas para incluir isAuthLoading
   
   // Configuração do gráfico de peso
   const weightChartData = {
@@ -134,13 +143,39 @@ const DashboardHome = () => {
     }
   }
   
+  // Renderização condicional baseada no estado de autenticação
+  if (isAuthLoading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-600"></div>
+        <p className="ml-3">Verificando autenticação...</p>
+      </div>
+    );
+  }
+  
+  // Se não houver usuário autenticado após o carregamento
+  if (!user) {
+    return (
+      <div className="flex flex-col justify-center items-center h-64">
+        <p className="text-lg text-red-600 mb-4">Sessão expirada ou usuário não autenticado</p>
+        <button 
+          onClick={() => window.location.href = '/login'} 
+          className="px-4 py-2 bg-primary-600 text-white rounded hover:bg-primary-700"
+        >
+          Fazer Login
+        </button>
+      </div>
+    );
+  }
+  
   return (
     <div>
       <h1 className="text-2xl font-bold mb-6">Dashboard</h1>
       
-      {isLoading ? (
+      {isDataLoading ? (
         <div className="flex justify-center items-center h-64">
           <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-600"></div>
+          <p className="ml-3">Carregando dados...</p>
         </div>
       ) : (
         <div className="space-y-6">
