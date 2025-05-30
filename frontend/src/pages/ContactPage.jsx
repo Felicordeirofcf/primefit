@@ -74,7 +74,7 @@ const ContactPage = () => {
               </div>
               <div>
                 <h3 className="text-lg font-medium mb-1">Telefone</h3>
-                <p className="text-gray-600">(11) 99999-9999</p>
+                <p className="text-gray-600">(21) 98770-8652</p>
                 <p className="text-gray-600">Segunda a Sexta, 8h às 20h</p>
               </div>
             </div>
@@ -101,8 +101,8 @@ const ContactPage = () => {
               </div>
               <div>
                 <h3 className="text-lg font-medium mb-1">Endereço</h3>
-                <p className="text-gray-600">Av. Paulista, 1000 - Bela Vista</p>
-                <p className="text-gray-600">São Paulo - SP, 01310-100</p>
+                <p className="text-gray-600">Estrada do Rio grande, 4804 - Taquara</p>
+                <p className="text-gray-600">Rio de Janeiro - RJ, 22720-002</p>
               </div>
             </div>
           </div>
@@ -261,7 +261,7 @@ const ContactPage = () => {
             <h3 className="text-lg font-bold mb-2">Como posso agendar uma avaliação física?</h3>
             <p className="text-gray-600">
               Você pode agendar uma avaliação física gratuita através do nosso formulário de contato,
-              ligando para o número (11) 99999-9999 ou enviando um email para contato@primefit.com.br.
+              ligando para o número (21) 98770-8652 ou enviando um email para contato@primefit.com.br.
             </p>
           </div>
           
