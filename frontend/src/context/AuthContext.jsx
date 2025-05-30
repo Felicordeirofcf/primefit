@@ -2,7 +2,6 @@
 
 import React, { createContext, useState, useEffect, useContext } from 'react'
 import { supabase } from '../supabaseClient'
-import { useNavigate } from 'react-router-dom'
 
 // Criação do contexto
 export const AuthContext = createContext()
@@ -75,47 +74,58 @@ export const AuthProvider = ({ children }) => {
 
   // Função de login
   const login = async (email, password) => {
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password })
 
-    if (error) {
-      console.error('Erro ao fazer login:', error.message)
-      return { success: false, message: error.message }
-    }
+      if (error) {
+        console.error('Erro ao fazer login:', error.message)
+        return { success: false, message: error.message }
+      }
 
-    setUser(data.user)
-    
-    // Buscar perfil do usuário após login
-    const profile = await fetchUserProfile(data.user.id)
-    
-    // Verificar se o perfil está completo
-    const profileComplete = profile && profile.full_name && profile.full_name.trim() !== ''
-    
-    return { 
-      success: true, 
-      profileComplete: profileComplete 
+      setUser(data.user)
+      
+      // Buscar perfil do usuário após login
+      const profile = await fetchUserProfile(data.user.id)
+      
+      // Verificar se o perfil está completo
+      const profileComplete = profile && profile.full_name && profile.full_name.trim() !== ''
+      
+      return { 
+        success: true, 
+        profileComplete: profileComplete 
+      }
+    } catch (error) {
+      console.error('Erro inesperado no login:', error.message)
+      return { success: false, message: 'Erro ao processar login. Tente novamente.' }
     }
   }
 
   // Função de cadastro
   const register = async (name, email, password) => {
-    // 1. Registrar usuário no Auth do Supabase
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          name // será armazenado no user_metadata
+    try {
+      // 1. Registrar usuário no Auth do Supabase
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            name // será armazenado no user_metadata
+          }
         }
+      })
+
+      if (error) {
+        console.error('Erro ao registrar:', error.message)
+        return { success: false, message: error.message }
       }
-    })
 
-    if (error) {
-      console.error('Erro ao registrar:', error.message)
-      return { success: false, message: error.message }
-    }
+      // Verificar se o usuário foi criado corretamente
+      if (!data.user || !data.user.id) {
+        console.error('Erro: Usuário não foi criado corretamente')
+        return { success: false, message: 'Erro ao criar usuário. Tente novamente.' }
+      }
 
-    // 2. Inserir dados na tabela public.users
-    if (data.user) {
+      // 2. Inserir dados na tabela public.users
       const { error: insertError } = await supabase
         .from('users')
         .insert([
@@ -134,9 +144,12 @@ export const AuthProvider = ({ children }) => {
         // Então retornamos sucesso, mas logamos o erro
         console.warn('Usuário criado no Auth, mas não na tabela users')
       }
-    }
 
-    return { success: true }
+      return { success: true }
+    } catch (error) {
+      console.error('Erro inesperado no cadastro:', error)
+      return { success: false, message: 'Erro ao processar cadastro. Tente novamente.' }
+    }
   }
 
   // Função para atualizar o perfil do usuário
