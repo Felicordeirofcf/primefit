@@ -133,8 +133,7 @@ export const AuthProvider = ({ children }) => {
             id: data.user.id, 
             email: email,
             full_name: name || '',
-            role: 'cliente',
-            profile_completed: false
+            role: 'client',
           }
         ])
 
