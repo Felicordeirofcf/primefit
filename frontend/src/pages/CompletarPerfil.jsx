@@ -24,13 +24,13 @@ export default function CompletarPerfil() {
   useEffect(() => {
     if (userProfile) {
       setForm({
-        full_name: userProfile.full_name || '',
-        birth_date: userProfile.birth_date || '',
-        phone: userProfile.phone || '',
-        goal: userProfile.goal || '',
-        height: userProfile.height || '',
-        weight: userProfile.weight || '',
-        health_conditions: userProfile.health_conditions || ''
+        full_name: userProfile.nome || '',
+        birth_date: userProfile.data_nascimento || '',
+        phone: userProfile.telefone || '',
+        goal: userProfile.objetivo || '',
+        height: userProfile.altura ? Math.round(userProfile.altura * 100) : '', // Converter de metros para cm
+        weight: userProfile.peso_inicial || '',
+        health_conditions: '' // Campo não existe na tabela ainda
       });
     }
   }, [userProfile]);

@@ -133,7 +133,7 @@ const ServicesPage = () => {
         {/* Plano Básico */}
         <div className="card p-6 border-t-4 border-gray-400">
           <h3 className="text-xl font-bold mb-2">Plano Básico</h3>
-          <div className="text-3xl font-bold mb-4">R$ 149<span className="text-lg font-normal text-gray-500">/mês</span></div>
+          <div className="text-3xl font-bold mb-4">R$ 100<span className="text-lg font-normal text-gray-500">/mês</span></div>
           <p className="text-gray-600 mb-4">Ideal para quem está começando sua jornada de transformação.</p>
           <ul className="text-gray-600 space-y-2 mb-6">
             <li className="flex items-start">
@@ -162,7 +162,7 @@ const ServicesPage = () => {
         <div className="card p-6 border-t-4 border-primary-600 shadow-lg transform scale-105">
           <div className="absolute top-0 right-0 bg-primary-600 text-white px-3 py-1 text-sm font-semibold rounded-bl-lg">Popular</div>
           <h3 className="text-xl font-bold mb-2">Plano Premium</h3>
-          <div className="text-3xl font-bold mb-4">R$ 249<span className="text-lg font-normal text-gray-500">/mês</span></div>
+          <div className="text-3xl font-bold mb-4">R$ 150<span className="text-lg font-normal text-gray-500">/mês</span></div>
           <p className="text-gray-600 mb-4">Nossa opção mais popular, com acompanhamento completo.</p>
           <ul className="text-gray-600 space-y-2 mb-6">
             <li className="flex items-start">
@@ -202,7 +202,7 @@ const ServicesPage = () => {
         {/* Plano VIP */}
         <div className="card p-6 border-t-4 border-accent-500">
           <h3 className="text-xl font-bold mb-2">Plano VIP</h3>
-          <div className="text-3xl font-bold mb-4">R$ 399<span className="text-lg font-normal text-gray-500">/mês</span></div>
+          <div className="text-3xl font-bold mb-4">R$ 200<span className="text-lg font-normal text-gray-500">/mês</span></div>
           <p className="text-gray-600 mb-4">Acompanhamento exclusivo e personalizado para resultados acelerados.</p>
           <ul className="text-gray-600 space-y-2 mb-6">
             <li className="flex items-start">

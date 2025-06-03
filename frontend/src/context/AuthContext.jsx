@@ -102,7 +102,73 @@ export const AuthProvider = ({ children }) => {
     }
   }
 
-  // Função para criar perfil básico quando não existe
+  // Função para mapear campos do frontend para o backend
+  const mapFieldsToDatabase = (profileData) => {
+    const fieldMapping = {
+      'full_name': 'nome',
+      'birth_date': 'data_nascimento',
+      'phone': 'telefone',
+      'goal': 'objetivo',
+      'height': 'altura',
+      'weight': 'peso_inicial'
+      // 'health_conditions' não existe na tabela, removido por enquanto
+    }
+
+    const mappedData = {}
+    
+    Object.keys(profileData).forEach(key => {
+      const dbField = fieldMapping[key]
+      if (dbField) { // Só mapear campos que existem na tabela
+        let value = profileData[key]
+        
+        // Converter valores numéricos se necessário
+        if ((dbField === 'altura' || dbField === 'peso_inicial') && value) {
+          value = parseFloat(value)
+        }
+        
+        // Converter altura de cm para metros se necessário
+        if (dbField === 'altura' && value > 10) {
+          value = value / 100 // Converter de cm para metros
+        }
+        
+        mappedData[dbField] = value
+      }
+    })
+    
+    return mappedData
+  }
+
+  // Função para mapear campos do backend para o frontend
+  const mapFieldsFromDatabase = (profileData) => {
+    if (!profileData) return {}
+    
+    const fieldMapping = {
+      'nome': 'full_name',
+      'data_nascimento': 'birth_date',
+      'telefone': 'phone',
+      'objetivo': 'goal',
+      'altura': 'height',
+      'peso_inicial': 'weight'
+    }
+
+    const mappedData = {}
+    
+    Object.keys(profileData).forEach(key => {
+      const frontendField = fieldMapping[key]
+      if (frontendField) {
+        let value = profileData[key]
+        
+        // Converter altura de metros para cm para exibição
+        if (key === 'altura' && value) {
+          value = Math.round(value * 100) // Converter de metros para cm
+        }
+        
+        mappedData[frontendField] = value
+      }
+    })
+    
+    return mappedData
+  }
   const createBasicProfile = async (userId) => {
     try {
       const { data: userData } = await supabase.auth.getUser()
@@ -239,13 +305,18 @@ export const AuthProvider = ({ children }) => {
     try {
       setIsLoading(true)
       
-      console.log('Atualizando perfil:', profileData)
+      console.log('Dados originais do formulário:', profileData)
+      
+      // Mapear campos do frontend para o banco de dados
+      const mappedData = mapFieldsToDatabase(profileData)
+      
+      console.log('Dados mapeados para o banco:', mappedData)
 
       // Atualizar dados na tabela profiles
       const { data, error } = await supabase
         .from('profiles')
         .update({ 
-          ...profileData,
+          ...mappedData,
           data_atualizacao: new Date().toISOString()
         })
         .eq('id', user.id)
@@ -257,7 +328,7 @@ export const AuthProvider = ({ children }) => {
         return { success: false, message: error.message }
       }
 
-      console.log('Perfil atualizado:', data)
+      console.log('Perfil atualizado no banco:', data)
       
       // Atualizar o estado local
       setUserProfile(data)
