@@ -8,7 +8,7 @@ const LoginPage = () => {
   const [password, setPassword] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   
-  const { login } = useAuth()
+  const { signIn } = useAuth()  // ✅ Corrigido: usar signIn em vez de login
   const navigate = useNavigate()
   
   const handleSubmit = async (e) => {
@@ -22,13 +22,14 @@ const LoginPage = () => {
     setIsLoading(true)
     
     try {
-      const result = await login(email, password)
+      // ✅ Corrigido: usar signIn e ajustar para o formato correto
+      const { data, error } = await signIn(email, password)
       
-      if (result.success) {
+      if (data && !error) {
         toast.success('Login realizado com sucesso!')
         navigate('/dashboard')
       } else {
-        toast.error(result.message || 'Erro ao fazer login')
+        toast.error(error?.message || 'Erro ao fazer login')
       }
     } catch (error) {
       console.error('Erro ao fazer login:', error)
@@ -171,3 +172,4 @@ const LoginPage = () => {
 }
 
 export default LoginPage
+
