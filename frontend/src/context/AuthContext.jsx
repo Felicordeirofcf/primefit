@@ -16,6 +16,7 @@ export const AuthProvider = ({ children }) => {
   const [userProfile, setUserProfile] = useState(null)
   const [loading, setLoading] = useState(true)
   const [isAdmin, setIsAdmin] = useState(false)
+  const [profileFetched, setProfileFetched] = useState(false) // ✅ Evitar loops
 
   // Propriedades derivadas para compatibilidade com ProtectedRoute
   const isAuthenticated = !!user
@@ -49,11 +50,13 @@ export const AuthProvider = ({ children }) => {
       
       if (event === 'SIGNED_IN' && session?.user) {
         setUser(session.user)
+        setProfileFetched(false) // ✅ Reset flag para novo usuário
         await fetchUserProfile(session.user.id, session.user.email)
       } else if (event === 'SIGNED_OUT') {
         setUser(null)
         setUserProfile(null)
         setIsAdmin(false)
+        setProfileFetched(false) // ✅ Reset flag
       }
       
       setLoading(false)
@@ -65,34 +68,25 @@ export const AuthProvider = ({ children }) => {
   }, [])
 
   const fetchUserProfile = async (userId, userEmail) => {
+    // ✅ CORREÇÃO: Evitar buscar perfil se já foi buscado
+    if (profileFetched) {
+      console.log('Perfil já foi buscado, evitando nova busca')
+      return
+    }
+
     try {
       console.log('Buscando perfil para usuário:', userId)
+      setProfileFetched(true) // ✅ Marcar como buscado ANTES da busca
       
-      // Aumentar timeout para 10 segundos e melhorar tratamento
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Timeout na busca do perfil')), 10000)
-      )
-      
-      const profilePromise = supabase
+      // Buscar perfil diretamente sem timeout para evitar loops
+      const { data: profile, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
         .single()
       
-      const { data: profile, error } = await Promise.race([profilePromise, timeoutPromise])
-      
       if (error) {
-        if (error.message === 'Timeout na busca do perfil') {
-          console.warn('Timeout na busca do perfil - usando dados básicos do usuário')
-          // Criar perfil básico com dados do usuário autenticado
-          const basicProfile = { 
-            id: userId, 
-            email: userEmail, 
-            nome: userEmail?.split('@')[0] || 'Usuário',
-            role: 'cliente'
-          }
-          setUserProfile(basicProfile)
-        } else if (error.code === 'PGRST116') {
+        if (error.code === 'PGRST116') {
           // Perfil não encontrado - criar perfil básico
           console.log('Perfil não encontrado, criando perfil básico')
           const basicProfile = { 
@@ -217,6 +211,7 @@ export const AuthProvider = ({ children }) => {
       setUser(null)
       setUserProfile(null)
       setIsAdmin(false)
+      setProfileFetched(false) // ✅ Reset flag
       
       return { error: null }
     } catch (error) {
@@ -332,7 +327,7 @@ export const AuthProvider = ({ children }) => {
     signOut,
     updateProfile,
     resetPassword,
-    getSessionToken      // ✅ Nova função para obter token
+    getSessionToken      // ✅ Função para obter token
   }
 
   return (

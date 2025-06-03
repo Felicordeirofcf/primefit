@@ -29,22 +29,34 @@ import AdminDashboard from './pages/dashboard/AdminDashboard'
 
 // Componente de proteção de rotas
 const ProtectedRoute = ({ children }) => {
-  const { isAuthenticated, isLoading, isProfileComplete } = useAuth()
+  const { isAuthenticated, loading, userProfile, isAdmin } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   
   useEffect(() => {
-    if (!isLoading) {
+    if (!loading) {
       if (!isAuthenticated) {
         navigate('/login?redirect=' + encodeURIComponent(location.pathname))
-      } else if (!isProfileComplete && location.pathname !== '/completar-perfil') {
-        // Redirecionar para completar perfil se não estiver completo
-        navigate('/completar-perfil')
+      } else {
+        // ✅ CORREÇÃO: Verificar se é admin ou se perfil está completo
+        const isProfileComplete = !!(userProfile?.nome && userProfile?.objetivo)
+        
+        // Se é admin, permitir acesso a qualquer rota do dashboard
+        if (isAdmin) {
+          console.log('Usuário é admin - acesso liberado para:', location.pathname)
+          return // ✅ Admin tem acesso livre
+        }
+        
+        // Se não é admin, verificar se perfil está completo
+        if (!isProfileComplete && location.pathname !== '/completar-perfil') {
+          console.log('Perfil incompleto, redirecionando para completar perfil')
+          navigate('/completar-perfil')
+        }
       }
     }
-  }, [isLoading, isAuthenticated, isProfileComplete, navigate, location.pathname])
+  }, [loading, isAuthenticated, userProfile, isAdmin, navigate, location.pathname])
   
-  if (isLoading) {
+  if (loading) {
     return <div className="flex items-center justify-center min-h-screen">
       <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-600"></div>
     </div>
@@ -54,7 +66,13 @@ const ProtectedRoute = ({ children }) => {
     return null
   }
   
-  // Se o perfil não estiver completo e não estiver na página de completar perfil
+  // ✅ CORREÇÃO: Se é admin, sempre permitir acesso
+  if (isAdmin) {
+    return children
+  }
+  
+  // Se não é admin, verificar se perfil está completo
+  const isProfileComplete = !!(userProfile?.nome && userProfile?.objetivo)
   if (!isProfileComplete && location.pathname !== '/completar-perfil') {
     return null
   }
@@ -104,3 +122,4 @@ function App() {
 }
 
 export default App
+
