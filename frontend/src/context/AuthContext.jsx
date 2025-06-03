@@ -16,7 +16,18 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const getUser = async () => {
       try {
+        setIsLoading(true)
+        
+        // Timeout de segurança para evitar carregamento infinito
+        const timeoutId = setTimeout(() => {
+          console.warn('Timeout na verificação de usuário')
+          setIsLoading(false)
+        }, 10000) // 10 segundos
+        
         const { data, error } = await supabase.auth.getUser()
+        
+        clearTimeout(timeoutId) // Limpar timeout se a operação completar
+        
         if (data?.user && !error) {
           setUser(data.user)
           // Buscar dados do perfil do usuário
@@ -24,11 +35,13 @@ export const AuthProvider = ({ children }) => {
         } else {
           setUser(null)
           setUserProfile(null)
+          setIsProfileComplete(true)
         }
       } catch (error) {
         console.error('Erro ao verificar usuário:', error)
         setUser(null)
         setUserProfile(null)
+        setIsProfileComplete(true)
       } finally {
         setIsLoading(false)
       }
@@ -40,15 +53,21 @@ export const AuthProvider = ({ children }) => {
     const { data: listener } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('Auth state changed:', event, session?.user?.id)
       
-      if (session?.user) {
-        setUser(session.user)
-        await fetchUserProfile(session.user.id)
-      } else {
-        setUser(null)
-        setUserProfile(null)
-        setIsProfileComplete(true)
+      try {
+        if (session?.user) {
+          setUser(session.user)
+          await fetchUserProfile(session.user.id)
+        } else {
+          setUser(null)
+          setUserProfile(null)
+          setIsProfileComplete(true)
+        }
+      } catch (error) {
+        console.error('Erro no listener de auth:', error)
+      } finally {
+        // Sempre definir loading como false após mudança de estado
+        setIsLoading(false)
       }
-      setIsLoading(false)
     })
 
     return () => {
@@ -73,13 +92,13 @@ export const AuthProvider = ({ children }) => {
         // Se o perfil não existe, criar um básico
         if (error.code === 'PGRST116') {
           console.log('Perfil não encontrado, criando perfil básico...')
-          await createBasicProfile(userId)
-          return
+          const newProfile = await createBasicProfile(userId)
+          return newProfile
         }
         
         setUserProfile(null)
         setIsProfileComplete(false)
-        return
+        return null
       }
 
       if (data) {
@@ -93,12 +112,14 @@ export const AuthProvider = ({ children }) => {
         return data
       } else {
         console.log('Nenhum perfil encontrado, criando perfil básico...')
-        await createBasicProfile(userId)
+        const newProfile = await createBasicProfile(userId)
+        return newProfile
       }
     } catch (error) {
       console.error('Erro ao processar perfil:', error.message)
       setUserProfile(null)
       setIsProfileComplete(false)
+      return null
     }
   }
 
