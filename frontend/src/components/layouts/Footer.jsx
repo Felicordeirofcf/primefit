@@ -81,14 +81,14 @@ const Footer = () => {
             <ul className="space-y-2">
               <li className="text-gray-400">
                 <span className="block">Email:</span>
-                <a href="mailto:contato@primefit.com.br" className="hover:text-white transition-colors">
-                  contato@primefit.com.br
+                <a href="mailto:felipecordeirofcf@gmail.com" className="hover:text-white transition-colors">
+                  felipecordeirofcf@gmail.com
                 </a>
               </li>
               <li className="text-gray-400">
                 <span className="block">Telefone:</span>
-                <a href="tel:+5511999999999" className="hover:text-white transition-colors">
-                  (11) 99999-9999
+                <a href="tel:+5521987708652" className="hover:text-white transition-colors">
+                  (21) 98770-8652
                 </a>
               </li>
               <li className="text-gray-400 mt-4">
