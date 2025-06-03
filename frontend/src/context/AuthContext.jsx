@@ -1,3 +1,5 @@
+// src/context/AuthContext.jsx
+
 import React, { createContext, useState, useEffect, useContext } from 'react'
 import { supabase } from '../supabaseClient'
 
@@ -16,32 +18,30 @@ export const AuthProvider = ({ children }) => {
       try {
         setIsLoading(true)
         
-        // Verificar sessão atual primeiro
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-        
-        if (sessionError) {
-          console.error('Erro ao obter sessão:', sessionError)
-          setUser(null)
-          setUserProfile(null)
+        // Timeout de segurança para evitar carregamento infinito
+        const timeoutId = setTimeout(() => {
+          console.warn('Timeout na verificação de usuário')
           setIsLoading(false)
-          return
-        }
-
-        if (session?.user) {
-          console.log('Sessão encontrada para usuário:', session.user.id)
-          setUser(session.user)
-          
-          // Buscar perfil com timeout reduzido e retry
-          await fetchUserProfileWithRetry(session.user.id)
+        }, 10000) // 10 segundos
+        
+        const { data, error } = await supabase.auth.getUser()
+        
+        clearTimeout(timeoutId) // Limpar timeout se a operação completar
+        
+        if (data?.user && !error) {
+          setUser(data.user)
+          // Buscar dados do perfil do usuário
+          await fetchUserProfile(data.user.id)
         } else {
-          console.log('Nenhuma sessão ativa encontrada')
           setUser(null)
           setUserProfile(null)
+          setIsProfileComplete(true)
         }
       } catch (error) {
         console.error('Erro ao verificar usuário:', error)
         setUser(null)
         setUserProfile(null)
+        setIsProfileComplete(true)
       } finally {
         setIsLoading(false)
       }
@@ -50,13 +50,13 @@ export const AuthProvider = ({ children }) => {
     getUser()
 
     // Listener para mudanças de sessão (login/logout)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const { data: listener } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('Auth state changed:', event, session?.user?.id)
       
       try {
         if (session?.user) {
           setUser(session.user)
-          await fetchUserProfileWithRetry(session.user.id)
+          await fetchUserProfile(session.user.id)
         } else {
           setUser(null)
           setUserProfile(null)
@@ -65,71 +65,44 @@ export const AuthProvider = ({ children }) => {
       } catch (error) {
         console.error('Erro no listener de auth:', error)
       } finally {
+        // Sempre definir loading como false após mudança de estado
         setIsLoading(false)
       }
     })
 
     return () => {
-      subscription.unsubscribe()
+      listener.subscription.unsubscribe()
     }
   }, [])
 
-  // Função para buscar perfil com retry e timeout reduzido
-  const fetchUserProfileWithRetry = async (userId, maxRetries = 3) => {
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      try {
-        console.log(`Tentativa ${attempt} de buscar perfil para usuário:`, userId)
-        
-        const profile = await fetchUserProfileSingle(userId)
-        if (profile) {
-          return profile
-        }
-        
-        // Se não encontrou perfil, tentar criar um básico
-        if (attempt === maxRetries) {
-          console.log('Criando perfil básico após todas as tentativas...')
-          return await createBasicProfile(userId)
-        }
-        
-      } catch (error) {
-        console.error(`Erro na tentativa ${attempt}:`, error)
-        
-        if (attempt === maxRetries) {
-          console.error('Todas as tentativas falharam')
-          setUserProfile(null)
-          setIsProfileComplete(false)
-          return null
-        }
-        
-        // Aguardar antes da próxima tentativa
-        await new Promise(resolve => setTimeout(resolve, 1000 * attempt))
-      }
-    }
-  }
-
-  // Função para buscar perfil (versão simplificada)
-  const fetchUserProfileSingle = async (userId) => {
+  // Função para buscar o perfil do usuário
+  const fetchUserProfile = async (userId) => {
     try {
-      // Timeout de 5 segundos para cada tentativa
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Timeout na busca do perfil')), 5000)
-      )
+      console.log('Buscando perfil para usuário:', userId)
       
-      const fetchPromise = supabase
+      const { data, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
-        .maybeSingle()
-      
-      const { data, error } = await Promise.race([fetchPromise, timeoutPromise])
+        .maybeSingle() // Use maybeSingle() ao invés de single() para evitar erro quando não há dados
 
       if (error) {
-        throw error
+        console.error('Erro ao buscar perfil:', error.message)
+        
+        // Se o perfil não existe, criar um básico
+        if (error.code === 'PGRST116') {
+          console.log('Perfil não encontrado, criando perfil básico...')
+          const newProfile = await createBasicProfile(userId)
+          return newProfile
+        }
+        
+        setUserProfile(null)
+        setIsProfileComplete(false)
+        return null
       }
 
       if (data) {
         console.log('Perfil encontrado:', data)
-        console.log('Role do usuário:', data.role)
         setUserProfile(data)
         
         // Verificar se o perfil está completo
@@ -137,55 +110,16 @@ export const AuthProvider = ({ children }) => {
         setIsProfileComplete(isComplete)
         
         return data
+      } else {
+        console.log('Nenhum perfil encontrado, criando perfil básico...')
+        const newProfile = await createBasicProfile(userId)
+        return newProfile
       }
-      
-      return null
     } catch (error) {
-      console.error('Erro ao buscar perfil:', error.message)
-      throw error
-    }
-  }
-
-  // Função para criar perfil básico
-  const createBasicProfile = async (userId) => {
-    try {
-      console.log('Criando perfil básico para usuário:', userId)
-      
-      // Buscar dados do usuário autenticado
-      const { data: userData } = await supabase.auth.getUser()
-      const email = userData?.user?.email || ''
-      const name = userData?.user?.user_metadata?.full_name || ''
-
-      const { data, error } = await supabase
-        .from('profiles')
-        .insert([
-          {
-            id: userId,
-            email: email,
-            nome: name,
-            role: 'cliente',
-            plano_ativo: 'inativo'
-          }
-        ])
-        .select()
-        .single()
-
-      if (error) {
-        console.error('Erro ao criar perfil básico:', error.message)
-        throw error
-      }
-
-      console.log('Perfil básico criado:', data)
-      console.log('Role definido como:', data.role)
-      setUserProfile(data)
-      setIsProfileComplete(data.nome && data.nome.trim() !== '')
-      
-      return data
-    } catch (error) {
-      console.error('Erro ao criar perfil básico:', error.message)
+      console.error('Erro ao processar perfil:', error.message)
       setUserProfile(null)
       setIsProfileComplete(false)
-      throw error
+      return null
     }
   }
 
@@ -198,29 +132,29 @@ export const AuthProvider = ({ children }) => {
       'goal': 'objetivo',
       'height': 'altura',
       'weight': 'peso_inicial'
+      // 'health_conditions' não existe na tabela, removido por enquanto
     }
 
     const mappedData = {}
     
     Object.keys(profileData).forEach(key => {
       const dbField = fieldMapping[key]
-      if (dbField) {
+      if (dbField) { // Só mapear campos que existem na tabela
         let value = profileData[key]
         
+        // Converter valores numéricos se necessário
         if ((dbField === 'altura' || dbField === 'peso_inicial') && value) {
           value = parseFloat(value)
         }
         
-        if (dbField === 'altura' && value && value > 10) {
-          value = value / 100
+        // Converter altura de cm para metros se necessário
+        if (dbField === 'altura' && value > 10) {
+          value = value / 100 // Converter de cm para metros
         }
         
         mappedData[dbField] = value
       }
     })
-
-    console.log('Dados originais do formulário:', profileData)
-    console.log('Dados mapeados para o banco:', mappedData)
     
     return mappedData
   }
@@ -245,17 +179,55 @@ export const AuthProvider = ({ children }) => {
       if (frontendField) {
         let value = profileData[key]
         
-        if (key === 'altura' && value && value < 10) {
-          value = Math.round(value * 100)
+        // Converter altura de metros para cm para exibição
+        if (key === 'altura' && value) {
+          value = Math.round(value * 100) // Converter de metros para cm
         }
         
         mappedData[frontendField] = value
-      } else {
-        mappedData[key] = profileData[key]
       }
     })
-
+    
     return mappedData
+  }
+  const createBasicProfile = async (userId) => {
+    try {
+      const { data: userData } = await supabase.auth.getUser()
+      const email = userData?.user?.email || ''
+      const name = userData?.user?.user_metadata?.name || userData?.user?.user_metadata?.full_name || ''
+
+      console.log('Criando perfil básico para:', { userId, email, name })
+
+      const { data, error } = await supabase
+        .from('profiles')
+        .insert([
+          {
+            id: userId,
+            email: email,
+            nome: name,
+            plano_ativo: 'inativo'
+          }
+        ])
+        .select()
+        .single()
+
+      if (error) {
+        console.error('Erro ao criar perfil básico:', error.message)
+        setUserProfile(null)
+        setIsProfileComplete(false)
+        return
+      }
+
+      console.log('Perfil básico criado:', data)
+      setUserProfile(data)
+      setIsProfileComplete(data.nome && data.nome.trim() !== '')
+      
+      return data
+    } catch (error) {
+      console.error('Erro ao criar perfil básico:', error.message)
+      setUserProfile(null)
+      setIsProfileComplete(false)
+    }
   }
 
   // Função de login
@@ -278,49 +250,115 @@ export const AuthProvider = ({ children }) => {
       }
 
       console.log('Login realizado com sucesso:', data.user.id)
+      setUser(data.user)
       
-      // Buscar perfil do usuário com retry
-      await fetchUserProfileWithRetry(data.user.id)
+      // Buscar perfil do usuário após login
+      const profile = await fetchUserProfile(data.user.id)
       
-      return { success: true, user: data.user }
+      // Verificar se o perfil está completo
+      const profileComplete = profile && profile.nome && profile.nome.trim() !== ''
+      
+      return { 
+        success: true, 
+        profileComplete: profileComplete 
+      }
     } catch (error) {
-      console.error('Erro no login:', error.message)
-      return { success: false, message: 'Erro interno do servidor' }
+      console.error('Erro inesperado no login:', error.message)
+      return { success: false, message: 'Erro ao processar login. Tente novamente.' }
     } finally {
       setIsLoading(false)
     }
   }
 
   // Função de cadastro
-  const register = async (email, password, fullName) => {
+  const register = async (name, email, password) => {
     try {
       setIsLoading(true)
       
+      console.log('Iniciando cadastro:', { name, email })
+
+      // 1. Registrar usuário no Auth do Supabase
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: {
-            full_name: fullName
+            name: name,
+            full_name: name
           }
         }
       })
 
       if (error) {
-        console.error('Erro ao fazer cadastro:', error.message)
+        console.error('Erro ao registrar:', error.message)
         return { success: false, message: error.message }
       }
 
-      if (!data.user) {
-        return { success: false, message: 'Erro ao processar cadastro' }
+      // Verificar se o usuário foi criado corretamente
+      if (!data.user || !data.user.id) {
+        console.error('Erro: Usuário não foi criado corretamente')
+        return { success: false, message: 'Erro ao criar usuário. Tente novamente.' }
       }
 
-      console.log('Cadastro realizado com sucesso:', data.user.id)
-      
-      return { success: true, user: data.user }
+      console.log('Usuário criado no Auth:', data.user.id)
+
+      // 2. O perfil será criado automaticamente pelo trigger ou pela função fetchUserProfile
+      // Não precisamos criar manualmente aqui
+
+      return { 
+        success: true,
+        message: data.user.email_confirmed_at ? 
+          'Cadastro realizado com sucesso!' : 
+          'Cadastro realizado! Verifique seu email para confirmar a conta.'
+      }
     } catch (error) {
-      console.error('Erro no cadastro:', error.message)
-      return { success: false, message: 'Erro interno do servidor' }
+      console.error('Erro inesperado no cadastro:', error)
+      return { success: false, message: 'Erro ao processar cadastro. Tente novamente.' }
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // Função para atualizar o perfil do usuário
+  const updateProfile = async (profileData) => {
+    if (!user) return { success: false, message: 'Usuário não autenticado' }
+
+    try {
+      setIsLoading(true)
+      
+      console.log('Dados originais do formulário:', profileData)
+      
+      // Mapear campos do frontend para o banco de dados
+      const mappedData = mapFieldsToDatabase(profileData)
+      
+      console.log('Dados mapeados para o banco:', mappedData)
+
+      // Atualizar dados na tabela profiles
+      const { data, error } = await supabase
+        .from('profiles')
+        .update({ 
+          ...mappedData,
+          data_atualizacao: new Date().toISOString()
+        })
+        .eq('id', user.id)
+        .select()
+        .single()
+
+      if (error) {
+        console.error('Erro ao atualizar perfil:', error.message)
+        return { success: false, message: error.message }
+      }
+
+      console.log('Perfil atualizado no banco:', data)
+      
+      // Atualizar o estado local
+      setUserProfile(data)
+      setIsProfileComplete(data.nome && data.nome.trim() !== '')
+      
+      return { success: true, data }
+    } catch (error) {
+      console.error('Erro ao processar atualização:', error)
+      return { success: false, message: 'Erro ao processar atualização' }
     } finally {
       setIsLoading(false)
     }
@@ -330,95 +368,35 @@ export const AuthProvider = ({ children }) => {
   const logout = async () => {
     try {
       setIsLoading(true)
-      
-      const { error } = await supabase.auth.signOut()
-      
-      if (error) {
-        console.error('Erro ao fazer logout:', error.message)
-        return { success: false, message: error.message }
-      }
-
+      await supabase.auth.signOut()
       setUser(null)
       setUserProfile(null)
       setIsProfileComplete(true)
       
-      return { success: true }
+      // Limpar tokens do localStorage
+      localStorage.removeItem('access_token')
+      sessionStorage.removeItem('access_token')
+      
+      console.log('Logout realizado com sucesso')
     } catch (error) {
-      console.error('Erro no logout:', error.message)
-      return { success: false, message: 'Erro interno do servidor' }
+      console.error('Erro ao fazer logout:', error)
     } finally {
       setIsLoading(false)
     }
   }
 
-  // Função para atualizar perfil
-  const updateProfile = async (profileData) => {
-    try {
-      if (!user) {
-        throw new Error('Usuário não autenticado')
-      }
-
-      console.log('Atualizando perfil:', profileData)
-      
-      const mappedData = mapFieldsToDatabase(profileData)
-      
-      const { data, error } = await supabase
-        .from('profiles')
-        .update(mappedData)
-        .eq('id', user.id)
-        .select()
-        .single()
-
-      if (error) {
-        console.error('Erro ao atualizar perfil:', error.message)
-        throw error
-      }
-
-      console.log('Perfil atualizado no banco:', data)
-      setUserProfile(data)
-      
-      const isComplete = data && data.nome && data.nome.trim() !== ''
-      setIsProfileComplete(isComplete)
-      
-      return { success: true, profile: data }
-    } catch (error) {
-      console.error('Erro ao atualizar perfil:', error.message)
-      return { success: false, message: error.message }
-    }
-  }
-
-  // Função para verificar se o usuário é admin
-  const isAdmin = () => {
-    console.log('Verificando se é admin. UserProfile:', userProfile)
-    console.log('Role atual:', userProfile?.role)
-    return userProfile?.role === 'admin'
-  }
-
-  // Função para recarregar perfil manualmente
-  const refreshProfile = async () => {
-    if (user) {
-      setIsLoading(true)
-      try {
-        await fetchUserProfileWithRetry(user.id)
-      } finally {
-        setIsLoading(false)
-      }
-    }
-  }
-
+  // Valores do contexto
   const value = {
     user,
     userProfile,
+    isAuthenticated: !!user,
     isLoading,
     isProfileComplete,
     login,
     register,
     logout,
     updateProfile,
-    fetchUserProfile: fetchUserProfileWithRetry,
-    isAdmin,
-    refreshProfile,
-    mapFieldsFromDatabase
+    fetchUserProfile
   }
 
   return (
@@ -428,7 +406,7 @@ export const AuthProvider = ({ children }) => {
   )
 }
 
-// Hook personalizado para usar o contexto
+// Hook customizado para usar o contexto
 export const useAuth = () => {
   const context = useContext(AuthContext)
   if (!context) {
