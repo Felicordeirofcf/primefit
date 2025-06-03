@@ -68,9 +68,9 @@ export const AuthProvider = ({ children }) => {
     try {
       console.log('Buscando perfil para usuário:', userId)
       
-      // Timeout de 3 segundos para evitar travamentos
+      // Aumentar timeout para 10 segundos e melhorar tratamento
       const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Timeout na busca do perfil')), 3000)
+        setTimeout(() => reject(new Error('Timeout na busca do perfil')), 10000)
       )
       
       const profilePromise = supabase
@@ -83,16 +83,28 @@ export const AuthProvider = ({ children }) => {
       
       if (error) {
         if (error.message === 'Timeout na busca do perfil') {
-          console.warn('Timeout na busca do perfil - usando dados básicos')
-          setUserProfile({ 
+          console.warn('Timeout na busca do perfil - usando dados básicos do usuário')
+          // Criar perfil básico com dados do usuário autenticado
+          const basicProfile = { 
             id: userId, 
             email: userEmail, 
             nome: userEmail?.split('@')[0] || 'Usuário',
-            role: 'cliente' 
-          })
+            role: 'cliente'
+          }
+          setUserProfile(basicProfile)
+        } else if (error.code === 'PGRST116') {
+          // Perfil não encontrado - criar perfil básico
+          console.log('Perfil não encontrado, criando perfil básico')
+          const basicProfile = { 
+            id: userId, 
+            email: userEmail, 
+            nome: userEmail?.split('@')[0] || 'Usuário',
+            role: 'cliente'
+          }
+          setUserProfile(basicProfile)
         } else {
           console.error('Erro ao buscar perfil:', error)
-          // Criar perfil básico se não existir
+          // Usar perfil básico em caso de erro
           setUserProfile({ 
             id: userId, 
             email: userEmail, 
@@ -110,6 +122,7 @@ export const AuthProvider = ({ children }) => {
       
     } catch (error) {
       console.error('Erro na busca do perfil:', error)
+      // Sempre criar um perfil básico para evitar loops
       setUserProfile({ 
         id: userId, 
         email: userEmail, 
@@ -284,18 +297,42 @@ export const AuthProvider = ({ children }) => {
     }
   }
 
+  // Função para obter token da sessão atual
+  const getSessionToken = async () => {
+    try {
+      const { data: { session }, error } = await supabase.auth.getSession()
+      
+      if (error) {
+        console.error('Erro ao obter token da sessão:', error)
+        return null
+      }
+      
+      if (session?.access_token) {
+        console.log('Token obtido da sessão Supabase: Token encontrado')
+        return session.access_token
+      } else {
+        console.warn('Nenhum token encontrado na sessão')
+        return null
+      }
+    } catch (error) {
+      console.error('Erro ao buscar token:', error)
+      return null
+    }
+  }
+
   const value = {
     user,
     userProfile,
     loading,
     isAdmin,
-    isAuthenticated,     // ✅ Adicionado para compatibilidade
-    isProfileComplete,   // ✅ Adicionado para compatibilidade
+    isAuthenticated,     // ✅ Para compatibilidade com ProtectedRoute
+    isProfileComplete,   // ✅ Para compatibilidade com ProtectedRoute
     signIn,
     signUp,
     signOut,
     updateProfile,
-    resetPassword
+    resetPassword,
+    getSessionToken      // ✅ Nova função para obter token
   }
 
   return (
