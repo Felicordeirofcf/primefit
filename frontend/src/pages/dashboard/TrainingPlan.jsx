@@ -1,25 +1,31 @@
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '../../hooks/useAuth'
-import axios from 'axios'
-import { toast } from 'react-toastify'
 
 // URL base da API
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
 const TrainingPlan = () => {
-  const { token } = useAuth()
+  const { user } = useAuth()
   const [isLoading, setIsLoading] = useState(true)
-  const [trainingPlans, setTrainingPlans] = useState([])
-  const [selectedPlan, setSelectedPlan] = useState(null)
-  const [selectedDay, setSelectedDay] = useState(null)
+  const [trainings, setTrainings] = useState([])
+  const [selectedTraining, setSelectedTraining] = useState(null)
+  const [showPdfViewer, setShowPdfViewer] = useState(false)
   
   useEffect(() => {
-    const fetchTrainingPlans = async () => {
-      if (!token) return
+    const fetchTrainings = async () => {
+      if (!user) return
       
       setIsLoading(true)
       
       try {
+        // Busca token do localStorage ou sessionStorage
+        const token = localStorage.getItem('access_token') || sessionStorage.getItem('access_token')
+        
+        if (!token) {
+          console.error('Token não encontrado')
+          return
+        }
+        
         // Configuração para requisições autenticadas
         const config = {
           headers: {
@@ -27,236 +33,267 @@ const TrainingPlan = () => {
           }
         }
         
-        // Busca planos de treino
-        const response = await axios.get(`${API_URL}/trainings/plans`, config)
+        // Busca treinos do usuário
+        const response = await fetch(`${API_URL}/trainings/`, config)
         
-        if (response.data && response.data.length > 0) {
-          setTrainingPlans(response.data)
-          setSelectedPlan(response.data[0])
+        if (response.ok) {
+          const data = await response.json()
+          setTrainings(data)
           
-          // Seleciona o primeiro treino do plano
-          if (response.data[0].trainings && response.data[0].trainings.length > 0) {
-            setSelectedDay(response.data[0].trainings[0])
+          // Seleciona o primeiro treino se existir
+          if (data.length > 0) {
+            setSelectedTraining(data[0])
           }
+        } else {
+          console.error('Erro ao buscar treinos:', response.statusText)
         }
       } catch (error) {
-        console.error('Erro ao buscar planos de treino:', error)
-        toast.error('Erro ao carregar planos de treino')
+        console.error('Erro ao buscar treinos:', error)
       } finally {
         setIsLoading(false)
       }
     }
     
-    fetchTrainingPlans()
-  }, [token])
+    fetchTrainings()
+  }, [user])
   
-  const handlePlanChange = (planId) => {
-    const plan = trainingPlans.find(p => p.id === planId)
-    setSelectedPlan(plan)
-    
-    // Seleciona o primeiro treino do plano
-    if (plan && plan.trainings && plan.trainings.length > 0) {
-      setSelectedDay(plan.trainings[0])
-    } else {
-      setSelectedDay(null)
-    }
+  const handleTrainingSelect = (training) => {
+    setSelectedTraining(training)
+    setShowPdfViewer(false)
   }
   
-  const handleDayChange = (trainingId) => {
-    if (selectedPlan && selectedPlan.trainings) {
-      const training = selectedPlan.trainings.find(t => t.id === trainingId)
-      setSelectedDay(training)
-    }
+  const handleViewPdf = () => {
+    setShowPdfViewer(true)
   }
   
-  const handleCompleteWorkout = async () => {
-    if (!token || !selectedDay) return
-    
-    try {
-      // Configuração para requisições autenticadas
-      const config = {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      }
-      
-      // Dados para o registro de treino
-      const trainingLogData = {
-        user_id: selectedPlan.user_id,
-        training_id: selectedDay.id,
-        date: new Date().toISOString(),
-        completed: true,
-        notes: "Treino concluído via dashboard"
-      }
-      
-      // Registra o treino como concluído
-      await axios.post(`${API_URL}/trainings/logs`, trainingLogData, config)
-      
-      toast.success('Treino registrado como concluído!')
-    } catch (error) {
-      console.error('Erro ao registrar treino:', error)
-      toast.error('Erro ao registrar treino')
+  const formatDate = (dateString) => {
+    return new Date(dateString).toLocaleDateString('pt-BR', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    })
+  }
+  
+  const getTrainingTypeLabel = (type) => {
+    const types = {
+      forca: 'Força',
+      cardio: 'Cardio',
+      funcional: 'Funcional',
+      hiit: 'HIIT',
+      yoga: 'Yoga',
+      personalizado: 'Personalizado'
     }
+    return types[type] || 'Não especificado'
+  }
+  
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-600"></div>
+      </div>
+    )
   }
   
   return (
-    <div>
-      <h1 className="text-2xl font-bold mb-6">Meus Treinos</h1>
-      
-      {isLoading ? (
-        <div className="flex justify-center items-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-600"></div>
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h1 className="text-2xl font-bold">Meus Treinos</h1>
+        <div className="text-sm text-gray-500">
+          {trainings.length} treino{trainings.length !== 1 ? 's' : ''} disponível{trainings.length !== 1 ? 'is' : ''}
         </div>
-      ) : (
-        <div className="space-y-6">
-          {trainingPlans.length > 0 ? (
-            <>
-              {/* Seletor de plano de treino */}
-              {trainingPlans.length > 1 && (
-                <div className="card p-6">
-                  <h3 className="text-lg font-semibold mb-4">Selecione o Plano de Treino</h3>
-                  <select 
-                    className="input"
-                    value={selectedPlan?.id || ''}
-                    onChange={(e) => handlePlanChange(e.target.value)}
+      </div>
+      
+      {trainings.length > 0 ? (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Lista de treinos */}
+          <div className="lg:col-span-1">
+            <div className="bg-white rounded-lg shadow-md">
+              <div className="p-4 border-b border-gray-200">
+                <h3 className="text-lg font-semibold">Treinos Disponíveis</h3>
+              </div>
+              <div className="divide-y divide-gray-200">
+                {trainings.map((training) => (
+                  <div
+                    key={training.id}
+                    onClick={() => handleTrainingSelect(training)}
+                    className={`p-4 cursor-pointer transition-colors hover:bg-gray-50 ${
+                      selectedTraining?.id === training.id ? 'bg-blue-50 border-r-4 border-blue-500' : ''
+                    }`}
                   >
-                    {trainingPlans.map(plan => (
-                      <option key={plan.id} value={plan.id}>
-                        {plan.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-              
-              {selectedPlan && (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  {/* Detalhes do plano */}
-                  <div className="md:col-span-1">
-                    <div className="card p-6">
-                      <h3 className="text-lg font-semibold mb-4">Detalhes do Plano</h3>
-                      <div className="space-y-3">
-                        <div>
-                          <p className="text-sm text-gray-500">Nome do Plano</p>
-                          <p className="font-medium">{selectedPlan.name}</p>
-                        </div>
-                        <div>
-                          <p className="text-sm text-gray-500">Descrição</p>
-                          <p>{selectedPlan.description || 'Sem descrição'}</p>
-                        </div>
-                        <div>
-                          <p className="text-sm text-gray-500">Data de Início</p>
-                          <p>{new Date(selectedPlan.start_date).toLocaleDateString('pt-BR')}</p>
-                        </div>
-                        {selectedPlan.end_date && (
-                          <div>
-                            <p className="text-sm text-gray-500">Data de Término</p>
-                            <p>{new Date(selectedPlan.end_date).toLocaleDateString('pt-BR')}</p>
-                          </div>
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <h4 className="font-medium text-gray-900 truncate">
+                          {training.nome_arquivo.replace('.pdf', '')}
+                        </h4>
+                        <p className="text-sm text-gray-500 mt-1">
+                          {formatDate(training.enviado_em)}
+                        </p>
+                        {training.tipo_treino && (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 mt-2">
+                            {getTrainingTypeLabel(training.tipo_treino)}
+                          </span>
                         )}
                       </div>
+                      {training.ativo && (
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                          Ativo
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+          
+          {/* Detalhes do treino selecionado */}
+          <div className="lg:col-span-2">
+            {selectedTraining ? (
+              <div className="bg-white rounded-lg shadow-md">
+                <div className="p-6 border-b border-gray-200">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h3 className="text-xl font-semibold text-gray-900">
+                        {selectedTraining.nome_arquivo.replace('.pdf', '')}
+                      </h3>
+                      <p className="text-sm text-gray-500 mt-1">
+                        Enviado em {formatDate(selectedTraining.enviado_em)}
+                      </p>
+                    </div>
+                    <button
+                      onClick={handleViewPdf}
+                      className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                    >
+                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                      </svg>
+                      Visualizar PDF
+                    </button>
+                  </div>
+                </div>
+                
+                <div className="p-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Informações do treino */}
+                    <div>
+                      <h4 className="text-lg font-medium text-gray-900 mb-4">Informações do Treino</h4>
+                      <dl className="space-y-3">
+                        <div>
+                          <dt className="text-sm font-medium text-gray-500">Tipo de Treino</dt>
+                          <dd className="text-sm text-gray-900">
+                            {selectedTraining.tipo_treino ? getTrainingTypeLabel(selectedTraining.tipo_treino) : 'Não especificado'}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-sm font-medium text-gray-500">Duração</dt>
+                          <dd className="text-sm text-gray-900">
+                            {selectedTraining.duracao_semanas ? `${selectedTraining.duracao_semanas} semanas` : 'Não especificado'}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-sm font-medium text-gray-500">Status</dt>
+                          <dd className="text-sm text-gray-900">
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                              selectedTraining.ativo 
+                                ? 'bg-green-100 text-green-800' 
+                                : 'bg-gray-100 text-gray-800'
+                            }`}>
+                              {selectedTraining.ativo ? 'Ativo' : 'Inativo'}
+                            </span>
+                          </dd>
+                        </div>
+                      </dl>
                     </div>
                     
-                    {/* Seletor de dia de treino */}
-                    {selectedPlan.trainings && selectedPlan.trainings.length > 0 && (
-                      <div className="card p-6 mt-6">
-                        <h3 className="text-lg font-semibold mb-4">Dias de Treino</h3>
-                        <div className="space-y-2">
-                          {selectedPlan.trainings.map(training => (
-                            <button
-                              key={training.id}
-                              onClick={() => handleDayChange(training.id)}
-                              className={`w-full text-left px-4 py-3 rounded-lg transition-colors ${
-                                selectedDay && selectedDay.id === training.id
-                                  ? 'bg-primary-100 text-primary-700'
-                                  : 'hover:bg-gray-100'
-                              }`}
-                            >
-                              {training.name || `Treino ${training.day_of_week || ''}`}
-                            </button>
-                          ))}
+                    {/* Descrição e observações */}
+                    <div>
+                      <h4 className="text-lg font-medium text-gray-900 mb-4">Detalhes</h4>
+                      {selectedTraining.descricao && (
+                        <div className="mb-4">
+                          <dt className="text-sm font-medium text-gray-500 mb-1">Descrição</dt>
+                          <dd className="text-sm text-gray-900">{selectedTraining.descricao}</dd>
                         </div>
-                      </div>
-                    )}
+                      )}
+                      {selectedTraining.observacoes && (
+                        <div>
+                          <dt className="text-sm font-medium text-gray-500 mb-1">Observações</dt>
+                          <dd className="text-sm text-gray-900">{selectedTraining.observacoes}</dd>
+                        </div>
+                      )}
+                      {!selectedTraining.descricao && !selectedTraining.observacoes && (
+                        <p className="text-sm text-gray-500 italic">Nenhuma descrição adicional disponível.</p>
+                      )}
+                    </div>
                   </div>
                   
-                  {/* Detalhes do treino selecionado */}
-                  <div className="md:col-span-2">
-                    {selectedDay ? (
-                      <div className="card p-6">
-                        <div className="flex justify-between items-center mb-6">
-                          <h3 className="text-xl font-semibold">{selectedDay.name || `Treino ${selectedDay.day_of_week || ''}`}</h3>
-                          <button 
-                            onClick={handleCompleteWorkout}
-                            className="btn btn-primary py-2"
+                  {/* Visualizador de PDF */}
+                  {showPdfViewer && selectedTraining.url_pdf && (
+                    <div className="mt-6">
+                      <div className="border border-gray-300 rounded-lg overflow-hidden">
+                        <div className="bg-gray-50 px-4 py-3 border-b border-gray-300 flex justify-between items-center">
+                          <h5 className="text-sm font-medium text-gray-900">Visualização do Treino</h5>
+                          <button
+                            onClick={() => setShowPdfViewer(false)}
+                            className="text-gray-400 hover:text-gray-600"
                           >
-                            Marcar como Concluído
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
                           </button>
                         </div>
-                        
-                        {selectedDay.description && (
-                          <p className="mb-6 text-gray-600">{selectedDay.description}</p>
-                        )}
-                        
-                        {selectedDay.exercise_sets && selectedDay.exercise_sets.length > 0 ? (
-                          <div className="overflow-hidden shadow ring-1 ring-black ring-opacity-5 md:rounded-lg">
-                            <table className="min-w-full divide-y divide-gray-300">
-                              <thead className="bg-gray-50">
-                                <tr>
-                                  <th scope="col" className="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Exercício</th>
-                                  <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Séries</th>
-                                  <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Repetições</th>
-                                  <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Carga</th>
-                                  <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Descanso</th>
-                                </tr>
-                              </thead>
-                              <tbody className="divide-y divide-gray-200 bg-white">
-                                {selectedDay.exercise_sets.map((set, index) => (
-                                  <tr key={index}>
-                                    <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6">
-                                      {set.exercise_id}
-                                    </td>
-                                    <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">{set.sets}</td>
-                                    <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">{set.reps}</td>
-                                    <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                                      {set.weight ? `${set.weight} kg` : '-'}
-                                    </td>
-                                    <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                                      {set.rest_time ? `${set.rest_time}s` : '-'}
-                                    </td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </div>
-                        ) : (
-                          <div className="flex justify-center items-center h-32 bg-gray-50 rounded-lg">
-                            <p className="text-gray-500">Nenhum exercício encontrado para este treino</p>
-                          </div>
-                        )}
-                        
-                        {selectedDay.notes && (
-                          <div className="mt-6">
-                            <h4 className="font-medium mb-2">Observações:</h4>
-                            <p className="text-gray-600">{selectedDay.notes}</p>
-                          </div>
-                        )}
+                        <div className="h-96">
+                          <iframe
+                            src={selectedTraining.url_pdf}
+                            className="w-full h-full"
+                            title="Visualizador de PDF do Treino"
+                          />
+                        </div>
+                        <div className="bg-gray-50 px-4 py-3 border-t border-gray-300">
+                          <a
+                            href={selectedTraining.url_pdf}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center text-sm text-blue-600 hover:text-blue-800"
+                          >
+                            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                            Baixar PDF
+                          </a>
+                        </div>
                       </div>
-                    ) : (
-                      <div className="card p-6 flex justify-center items-center h-64">
-                        <p className="text-gray-500">Selecione um dia de treino para ver os detalhes</p>
-                      </div>
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </div>
-              )}
-            </>
-          ) : (
-            <div className="card p-6 flex flex-col items-center justify-center h-64">
-              <p className="text-gray-500 mb-4">Você ainda não possui planos de treino</p>
-              <button className="btn btn-primary">Solicitar Plano de Treino</button>
-            </div>
-          )}
+              </div>
+            ) : (
+              <div className="bg-white rounded-lg shadow-md p-6 flex flex-col items-center justify-center h-64">
+                <svg className="w-12 h-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <p className="text-gray-500 text-center">
+                  Selecione um treino da lista para ver os detalhes
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      ) : (
+        <div className="bg-white rounded-lg shadow-md p-8 text-center">
+          <svg className="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">Nenhum treino disponível</h3>
+          <p className="text-gray-500 mb-6">
+            Você ainda não possui treinos cadastrados. Entre em contato com nossa equipe para receber seu plano personalizado.
+          </p>
+          <button className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+            </svg>
+            Solicitar Treino
+          </button>
         </div>
       )}
     </div>
@@ -264,3 +301,4 @@ const TrainingPlan = () => {
 }
 
 export default TrainingPlan
+

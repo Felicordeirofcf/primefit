@@ -25,6 +25,7 @@ import Progress from './pages/dashboard/Progress'
 import Assessments from './pages/dashboard/Assessments'
 import Profile from './pages/dashboard/Profile'
 import Messages from './pages/dashboard/Messages'
+import AdminDashboard from './pages/dashboard/AdminDashboard'
 
 // Componente de proteção de rotas
 const ProtectedRoute = ({ children }) => {
@@ -96,6 +97,7 @@ function App() {
         <Route path="avaliacoes" element={<Assessments />} />
         <Route path="perfil" element={<Profile />} />
         <Route path="mensagens" element={<Messages />} />
+        <Route path="admin" element={<AdminDashboard />} />
       </Route>
     </Routes>
   )

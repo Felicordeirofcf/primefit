@@ -1,62 +1,32 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from typing import List, Optional
 
 from src.core.supabase_client import supabase
 from src.api.endpoints.auth import get_current_user
-from src.schemas.training import Exercise, Training, TrainingPlan, TrainingLog
+from src.schemas.models import TreinoCreate, TreinoResponse
 
 router = APIRouter()
 
-# Rotas para exercícios
-@router.post("/exercises", response_model=Exercise)
-async def create_exercise(
-    exercise: Exercise,
+@router.get("/", response_model=List[TreinoResponse])
+async def get_my_trainings(
+    skip: int = 0,
+    limit: int = 100,
+    apenas_ativos: bool = True,
     current_user: dict = Depends(get_current_user)
 ):
-    # Apenas administradores e personal trainers podem criar exercícios
-    if current_user["role"] not in ["admin", "trainer"]:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Sem permissão para criar exercícios"
-        )
-    
+    """Obtém os treinos do usuário autenticado"""
     try:
-        # Prepara dados para inserção
-        exercise_data = exercise.dict(exclude={"id"})
+        query = supabase.table("treinos_enviados").select("*").eq("cliente_id", current_user["id"])
         
-        # Insere exercício no Supabase
-        response = supabase.table("exercises").insert(exercise_data).execute()
+        # Filtro opcional para apenas treinos ativos
+        if apenas_ativos:
+            query = query.eq("ativo", True)
         
-        if not response.data or len(response.data) == 0:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Erro ao criar exercício"
-            )
+        # Ordena por data de envio (mais recente primeiro)
+        query = query.order("enviado_em", desc=True)
         
-        return response.data[0]
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Erro ao criar exercício: {str(e)}"
-        )
-
-@router.get("/exercises", response_model=List[Exercise])
-async def get_exercises(
-    muscle_group: Optional[str] = None,
-    equipment: Optional[str] = None,
-    current_user: dict = Depends(get_current_user)
-):
-    try:
-        query = supabase.table("exercises").select("*")
-        
-        # Aplica filtros se fornecidos
-        if muscle_group:
-            query = query.eq("muscle_group", muscle_group)
-        
-        if equipment:
-            query = query.eq("equipment", equipment)
-        
-        response = query.execute()
+        # Aplica paginação
+        response = query.range(skip, skip + limit).execute()
         
         if not response.data:
             return []
@@ -65,21 +35,76 @@ async def get_exercises(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Erro ao buscar exercícios: {str(e)}"
+            detail=f"Erro ao buscar treinos: {str(e)}"
         )
 
-@router.get("/exercises/{exercise_id}", response_model=Exercise)
-async def get_exercise(
-    exercise_id: str,
+@router.get("/{training_id}", response_model=TreinoResponse)
+async def get_training(
+    training_id: str,
     current_user: dict = Depends(get_current_user)
 ):
+    """Obtém um treino específico"""
     try:
-        response = supabase.table("exercises").select("*").eq("id", exercise_id).execute()
+        response = supabase.table("treinos_enviados").select("*").eq("id", training_id).execute()
         
         if not response.data or len(response.data) == 0:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Exercício não encontrado"
+                detail="Treino não encontrado"
+            )
+        
+        training = response.data[0]
+        
+        # Verifica se o usuário tem permissão para ver este treino
+        if training["cliente_id"] != current_user["id"] and current_user.get("role") != "admin":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Sem permissão para acessar este treino"
+            )
+        
+        return training
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro ao buscar treino: {str(e)}"
+        )
+
+@router.post("/", response_model=TreinoResponse)
+async def create_training(
+    training_data: TreinoCreate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Cria um novo treino (apenas para admins)"""
+    # Verifica se o usuário tem permissão de administrador
+    if current_user.get("role") != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Sem permissão para criar treinos"
+        )
+    
+    try:
+        # Verifica se o cliente existe
+        response = supabase.table("profiles").select("email").eq("id", training_data.cliente_id).execute()
+        
+        if not response.data or len(response.data) == 0:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Cliente não encontrado"
+            )
+        
+        # Prepara dados para inserção
+        training_dict = training_data.dict()
+        training_dict["cliente_email"] = response.data[0]["email"]
+        
+        # Insere treino no Supabase
+        response = supabase.table("treinos_enviados").insert(training_dict).execute()
+        
+        if not response.data or len(response.data) == 0:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Erro ao criar treino"
             )
         
         return response.data[0]
@@ -88,247 +113,124 @@ async def get_exercise(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Erro ao buscar exercício: {str(e)}"
+            detail=f"Erro ao criar treino: {str(e)}"
         )
 
-# Rotas para planos de treino
-@router.post("/plans", response_model=TrainingPlan)
-async def create_training_plan(
-    training_plan: TrainingPlan,
+@router.put("/{training_id}", response_model=TreinoResponse)
+async def update_training(
+    training_id: str,
+    training_update: TreinoCreate,
     current_user: dict = Depends(get_current_user)
 ):
-    # Apenas administradores e personal trainers podem criar planos de treino
-    if current_user["role"] not in ["admin", "trainer"]:
+    """Atualiza um treino (apenas para admins)"""
+    # Verifica se o usuário tem permissão de administrador
+    if current_user.get("role") != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Sem permissão para criar planos de treino"
+            detail="Sem permissão para atualizar treinos"
         )
     
     try:
-        # Prepara dados para inserção
-        plan_data = training_plan.dict(exclude={"id", "trainings"})
-        plan_data["created_by"] = current_user["id"]  # Define o criador como o usuário atual
-        
-        # Insere plano de treino no Supabase
-        response = supabase.table("training_plans").insert(plan_data).execute()
+        # Verifica se o treino existe
+        response = supabase.table("treinos_enviados").select("*").eq("id", training_id).execute()
         
         if not response.data or len(response.data) == 0:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Erro ao criar plano de treino"
-            )
-        
-        plan_id = response.data[0]["id"]
-        
-        # Insere treinos associados ao plano
-        for training in training_plan.trainings:
-            training_data = training.dict(exclude={"id", "exercise_sets"})
-            training_data["plan_id"] = plan_id
-            
-            training_response = supabase.table("trainings").insert(training_data).execute()
-            
-            if not training_response.data or len(training_response.data) == 0:
-                # Rollback: exclui o plano se houver erro ao inserir treinos
-                supabase.table("training_plans").delete().eq("id", plan_id).execute()
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="Erro ao criar treinos do plano"
-                )
-            
-            training_id = training_response.data[0]["id"]
-            
-            # Insere séries de exercícios associadas ao treino
-            for exercise_set in training.exercise_sets:
-                set_data = exercise_set.dict()
-                set_data["training_id"] = training_id
-                
-                set_response = supabase.table("exercise_sets").insert(set_data).execute()
-                
-                if not set_response.data or len(set_response.data) == 0:
-                    # Rollback: exclui o treino e o plano se houver erro ao inserir séries
-                    supabase.table("trainings").delete().eq("id", training_id).execute()
-                    supabase.table("training_plans").delete().eq("id", plan_id).execute()
-                    raise HTTPException(
-                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                        detail="Erro ao criar séries de exercícios"
-                    )
-        
-        # Busca o plano completo com treinos e séries
-        return await get_training_plan(plan_id, current_user)
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Erro ao criar plano de treino: {str(e)}"
-        )
-
-@router.get("/plans", response_model=List[TrainingPlan])
-async def get_training_plans(
-    user_id: Optional[str] = None,
-    current_user: dict = Depends(get_current_user)
-):
-    try:
-        # Se um user_id for fornecido, verifica permissões
-        if user_id:
-            # Usuários comuns só podem ver seus próprios planos
-            if current_user["role"] == "client" and current_user["id"] != user_id:
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Sem permissão para acessar planos de outros usuários"
-                )
-            
-            query = supabase.table("training_plans").select("*").eq("user_id", user_id)
-        else:
-            # Sem user_id, retorna todos os planos (apenas para admin/trainer)
-            if current_user["role"] == "client":
-                # Clientes só veem seus próprios planos
-                query = supabase.table("training_plans").select("*").eq("user_id", current_user["id"])
-            else:
-                # Admin/trainer veem todos ou filtram por created_by
-                query = supabase.table("training_plans").select("*")
-                if current_user["role"] == "trainer":
-                    query = query.eq("created_by", current_user["id"])
-        
-        response = query.execute()
-        
-        if not response.data:
-            return []
-        
-        # Para cada plano, busca os treinos e séries associados
-        plans = []
-        for plan_data in response.data:
-            plan = await get_training_plan(plan_data["id"], current_user)
-            plans.append(plan)
-        
-        return plans
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Erro ao buscar planos de treino: {str(e)}"
-        )
-
-@router.get("/plans/{plan_id}", response_model=TrainingPlan)
-async def get_training_plan(
-    plan_id: str,
-    current_user: dict = Depends(get_current_user)
-):
-    try:
-        # Busca o plano
-        plan_response = supabase.table("training_plans").select("*").eq("id", plan_id).execute()
-        
-        if not plan_response.data or len(plan_response.data) == 0:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Plano de treino não encontrado"
+                detail="Treino não encontrado"
             )
         
-        plan_data = plan_response.data[0]
+        # Prepara dados para atualização
+        update_data = training_update.dict(exclude_unset=True)
         
-        # Verifica permissões
-        if current_user["role"] == "client" and current_user["id"] != plan_data["user_id"]:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Sem permissão para acessar este plano de treino"
-            )
-        
-        # Busca os treinos associados ao plano
-        trainings_response = supabase.table("trainings").select("*").eq("plan_id", plan_id).execute()
-        trainings = trainings_response.data or []
-        
-        # Para cada treino, busca as séries de exercícios
-        for training in trainings:
-            sets_response = supabase.table("exercise_sets").select("*").eq("training_id", training["id"]).execute()
-            training["exercise_sets"] = sets_response.data or []
-        
-        # Monta o objeto completo
-        plan_data["trainings"] = trainings
-        
-        return plan_data
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Erro ao buscar plano de treino: {str(e)}"
-        )
-
-# Rotas para registro de treinos realizados
-@router.post("/logs", response_model=TrainingLog)
-async def log_training(
-    training_log: TrainingLog,
-    current_user: dict = Depends(get_current_user)
-):
-    # Usuários só podem registrar seus próprios treinos
-    if current_user["id"] != training_log.user_id and current_user["role"] not in ["admin", "trainer"]:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Sem permissão para registrar treinos de outros usuários"
-        )
-    
-    try:
-        # Prepara dados para inserção
-        log_data = training_log.dict(exclude={"id"})
-        
-        # Insere registro de treino no Supabase
-        response = supabase.table("training_logs").insert(log_data).execute()
+        # Atualiza treino no Supabase
+        response = supabase.table("treinos_enviados").update(update_data).eq("id", training_id).execute()
         
         if not response.data or len(response.data) == 0:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Erro ao registrar treino"
+                detail="Erro ao atualizar treino"
             )
         
         return response.data[0]
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Erro ao registrar treino: {str(e)}"
+            detail=f"Erro ao atualizar treino: {str(e)}"
         )
 
-@router.get("/logs", response_model=List[TrainingLog])
-async def get_training_logs(
-    user_id: Optional[str] = None,
-    start_date: Optional[str] = None,
-    end_date: Optional[str] = None,
+@router.delete("/{training_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_training(
+    training_id: str,
     current_user: dict = Depends(get_current_user)
 ):
+    """Exclui um treino (apenas para admins)"""
+    # Verifica se o usuário tem permissão de administrador
+    if current_user.get("role") != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Sem permissão para excluir treinos"
+        )
+    
     try:
-        # Define o user_id para filtro
-        filter_user_id = user_id if user_id else current_user["id"]
+        # Verifica se o treino existe
+        response = supabase.table("treinos_enviados").select("*").eq("id", training_id).execute()
         
-        # Usuários comuns só podem ver seus próprios registros
-        if current_user["role"] == "client" and current_user["id"] != filter_user_id:
+        if not response.data or len(response.data) == 0:
             raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Sem permissão para acessar registros de outros usuários"
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Treino não encontrado"
             )
         
-        # Monta a query
-        query = supabase.table("training_logs").select("*").eq("user_id", filter_user_id)
+        # Marca treino como inativo ao invés de excluir
+        response = supabase.table("treinos_enviados").update({"ativo": False}).eq("id", training_id).execute()
         
-        # Aplica filtros de data se fornecidos
-        if start_date:
-            query = query.gte("date", start_date)
+        return None
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro ao excluir treino: {str(e)}"
+        )
+
+@router.get("/admin/all", response_model=List[TreinoResponse])
+async def get_all_trainings(
+    skip: int = 0,
+    limit: int = 100,
+    cliente_id: Optional[str] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """Obtém todos os treinos (apenas para admins)"""
+    # Verifica se o usuário tem permissão de administrador
+    if current_user.get("role") != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Sem permissão para acessar esta funcionalidade"
+        )
+    
+    try:
+        query = supabase.table("treinos_enviados").select("*")
         
-        if end_date:
-            query = query.lte("date", end_date)
+        # Filtro opcional por cliente
+        if cliente_id:
+            query = query.eq("cliente_id", cliente_id)
         
-        # Ordena por data decrescente
-        query = query.order("date", desc=True)
+        # Ordena por data de envio (mais recente primeiro)
+        query = query.order("enviado_em", desc=True)
         
-        response = query.execute()
+        # Aplica paginação
+        response = query.range(skip, skip + limit).execute()
         
         if not response.data:
             return []
         
         return response.data
-    except HTTPException:
-        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Erro ao buscar registros de treino: {str(e)}"
+            detail=f"Erro ao buscar treinos: {str(e)}"
         )
+

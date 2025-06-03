@@ -3,34 +3,54 @@ from typing import List, Optional
 
 from src.core.supabase_client import supabase
 from src.api.endpoints.auth import get_current_user
-from src.schemas.assessment import Assessment, AssessmentCreate, AssessmentResponse
+from src.schemas.models import AvaliacaoCreate, AvaliacaoResponse
 
 router = APIRouter()
 
-@router.post("/", response_model=AssessmentResponse)
-async def create_assessment(
-    assessment: AssessmentCreate,
+@router.get("/", response_model=List[AvaliacaoResponse])
+async def get_my_assessments(
+    skip: int = 0,
+    limit: int = 100,
+    status_filter: Optional[str] = None,
     current_user: dict = Depends(get_current_user)
 ):
-    # Apenas administradores e personal trainers podem criar avaliações
-    if current_user["role"] not in ["admin", "trainer"]:
+    """Obtém as avaliações do usuário autenticado"""
+    try:
+        query = supabase.table("avaliacoes").select("*").eq("usuario_id", current_user["id"])
+        
+        # Filtro opcional por status
+        if status_filter:
+            query = query.eq("status", status_filter)
+        
+        # Ordena por data de criação (mais recente primeiro)
+        query = query.order("data_criacao", desc=True)
+        
+        # Aplica paginação
+        response = query.range(skip, skip + limit).execute()
+        
+        if not response.data:
+            return []
+        
+        return response.data
+    except Exception as e:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Sem permissão para criar avaliações"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro ao buscar avaliações: {str(e)}"
         )
-    
+
+@router.post("/", response_model=AvaliacaoResponse)
+async def create_assessment(
+    assessment_data: AvaliacaoCreate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Cria uma nova avaliação para o usuário autenticado"""
     try:
         # Prepara dados para inserção
-        assessment_data = assessment.dict()
-        assessment_data["trainer_id"] = current_user["id"]  # Define o avaliador como o usuário atual
-        
-        # Calcula o IMC se altura e peso estiverem disponíveis
-        if assessment.height and assessment.weight:
-            height_m = assessment.height / 100  # Converte cm para m
-            assessment_data["bmi"] = round(assessment.weight / (height_m * height_m), 2)
+        assessment_dict = assessment_data.dict()
+        assessment_dict["usuario_id"] = current_user["id"]
         
         # Insere avaliação no Supabase
-        response = supabase.table("assessments").insert(assessment_data).execute()
+        response = supabase.table("avaliacoes").insert(assessment_dict).execute()
         
         if not response.data or len(response.data) == 0:
             raise HTTPException(
@@ -38,64 +58,23 @@ async def create_assessment(
                 detail="Erro ao criar avaliação"
             )
         
-        # Busca a avaliação anterior para calcular mudanças
-        return await enrich_assessment_data(response.data[0])
+        return response.data[0]
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Erro ao criar avaliação: {str(e)}"
         )
 
-@router.get("/", response_model=List[AssessmentResponse])
-async def get_assessments(
-    user_id: Optional[str] = None,
-    current_user: dict = Depends(get_current_user)
-):
-    try:
-        # Define o user_id para filtro
-        filter_user_id = user_id if user_id else current_user["id"]
-        
-        # Usuários comuns só podem ver suas próprias avaliações
-        if current_user["role"] == "client" and current_user["id"] != filter_user_id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Sem permissão para acessar avaliações de outros usuários"
-            )
-        
-        # Monta a query
-        query = supabase.table("assessments").select("*").eq("user_id", filter_user_id)
-        
-        # Ordena por data decrescente
-        query = query.order("date", desc=True)
-        
-        response = query.execute()
-        
-        if not response.data:
-            return []
-        
-        # Enriquece os dados de cada avaliação
-        assessments = []
-        for assessment_data in response.data:
-            enriched_assessment = await enrich_assessment_data(assessment_data)
-            assessments.append(enriched_assessment)
-        
-        return assessments
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Erro ao buscar avaliações: {str(e)}"
-        )
-
-@router.get("/{assessment_id}", response_model=AssessmentResponse)
+@router.get("/{assessment_id}", response_model=AvaliacaoResponse)
 async def get_assessment(
     assessment_id: str,
     current_user: dict = Depends(get_current_user)
 ):
+    """Obtém uma avaliação específica"""
     try:
-        # Busca a avaliação
-        response = supabase.table("assessments").select("*").eq("id", assessment_id).execute()
+        response = supabase.table("avaliacoes").select("*").eq("id", assessment_id).execute()
         
         if not response.data or len(response.data) == 0:
             raise HTTPException(
@@ -103,17 +82,18 @@ async def get_assessment(
                 detail="Avaliação não encontrada"
             )
         
-        assessment_data = response.data[0]
+        assessment = response.data[0]
         
-        # Verifica permissões
-        if current_user["role"] == "client" and current_user["id"] != assessment_data["user_id"]:
+        # Verifica se o usuário tem permissão para ver esta avaliação
+        if (assessment["usuario_id"] != current_user["id"] and 
+            assessment.get("avaliador_id") != current_user["id"] and 
+            current_user.get("role") != "admin"):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Sem permissão para acessar esta avaliação"
             )
         
-        # Enriquece os dados da avaliação
-        return await enrich_assessment_data(assessment_data)
+        return assessment
     except HTTPException:
         raise
     except Exception as e:
@@ -122,13 +102,158 @@ async def get_assessment(
             detail=f"Erro ao buscar avaliação: {str(e)}"
         )
 
+@router.put("/{assessment_id}", response_model=AvaliacaoResponse)
+async def update_assessment(
+    assessment_id: str,
+    assessment_update: AvaliacaoCreate,
+    current_user: dict = Depends(get_current_user)
+):
+    """Atualiza uma avaliação"""
+    try:
+        # Verifica se a avaliação existe
+        response = supabase.table("avaliacoes").select("*").eq("id", assessment_id).execute()
+        
+        if not response.data or len(response.data) == 0:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Avaliação não encontrada"
+            )
+        
+        assessment = response.data[0]
+        
+        # Verifica permissões
+        if (assessment["usuario_id"] != current_user["id"] and 
+            assessment.get("avaliador_id") != current_user["id"] and 
+            current_user.get("role") != "admin"):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Sem permissão para atualizar esta avaliação"
+            )
+        
+        # Prepara dados para atualização
+        update_data = assessment_update.dict(exclude_unset=True)
+        
+        # Atualiza avaliação no Supabase
+        response = supabase.table("avaliacoes").update(update_data).eq("id", assessment_id).execute()
+        
+        if not response.data or len(response.data) == 0:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Erro ao atualizar avaliação"
+            )
+        
+        return response.data[0]
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro ao atualizar avaliação: {str(e)}"
+        )
+
+@router.put("/{assessment_id}/status")
+async def update_assessment_status(
+    assessment_id: str,
+    new_status: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """Atualiza o status de uma avaliação (apenas para avaliadores e admins)"""
+    try:
+        # Verifica se a avaliação existe
+        response = supabase.table("avaliacoes").select("*").eq("id", assessment_id).execute()
+        
+        if not response.data or len(response.data) == 0:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Avaliação não encontrada"
+            )
+        
+        assessment = response.data[0]
+        
+        # Verifica permissões (apenas avaliador ou admin)
+        if (assessment.get("avaliador_id") != current_user["id"] and 
+            current_user.get("role") != "admin"):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Sem permissão para atualizar o status desta avaliação"
+            )
+        
+        # Valida o novo status
+        valid_statuses = ["pendente", "em_andamento", "concluida", "cancelada"]
+        if new_status not in valid_statuses:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Status inválido. Valores aceitos: {', '.join(valid_statuses)}"
+            )
+        
+        # Atualiza status
+        update_data = {"status": new_status}
+        response = supabase.table("avaliacoes").update(update_data).eq("id", assessment_id).execute()
+        
+        if not response.data or len(response.data) == 0:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Erro ao atualizar status da avaliação"
+            )
+        
+        return {"message": "Status atualizado com sucesso", "new_status": new_status}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro ao atualizar status: {str(e)}"
+        )
+
+@router.get("/admin/all", response_model=List[AvaliacaoResponse])
+async def get_all_assessments(
+    skip: int = 0,
+    limit: int = 100,
+    usuario_id: Optional[str] = None,
+    status_filter: Optional[str] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """Obtém todas as avaliações (apenas para admins)"""
+    # Verifica se o usuário tem permissão de administrador
+    if current_user.get("role") != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Sem permissão para acessar esta funcionalidade"
+        )
+    
+    try:
+        query = supabase.table("avaliacoes").select("*")
+        
+        # Filtros opcionais
+        if usuario_id:
+            query = query.eq("usuario_id", usuario_id)
+        if status_filter:
+            query = query.eq("status", status_filter)
+        
+        # Ordena por data de criação (mais recente primeiro)
+        query = query.order("data_criacao", desc=True)
+        
+        # Aplica paginação
+        response = query.range(skip, skip + limit).execute()
+        
+        if not response.data:
+            return []
+        
+        return response.data
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro ao buscar avaliações: {str(e)}"
+        )
+
 @router.delete("/{assessment_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_assessment(
     assessment_id: str,
     current_user: dict = Depends(get_current_user)
 ):
-    # Apenas administradores e personal trainers podem excluir avaliações
-    if current_user["role"] not in ["admin", "trainer"]:
+    """Exclui uma avaliação (apenas para admins)"""
+    # Verifica se o usuário tem permissão de administrador
+    if current_user.get("role") != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Sem permissão para excluir avaliações"
@@ -136,7 +261,7 @@ async def delete_assessment(
     
     try:
         # Verifica se a avaliação existe
-        response = supabase.table("assessments").select("*").eq("id", assessment_id).execute()
+        response = supabase.table("avaliacoes").select("*").eq("id", assessment_id).execute()
         
         if not response.data or len(response.data) == 0:
             raise HTTPException(
@@ -145,7 +270,7 @@ async def delete_assessment(
             )
         
         # Exclui avaliação do Supabase
-        supabase.table("assessments").delete().eq("id", assessment_id).execute()
+        supabase.table("avaliacoes").delete().eq("id", assessment_id).execute()
         
         return None
     except HTTPException:
@@ -156,48 +281,3 @@ async def delete_assessment(
             detail=f"Erro ao excluir avaliação: {str(e)}"
         )
 
-# Função auxiliar para enriquecer os dados da avaliação
-async def enrich_assessment_data(assessment_data: dict) -> dict:
-    try:
-        # Calcula a relação cintura-quadril se disponível
-        if assessment_data.get("waist") and assessment_data.get("hip") and assessment_data["hip"] > 0:
-            assessment_data["waist_hip_ratio"] = round(assessment_data["waist"] / assessment_data["hip"], 2)
-        else:
-            assessment_data["waist_hip_ratio"] = None
-        
-        # Busca a avaliação anterior para calcular mudanças de peso
-        user_id = assessment_data["user_id"]
-        current_date = assessment_data["date"]
-        
-        previous_assessment_response = supabase.table("assessments") \
-            .select("weight") \
-            .eq("user_id", user_id) \
-            .lt("date", current_date) \
-            .order("date", desc=True) \
-            .limit(1) \
-            .execute()
-        
-        if previous_assessment_response.data and len(previous_assessment_response.data) > 0:
-            previous_weight = previous_assessment_response.data[0]["weight"]
-            assessment_data["previous_weight"] = previous_weight
-            
-            # Calcula mudança de peso
-            weight_change = assessment_data["weight"] - previous_weight
-            assessment_data["weight_change"] = round(weight_change, 2)
-            
-            # Calcula percentual de mudança
-            if previous_weight > 0:
-                weight_change_percentage = (weight_change / previous_weight) * 100
-                assessment_data["weight_change_percentage"] = round(weight_change_percentage, 2)
-            else:
-                assessment_data["weight_change_percentage"] = None
-        else:
-            assessment_data["previous_weight"] = None
-            assessment_data["weight_change"] = None
-            assessment_data["weight_change_percentage"] = None
-        
-        return assessment_data
-    except Exception as e:
-        print(f"Erro ao enriquecer dados da avaliação: {e}")
-        # Retorna os dados originais se houver erro
-        return assessment_data

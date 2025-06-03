@@ -1,50 +1,239 @@
-vamos detalhar a pagina de inicio mudar o nome colocar para PRIME FIT CONSULTING. 
-INIICO 
-inclua estes textos 
+# PrimeFit - Sistema de Consultoria Fitness
 
-A <strong>PRIME FIT CONSULTING</strong> é referência em saúde, estética e bem-estar.  
-  Combinamos produtos naturais de alta qualidade com consultorias fitness personalizadas,  
-  integrando tecnologia de ponta via apps como MFIT e Tecnofit.  
-  Nosso objetivo é oferecer uma experiência completa para você atingir seus resultados com eficiência e segurança.
+Sistema completo de consultoria fitness com backend em Python/FastAPI e frontend em React, integrado com Supabase.
 
-  <h2>💼 Nossos Serviços</h2>
-<ul>
-  <li>🌱 Venda de suplementos naturais certificados e aprovados</li>
-  <li>🤝 Consultoria online com personal trainers experientes e credenciados</li>
-  <li>📲 Programas personalizados via aplicativo (MFIT, Tecnofit e similares)</li>
-  <li>🎯 Planos sob medida para emagrecimento, performance e bem-estar</li>
-</ul>
+## 🚀 Funcionalidades
 
-✅ Por que escolher a PRIME FIT CONSULTING?</h2>
-<ul>
-  <li>🏅 Mais de 10.000 clientes satisfeitos em todo o Brasil</li>
-  <li>🧬 Produtos naturais, seguros e com respaldo científico</li>
-  <li>📈 Planos e metas adaptadas ao seu ritmo e objetivo</li>
-  <li>🤖 Tecnologia a seu favor: acompanhamento via app</li>
-  <li>📞 Suporte humano e rápido para tirar dúvidas sempre que precisar</li>
-</ul>
-<p>
-  <strong>Sua saúde merece atenção personalizada.</strong> Com a PRIME FIT CONSULTING, você não está sozinho(a) nessa jornada!
-</p>
+### Para Clientes
+- ✅ **Dashboard Funcional** - Visão geral com estatísticas reais
+- ✅ **Meus Treinos** - Visualização e download de PDFs de treino
+- ✅ **Meu Progresso** - Registro e acompanhamento com gráficos
+- ✅ **Avaliações** - Sistema completo de avaliações físicas
+- ✅ **Mensagens** - Comunicação com a equipe
+- ✅ **Perfil** - Gerenciamento de dados pessoais
 
-<h2>💬 O que nossos clientes dizem:</h2>
+### Para Administradores
+- ✅ **Painel Administrativo** - Estatísticas e análises completas
+- ✅ **Gerenciamento de Usuários** - Visualização e edição de perfis
+- ✅ **Atividades Recentes** - Monitoramento em tempo real
+- ✅ **Analytics** - Gráficos de crescimento e distribuição
 
-<blockquote>
-  <p>“Consegui eliminar 8kg em 2 meses com os produtos da PRIME FIT e ainda ganhei mais disposição no dia a dia!”</p>
-  <footer>— Juliana M., São Paulo - SP</footer>
-</blockquote>
+### Recursos Técnicos
+- ✅ **Autenticação Completa** - Login, registro e recuperação de senha
+- ✅ **Upload de Arquivos** - Sistema de storage para PDFs e imagens
+- ✅ **Gráficos Interativos** - Visualizações com Chart.js
+- ✅ **Responsivo** - Interface adaptada para mobile e desktop
+- ✅ **API RESTful** - Backend completo com documentação automática
 
-<blockquote>
-  <p>“O acompanhamento pelo aplicativo é incrível! Me senti motivado todos os dias.”</p>
-  <footer>— Ricardo T., Belo Horizonte - MG</footer>
-</blockquote>
+## 🛠️ Tecnologias
 
-<blockquote>
-  <p>“Já testei várias coisas antes e nada funcionava. Com a PRIME FIT tive resultado logo nas primeiras semanas.”</p>
-  <footer>— Camila R., Curitiba - PR</footer>
-</blockquote>
+### Backend
+- **FastAPI** - Framework web moderno e rápido
+- **Supabase** - Banco de dados PostgreSQL e autenticação
+- **Pydantic** - Validação de dados
+- **SQLAlchemy** - ORM para banco de dados
+- **Python-JOSE** - Autenticação JWT
 
-quero que inclua tambem modelo saas de uma serie UNICA a R$80 REAIS 
+### Frontend
+- **React** - Biblioteca para interfaces de usuário
+- **React Router** - Roteamento SPA
+- **Chart.js** - Gráficos interativos
+- **Tailwind CSS** - Framework CSS utilitário
+- **Vite** - Build tool moderna
 
-OU CONSULTORIA COMPLETA COM ACOMPANHAMENTO SEMANAL  R$150 REAIS  
- 
+## 📋 Pré-requisitos
+
+- Python 3.11+
+- Node.js 18+
+- Conta no Supabase
+- Git
+
+## 🔧 Instalação
+
+### 1. Clone o repositório
+```bash
+git clone https://github.com/Felicordeirofcf/primefit.git
+cd primefit
+```
+
+### 2. Configuração do Supabase
+
+1. Crie um projeto no [Supabase](https://supabase.com)
+2. Execute o script SQL fornecido em `setup_supabase_primefit.sql`
+3. Configure os buckets de storage conforme o guia
+4. Anote a URL do projeto e as chaves de API
+
+### 3. Configuração do Backend
+
+```bash
+cd backend
+
+# Instalar dependências
+pip install -r requirements.txt
+
+# Configurar variáveis de ambiente
+cp .env.example .env
+# Edite o arquivo .env com suas configurações do Supabase
+```
+
+### 4. Configuração do Frontend
+
+```bash
+cd frontend
+
+# Instalar dependências
+npm install
+
+# Configurar variáveis de ambiente
+cp .env.example .env
+# Edite o arquivo .env com suas configurações
+```
+
+## 🚀 Execução
+
+### Backend
+```bash
+cd backend
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
+```
+
+### Frontend
+```bash
+cd frontend
+npm run dev
+```
+
+## 📊 Configuração do Banco de Dados
+
+### Tabelas Principais
+- **profiles** - Perfis de usuário
+- **treinos_enviados** - Treinos em PDF
+- **progresso** - Registros de evolução
+- **avaliacoes** - Avaliações físicas
+- **mensagens** - Sistema de mensagens
+- **planos** - Planos de assinatura
+- **assinaturas** - Controle de assinaturas
+- **audit_log** - Log de auditoria
+
+### Buckets de Storage
+- **treinos** - Arquivos PDF de treino
+- **fotos-progresso** - Fotos de evolução
+- **avatars** - Fotos de perfil
+
+## 🔐 Autenticação
+
+O sistema utiliza autenticação JWT integrada com Supabase Auth:
+
+- **Registro** - Criação de conta com email/senha
+- **Login** - Autenticação com JWT
+- **Recuperação** - Reset de senha por email
+- **Perfis** - Completar dados após registro
+
+## 📱 Planos de Assinatura
+
+### Série Única - R$ 80,00
+- Treino personalizado em PDF
+- Suporte básico por mensagens
+
+### Consultoria Completa - R$ 150,00
+- Treino personalizado em PDF
+- Acompanhamento de progresso
+- Avaliações físicas
+- Suporte completo por mensagens
+
+## 🎯 Endpoints da API
+
+### Autenticação
+- `POST /auth/register` - Registro de usuário
+- `POST /auth/login` - Login
+- `POST /auth/logout` - Logout
+
+### Usuários
+- `GET /profiles/me` - Perfil do usuário
+- `PUT /profiles/me` - Atualizar perfil
+
+### Treinos
+- `GET /trainings/` - Listar treinos
+- `POST /trainings/` - Criar treino
+- `GET /trainings/{id}` - Detalhes do treino
+
+### Progresso
+- `GET /progress/` - Listar progresso
+- `POST /progress/` - Registrar progresso
+- `GET /progress/stats/summary` - Estatísticas
+
+### Dashboard
+- `GET /dashboard/user-summary` - Resumo do usuário
+- `GET /dashboard/recent-activity` - Atividades recentes
+- `GET /dashboard/quick-stats` - Estatísticas rápidas
+
+### Admin (Apenas Administradores)
+- `GET /admin/stats/overview` - Visão geral
+- `GET /admin/users` - Listar usuários
+- `GET /admin/analytics/users` - Analytics
+
+## 🔧 Configurações Avançadas
+
+### Variáveis de Ambiente - Backend
+```env
+SUPABASE_URL=https://seu-projeto.supabase.co
+SUPABASE_ANON_KEY=sua-chave-anonima
+SUPABASE_SERVICE_ROLE_KEY=sua-chave-service-role
+JWT_SECRET_KEY=sua-chave-jwt-segura
+```
+
+### Variáveis de Ambiente - Frontend
+```env
+VITE_API_URL=http://localhost:8000
+VITE_SUPABASE_URL=https://seu-projeto.supabase.co
+VITE_SUPABASE_ANON_KEY=sua-chave-anonima
+```
+
+## 📚 Documentação da API
+
+Após iniciar o backend, acesse:
+- **Swagger UI**: http://localhost:8000/docs
+- **ReDoc**: http://localhost:8000/redoc
+
+## 🐛 Solução de Problemas
+
+### Erro de CORS
+Verifique se a URL do frontend está configurada no CORS do backend.
+
+### Erro de Autenticação
+Confirme se as chaves do Supabase estão corretas no arquivo .env.
+
+### Erro de Banco de Dados
+Execute o script SQL completo no Supabase e verifique as permissões RLS.
+
+### Erro de Upload
+Verifique se os buckets foram criados e configurados corretamente.
+
+## 🤝 Contribuição
+
+1. Fork o projeto
+2. Crie uma branch para sua feature (`git checkout -b feature/AmazingFeature`)
+3. Commit suas mudanças (`git commit -m 'Add some AmazingFeature'`)
+4. Push para a branch (`git push origin feature/AmazingFeature`)
+5. Abra um Pull Request
+
+## 📄 Licença
+
+Este projeto está sob a licença MIT. Veja o arquivo `LICENSE` para mais detalhes.
+
+## 📞 Suporte
+
+Para suporte técnico ou dúvidas sobre o projeto:
+- Email: suporte@primefit.com.br
+- WhatsApp: (11) 99999-9999
+
+## 🎉 Agradecimentos
+
+- Equipe Supabase pela excelente plataforma
+- Comunidade React e FastAPI
+- Todos os contribuidores do projeto
+
+---
+
+**PrimeFit** - Transformando vidas através do fitness 💪
+

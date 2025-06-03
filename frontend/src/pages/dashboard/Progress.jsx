@@ -1,210 +1,233 @@
 import React, { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
+import { Line } from 'react-chartjs-2'
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+} from 'chart.js'
+
+// Registra os componentes necessários do Chart.js
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend
+)
+
+// URL base da API
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
 const Progress = () => {
   const { user } = useAuth()
-  const [progressData, setProgressData] = useState({
-    weight: [],
-    measurements: {
-      chest: [],
-      waist: [],
-      hips: [],
-      thighs: [],
-      arms: []
-    },
-    bodyFat: []
+  const [isLoading, setIsLoading] = useState(true)
+  const [progressData, setProgressData] = useState([])
+  const [summary, setSummary] = useState(null)
+  const [showAddForm, setShowAddForm] = useState(false)
+  const [formData, setFormData] = useState({
+    peso: '',
+    percentual_gordura: '',
+    massa_muscular: '',
+    circunferencia_cintura: '',
+    circunferencia_quadril: '',
+    circunferencia_braco: '',
+    circunferencia_coxa: '',
+    pressao_arterial_sistolica: '',
+    pressao_arterial_diastolica: '',
+    frequencia_cardiaca_repouso: '',
+    observacoes: '',
+    data_medicao: new Date().toISOString().split('T')[0]
   })
   
-  const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState('weight')
-  
-  // Dados simulados para demonstração
   useEffect(() => {
-    // Simulação de chamada à API
-    setTimeout(() => {
-      const mockData = {
-        weight: [
-          { date: '2025-01-01', value: 85.5 },
-          { date: '2025-01-15', value: 84.2 },
-          { date: '2025-02-01', value: 82.8 },
-          { date: '2025-02-15', value: 81.5 },
-          { date: '2025-03-01', value: 80.3 },
-          { date: '2025-03-15', value: 79.1 },
-          { date: '2025-04-01', value: 78.2 },
-          { date: '2025-04-15', value: 77.5 },
-          { date: '2025-05-01', value: 76.8 },
-          { date: '2025-05-15', value: 76.0 }
-        ],
-        measurements: {
-          chest: [
-            { date: '2025-01-01', value: 105 },
-            { date: '2025-02-01', value: 103 },
-            { date: '2025-03-01', value: 101 },
-            { date: '2025-04-01', value: 99 },
-            { date: '2025-05-01', value: 98 }
-          ],
-          waist: [
-            { date: '2025-01-01', value: 92 },
-            { date: '2025-02-01', value: 90 },
-            { date: '2025-03-01', value: 88 },
-            { date: '2025-04-01', value: 86 },
-            { date: '2025-05-01', value: 84 }
-          ],
-          hips: [
-            { date: '2025-01-01', value: 108 },
-            { date: '2025-02-01', value: 106 },
-            { date: '2025-03-01', value: 104 },
-            { date: '2025-04-01', value: 103 },
-            { date: '2025-05-01', value: 102 }
-          ],
-          thighs: [
-            { date: '2025-01-01', value: 62 },
-            { date: '2025-02-01', value: 61 },
-            { date: '2025-03-01', value: 60 },
-            { date: '2025-04-01', value: 59 },
-            { date: '2025-05-01', value: 58 }
-          ],
-          arms: [
-            { date: '2025-01-01', value: 36 },
-            { date: '2025-02-01', value: 35.5 },
-            { date: '2025-03-01', value: 35 },
-            { date: '2025-04-01', value: 34.5 },
-            { date: '2025-05-01', value: 34 }
-          ]
-        },
-        bodyFat: [
-          { date: '2025-01-01', value: 24.5 },
-          { date: '2025-02-01', value: 23.2 },
-          { date: '2025-03-01', value: 22.1 },
-          { date: '2025-04-01', value: 21.3 },
-          { date: '2025-05-01', value: 20.5 }
-        ]
+    fetchProgressData()
+    fetchProgressSummary()
+  }, [user])
+  
+  const fetchProgressData = async () => {
+    if (!user) return
+    
+    try {
+      const token = localStorage.getItem('access_token') || sessionStorage.getItem('access_token')
+      
+      if (!token) {
+        console.error('Token não encontrado')
+        return
       }
       
-      setProgressData(mockData)
-      setLoading(false)
-    }, 1500)
-  }, [])
-  
-  // Função para formatar data
-  const formatDate = (dateString) => {
-    const date = new Date(dateString)
-    return date.toLocaleDateString('pt-BR')
+      const config = {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      }
+      
+      const response = await fetch(`${API_URL}/progress/`, config)
+      
+      if (response.ok) {
+        const data = await response.json()
+        setProgressData(data)
+      } else {
+        console.error('Erro ao buscar dados de progresso:', response.statusText)
+      }
+    } catch (error) {
+      console.error('Erro ao buscar progresso:', error)
+    } finally {
+      setIsLoading(false)
+    }
   }
   
-  // Função para calcular a diferença entre o primeiro e o último valor
-  const calculateDifference = (dataArray) => {
-    if (!dataArray || dataArray.length < 2) return 0
+  const fetchProgressSummary = async () => {
+    if (!user) return
     
-    const firstValue = dataArray[0].value
-    const lastValue = dataArray[dataArray.length - 1].value
-    
-    return (lastValue - firstValue).toFixed(1)
+    try {
+      const token = localStorage.getItem('access_token') || sessionStorage.getItem('access_token')
+      
+      if (!token) return
+      
+      const config = {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      }
+      
+      const response = await fetch(`${API_URL}/progress/stats/summary`, config)
+      
+      if (response.ok) {
+        const data = await response.json()
+        setSummary(data)
+      }
+    } catch (error) {
+      console.error('Erro ao buscar resumo de progresso:', error)
+    }
   }
   
-  // Função para renderizar o gráfico (simplificada para este exemplo)
-  const renderChart = (data, label, color = 'primary') => {
-    if (!data || data.length === 0) return null
+  const handleSubmit = async (e) => {
+    e.preventDefault()
     
-    // Encontrar valores mínimo e máximo para escala
-    const values = data.map(item => item.value)
-    const minValue = Math.min(...values) * 0.95
-    const maxValue = Math.max(...values) * 1.05
-    const range = maxValue - minValue
-    
-    return (
-      <div className="mt-6">
-        <h3 className="text-lg font-medium mb-4">{label}</h3>
-        <div className="relative h-64 bg-gray-100 rounded-lg p-4">
-          {/* Eixo Y */}
-          <div className="absolute left-0 top-0 bottom-0 w-12 flex flex-col justify-between text-xs text-gray-500 py-2">
-            <span>{maxValue.toFixed(1)}</span>
-            <span>{((maxValue + minValue) / 2).toFixed(1)}</span>
-            <span>{minValue.toFixed(1)}</span>
-          </div>
-          
-          {/* Área do gráfico */}
-          <div className="ml-12 h-full flex items-end">
-            {data.map((item, index) => {
-              const height = ((item.value - minValue) / range) * 100
-              
-              return (
-                <div 
-                  key={index} 
-                  className="flex flex-col items-center justify-end mx-1 flex-1"
-                >
-                  <div 
-                    className={`w-full bg-${color}-600 rounded-t`} 
-                    style={{ height: `${height}%` }}
-                  ></div>
-                  <div className="text-xs text-gray-500 mt-1 transform -rotate-45 origin-top-left">
-                    {formatDate(item.date)}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      </div>
-    )
+    try {
+      const token = localStorage.getItem('access_token') || sessionStorage.getItem('access_token')
+      
+      if (!token) {
+        alert('Token não encontrado')
+        return
+      }
+      
+      // Prepara os dados, convertendo strings vazias para null
+      const submitData = {}
+      Object.keys(formData).forEach(key => {
+        if (formData[key] === '') {
+          submitData[key] = null
+        } else if (key === 'data_medicao' || key === 'observacoes') {
+          submitData[key] = formData[key]
+        } else {
+          submitData[key] = parseFloat(formData[key]) || null
+        }
+      })
+      
+      const response = await fetch(`${API_URL}/progress/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify(submitData)
+      })
+      
+      if (response.ok) {
+        alert('Progresso registrado com sucesso!')
+        setShowAddForm(false)
+        setFormData({
+          peso: '',
+          percentual_gordura: '',
+          massa_muscular: '',
+          circunferencia_cintura: '',
+          circunferencia_quadril: '',
+          circunferencia_braco: '',
+          circunferencia_coxa: '',
+          pressao_arterial_sistolica: '',
+          pressao_arterial_diastolica: '',
+          frequencia_cardiaca_repouso: '',
+          observacoes: '',
+          data_medicao: new Date().toISOString().split('T')[0]
+        })
+        fetchProgressData()
+        fetchProgressSummary()
+      } else {
+        const errorData = await response.json()
+        alert(`Erro ao registrar progresso: ${errorData.detail || 'Erro desconhecido'}`)
+      }
+    } catch (error) {
+      console.error('Erro ao registrar progresso:', error)
+      alert('Erro ao registrar progresso')
+    }
   }
   
-  // Função para renderizar tabela de dados
-  const renderDataTable = (data, label) => {
-    if (!data || data.length === 0) return null
-    
-    return (
-      <div className="mt-6">
-        <h3 className="text-lg font-medium mb-4">{label}</h3>
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Data
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Valor
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Diferença
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {data.map((item, index) => {
-                const prevValue = index > 0 ? data[index - 1].value : item.value
-                const difference = item.value - prevValue
-                
-                return (
-                  <tr key={index}>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {formatDate(item.date)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      {item.value}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">
-                      {index === 0 ? (
-                        '-'
-                      ) : (
-                        <span className={difference < 0 ? 'text-green-600' : 'text-red-600'}>
-                          {difference > 0 ? '+' : ''}{difference.toFixed(1)}
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    )
+  const handleInputChange = (e) => {
+    const { name, value } = e.target
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }))
   }
   
-  if (loading) {
+  // Configuração do gráfico de peso
+  const weightChartData = {
+    labels: progressData.map(data => 
+      new Date(data.data_medicao).toLocaleDateString('pt-BR')
+    ).reverse(),
+    datasets: [
+      {
+        label: 'Peso (kg)',
+        data: progressData.map(data => data.peso).reverse(),
+        borderColor: 'rgb(59, 130, 246)',
+        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+        tension: 0.3,
+        fill: true
+      }
+    ]
+  }
+  
+  // Configuração do gráfico de percentual de gordura
+  const bodyFatChartData = {
+    labels: progressData.map(data => 
+      new Date(data.data_medicao).toLocaleDateString('pt-BR')
+    ).reverse(),
+    datasets: [
+      {
+        label: 'Percentual de Gordura (%)',
+        data: progressData.map(data => data.percentual_gordura).reverse(),
+        borderColor: 'rgb(239, 68, 68)',
+        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+        tension: 0.3,
+        fill: true
+      }
+    ]
+  }
+  
+  const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: 'top',
+      }
+    },
+    scales: {
+      y: {
+        beginAtZero: false
+      }
+    }
+  }
+  
+  if (isLoading) {
     return (
       <div className="flex justify-center items-center h-64">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-600"></div>
@@ -213,174 +236,295 @@ const Progress = () => {
   }
   
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="flex justify-between items-center mb-6">
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">Meu Progresso</h1>
-        <button className="btn btn-primary">Registrar Medidas</button>
+        <button
+          onClick={() => setShowAddForm(true)}
+          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+        >
+          <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+          </svg>
+          Registrar Progresso
+        </button>
       </div>
       
-      {/* Resumo */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div className="card p-6">
-          <h3 className="text-lg font-medium mb-2">Peso</h3>
-          <div className="flex items-end">
-            <div className="text-3xl font-bold">
-              {progressData.weight[progressData.weight.length - 1]?.value} kg
-            </div>
-            <div className="ml-2 text-sm">
-              <span className={calculateDifference(progressData.weight) < 0 ? 'text-green-600' : 'text-red-600'}>
-                {calculateDifference(progressData.weight) > 0 ? '+' : ''}
-                {calculateDifference(progressData.weight)} kg
-              </span>
-            </div>
-          </div>
-          <p className="text-gray-500 text-sm mt-1">Desde o início</p>
-        </div>
-        
-        <div className="card p-6">
-          <h3 className="text-lg font-medium mb-2">Cintura</h3>
-          <div className="flex items-end">
-            <div className="text-3xl font-bold">
-              {progressData.measurements.waist[progressData.measurements.waist.length - 1]?.value} cm
-            </div>
-            <div className="ml-2 text-sm">
-              <span className={calculateDifference(progressData.measurements.waist) < 0 ? 'text-green-600' : 'text-red-600'}>
-                {calculateDifference(progressData.measurements.waist) > 0 ? '+' : ''}
-                {calculateDifference(progressData.measurements.waist)} cm
-              </span>
-            </div>
-          </div>
-          <p className="text-gray-500 text-sm mt-1">Desde o início</p>
-        </div>
-        
-        <div className="card p-6">
-          <h3 className="text-lg font-medium mb-2">% de Gordura</h3>
-          <div className="flex items-end">
-            <div className="text-3xl font-bold">
-              {progressData.bodyFat[progressData.bodyFat.length - 1]?.value}%
-            </div>
-            <div className="ml-2 text-sm">
-              <span className={calculateDifference(progressData.bodyFat) < 0 ? 'text-green-600' : 'text-red-600'}>
-                {calculateDifference(progressData.bodyFat) > 0 ? '+' : ''}
-                {calculateDifference(progressData.bodyFat)}%
-              </span>
-            </div>
-          </div>
-          <p className="text-gray-500 text-sm mt-1">Desde o início</p>
-        </div>
-      </div>
-      
-      {/* Tabs */}
-      <div className="mb-6">
-        <div className="border-b border-gray-200">
-          <nav className="-mb-px flex space-x-8">
-            <button
-              onClick={() => setActiveTab('weight')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'weight'
-                  ? 'border-primary-600 text-primary-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              Peso
-            </button>
-            <button
-              onClick={() => setActiveTab('measurements')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'measurements'
-                  ? 'border-primary-600 text-primary-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              Medidas
-            </button>
-            <button
-              onClick={() => setActiveTab('bodyFat')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'bodyFat'
-                  ? 'border-primary-600 text-primary-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              % de Gordura
-            </button>
-            <button
-              onClick={() => setActiveTab('photos')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'photos'
-                  ? 'border-primary-600 text-primary-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              Fotos
-            </button>
-          </nav>
-        </div>
-      </div>
-      
-      {/* Conteúdo da tab */}
-      <div>
-        {activeTab === 'weight' && (
-          <div>
-            {renderChart(progressData.weight, 'Evolução do Peso (kg)', 'primary')}
-            {renderDataTable(progressData.weight, 'Histórico de Peso')}
-          </div>
-        )}
-        
-        {activeTab === 'measurements' && (
-          <div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {renderChart(progressData.measurements.chest, 'Tórax (cm)', 'blue')}
-              {renderChart(progressData.measurements.waist, 'Cintura (cm)', 'green')}
-              {renderChart(progressData.measurements.hips, 'Quadril (cm)', 'yellow')}
-              {renderChart(progressData.measurements.thighs, 'Coxas (cm)', 'purple')}
-              {renderChart(progressData.measurements.arms, 'Braços (cm)', 'pink')}
-            </div>
-          </div>
-        )}
-        
-        {activeTab === 'bodyFat' && (
-          <div>
-            {renderChart(progressData.bodyFat, 'Evolução do Percentual de Gordura (%)', 'accent')}
-            {renderDataTable(progressData.bodyFat, 'Histórico de Percentual de Gordura')}
-          </div>
-        )}
-        
-        {activeTab === 'photos' && (
-          <div>
-            <div className="text-center py-12">
-              <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
-              <h3 className="mt-2 text-sm font-medium text-gray-900">Nenhuma foto ainda</h3>
-              <p className="mt-1 text-sm text-gray-500">
-                Comece a registrar seu progresso visual.
-              </p>
-              <div className="mt-6">
-                <button className="btn btn-primary">
-                  Adicionar Fotos
-                </button>
+      {/* Resumo estatístico */}
+      {summary && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="bg-white p-6 rounded-lg shadow-md">
+            <div className="flex items-center">
+              <div className="p-3 bg-blue-100 rounded-full">
+                <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600">Total de Medições</p>
+                <p className="text-2xl font-bold text-gray-900">{summary.total_medicoes}</p>
               </div>
             </div>
           </div>
+          
+          <div className="bg-white p-6 rounded-lg shadow-md">
+            <div className="flex items-center">
+              <div className="p-3 bg-green-100 rounded-full">
+                <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                </svg>
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600">Evolução de Peso</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {summary.evolucao_peso !== null 
+                    ? `${summary.evolucao_peso > 0 ? '+' : ''}${summary.evolucao_peso}kg`
+                    : 'N/A'}
+                </p>
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-white p-6 rounded-lg shadow-md">
+            <div className="flex items-center">
+              <div className="p-3 bg-purple-100 rounded-full">
+                <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                </svg>
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600">Peso Atual</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {summary.peso_atual ? `${summary.peso_atual}kg` : 'N/A'}
+                </p>
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-white p-6 rounded-lg shadow-md">
+            <div className="flex items-center">
+              <div className="p-3 bg-red-100 rounded-full">
+                <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600">Gordura Atual</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {summary.gordura_atual ? `${summary.gordura_atual}%` : 'N/A'}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Gráficos */}
+      {progressData.length > 0 && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="bg-white p-6 rounded-lg shadow-md">
+            <h3 className="text-lg font-semibold mb-4">Evolução do Peso</h3>
+            <div className="h-64">
+              <Line data={weightChartData} options={chartOptions} />
+            </div>
+          </div>
+          
+          <div className="bg-white p-6 rounded-lg shadow-md">
+            <h3 className="text-lg font-semibold mb-4">Percentual de Gordura</h3>
+            <div className="h-64">
+              <Line data={bodyFatChartData} options={chartOptions} />
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Histórico de medições */}
+      <div className="bg-white rounded-lg shadow-md">
+        <div className="p-6 border-b border-gray-200">
+          <h3 className="text-lg font-semibold">Histórico de Medições</h3>
+        </div>
+        {progressData.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Data</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Peso</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">% Gordura</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Massa Muscular</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cintura</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Observações</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {progressData.map((entry) => (
+                  <tr key={entry.id}>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {new Date(entry.data_medicao).toLocaleDateString('pt-BR')}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {entry.peso ? `${entry.peso} kg` : '-'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {entry.percentual_gordura ? `${entry.percentual_gordura}%` : '-'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {entry.massa_muscular ? `${entry.massa_muscular} kg` : '-'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {entry.circunferencia_cintura ? `${entry.circunferencia_cintura} cm` : '-'}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">
+                      {entry.observacoes || '-'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="p-6 text-center">
+            <svg className="w-12 h-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+            <p className="text-gray-500">Nenhum registro de progresso encontrado</p>
+            <p className="text-sm text-gray-400 mt-1">Clique em "Registrar Progresso" para começar</p>
+          </div>
         )}
       </div>
       
-      {/* Dicas */}
-      <div className="mt-12">
-        <div className="bg-blue-50 p-6 rounded-lg">
-          <h3 className="text-lg font-medium text-blue-800 mb-2">Dicas para acompanhar seu progresso</h3>
-          <ul className="list-disc pl-5 text-blue-700 space-y-1">
-            <li>Registre seu peso sempre no mesmo horário, preferencialmente pela manhã</li>
-            <li>Tire suas medidas sempre nos mesmos pontos do corpo</li>
-            <li>Tire fotos de progresso a cada 4 semanas, usando a mesma iluminação e posição</li>
-            <li>Lembre-se que a composição corporal é mais importante que o peso na balança</li>
-            <li>Celebre pequenas vitórias ao longo do caminho!</li>
-          </ul>
+      {/* Modal de adicionar progresso */}
+      {showAddForm && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-5 border w-11/12 md:w-3/4 lg:w-1/2 shadow-lg rounded-md bg-white">
+            <div className="mt-3">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-medium text-gray-900">Registrar Novo Progresso</h3>
+                <button
+                  onClick={() => setShowAddForm(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Data da Medição</label>
+                    <input
+                      type="date"
+                      name="data_medicao"
+                      value={formData.data_medicao}
+                      onChange={handleInputChange}
+                      className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                      required
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Peso (kg)</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      name="peso"
+                      value={formData.peso}
+                      onChange={handleInputChange}
+                      className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Ex: 70.5"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Percentual de Gordura (%)</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      name="percentual_gordura"
+                      value={formData.percentual_gordura}
+                      onChange={handleInputChange}
+                      className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Ex: 15.2"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Massa Muscular (kg)</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      name="massa_muscular"
+                      value={formData.massa_muscular}
+                      onChange={handleInputChange}
+                      className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Ex: 45.3"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Circunferência da Cintura (cm)</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      name="circunferencia_cintura"
+                      value={formData.circunferencia_cintura}
+                      onChange={handleInputChange}
+                      className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Ex: 85.0"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Circunferência do Quadril (cm)</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      name="circunferencia_quadril"
+                      value={formData.circunferencia_quadril}
+                      onChange={handleInputChange}
+                      className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Ex: 95.0"
+                    />
+                  </div>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Observações</label>
+                  <textarea
+                    name="observacoes"
+                    value={formData.observacoes}
+                    onChange={handleInputChange}
+                    rows={3}
+                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Observações sobre esta medição..."
+                  />
+                </div>
+                
+                <div className="flex justify-end space-x-3 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => setShowAddForm(false)}
+                    className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                  >
+                    Registrar
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   )
 }
 
 export default Progress
+

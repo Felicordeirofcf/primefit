@@ -1,128 +1,180 @@
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '../../hooks/useAuth'
 
+// URL base da API
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+
 const Assessments = () => {
   const { user } = useAuth()
+  const [isLoading, setIsLoading] = useState(true)
   const [assessments, setAssessments] = useState([])
-  const [loading, setLoading] = useState(true)
+  const [activeTab, setActiveTab] = useState('list')
+  const [showCreateForm, setShowCreateForm] = useState(false)
   const [selectedAssessment, setSelectedAssessment] = useState(null)
+  const [formData, setFormData] = useState({
+    tipo_avaliacao: 'inicial',
+    restricoes_medicas: '',
+    medicamentos_uso: '',
+    lesoes_anteriores: '',
+    experiencia_exercicio: '',
+    disponibilidade_treino: '',
+    local_treino: '',
+    equipamentos_disponiveis: [],
+    objetivos_especificos: '',
+    expectativas: '',
+    data_avaliacao: new Date().toISOString().split('T')[0]
+  })
   
-  // Dados simulados para demonstração
   useEffect(() => {
-    // Simulação de chamada à API
-    setTimeout(() => {
-      const mockAssessments = [
-        {
-          id: 1,
-          date: '2025-05-01',
-          type: 'Completa',
-          trainer: 'Ricardo Oliveira',
-          metrics: {
-            weight: 76.0,
-            height: 175,
-            bmi: 24.8,
-            bodyFat: 20.5,
-            muscleMass: 58.2,
-            restingMetabolism: 1720,
-            visceralFat: 8
-          },
-          measurements: {
-            chest: 98,
-            waist: 84,
-            abdomen: 86,
-            hips: 102,
-            rightArm: 34,
-            leftArm: 33.5,
-            rightThigh: 58,
-            leftThigh: 57.5,
-            rightCalf: 38,
-            leftCalf: 38
-          },
-          notes: "Boa evolução desde a última avaliação. Redução significativa na circunferência da cintura e percentual de gordura. Recomenda-se manter o plano atual com pequenos ajustes no treino de força para focar em hipertrofia dos membros superiores."
-        },
-        {
-          id: 2,
-          date: '2025-04-01',
-          type: 'Completa',
-          trainer: 'Ricardo Oliveira',
-          metrics: {
-            weight: 78.2,
-            height: 175,
-            bmi: 25.5,
-            bodyFat: 21.3,
-            muscleMass: 57.8,
-            restingMetabolism: 1710,
-            visceralFat: 9
-          },
-          measurements: {
-            chest: 99,
-            waist: 86,
-            abdomen: 88,
-            hips: 103,
-            rightArm: 33.5,
-            leftArm: 33,
-            rightThigh: 59,
-            leftThigh: 58.5,
-            rightCalf: 38,
-            leftCalf: 38
-          },
-          notes: "Progresso consistente. Redução de gordura corporal e aumento de massa muscular dentro do esperado. Recomenda-se aumentar a intensidade do treino cardiovascular para acelerar a perda de gordura."
-        },
-        {
-          id: 3,
-          date: '2025-03-01',
-          type: 'Completa',
-          trainer: 'Ricardo Oliveira',
-          metrics: {
-            weight: 80.3,
-            height: 175,
-            bmi: 26.2,
-            bodyFat: 22.1,
-            muscleMass: 57.5,
-            restingMetabolism: 1700,
-            visceralFat: 9
-          },
-          measurements: {
-            chest: 101,
-            waist: 88,
-            abdomen: 90,
-            hips: 104,
-            rightArm: 33,
-            leftArm: 32.5,
-            rightThigh: 60,
-            leftThigh: 59.5,
-            rightCalf: 38.5,
-            leftCalf: 38.5
-          },
-          notes: "Bom progresso inicial. Cliente demonstra boa adaptação ao plano de treinos e alimentação. Recomenda-se manter o plano atual e reavaliar em 4 semanas."
-        }
-      ]
-      
-      setAssessments(mockAssessments)
-      setSelectedAssessment(mockAssessments[0])
-      setLoading(false)
-    }, 1500)
-  }, [])
+    fetchAssessments()
+  }, [user])
   
-  // Função para formatar data
-  const formatDate = (dateString) => {
-    const date = new Date(dateString)
-    return date.toLocaleDateString('pt-BR')
-  }
-  
-  // Função para calcular a diferença entre duas avaliações
-  const calculateDifference = (current, previous, metric) => {
-    if (!current || !previous) return null
+  const fetchAssessments = async () => {
+    if (!user) return
     
-    const diff = current[metric] - previous[metric]
-    return {
-      value: Math.abs(diff).toFixed(1),
-      isPositive: diff > 0,
-      isNegative: diff < 0
+    setIsLoading(true)
+    
+    try {
+      const token = localStorage.getItem('access_token') || sessionStorage.getItem('access_token')
+      
+      if (!token) {
+        console.error('Token não encontrado')
+        return
+      }
+      
+      const config = {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      }
+      
+      const response = await fetch(`${API_URL}/assessments/`, config)
+      
+      if (response.ok) {
+        const data = await response.json()
+        setAssessments(data)
+      } else {
+        console.error('Erro ao buscar avaliações:', response.statusText)
+      }
+    } catch (error) {
+      console.error('Erro ao buscar avaliações:', error)
+    } finally {
+      setIsLoading(false)
     }
   }
   
-  if (loading) {
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    
+    try {
+      const token = localStorage.getItem('access_token') || sessionStorage.getItem('access_token')
+      
+      if (!token) {
+        alert('Token não encontrado')
+        return
+      }
+      
+      const response = await fetch(`${API_URL}/assessments/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify(formData)
+      })
+      
+      if (response.ok) {
+        alert('Avaliação criada com sucesso!')
+        setShowCreateForm(false)
+        setFormData({
+          tipo_avaliacao: 'inicial',
+          restricoes_medicas: '',
+          medicamentos_uso: '',
+          lesoes_anteriores: '',
+          experiencia_exercicio: '',
+          disponibilidade_treino: '',
+          local_treino: '',
+          equipamentos_disponiveis: [],
+          objetivos_especificos: '',
+          expectativas: '',
+          data_avaliacao: new Date().toISOString().split('T')[0]
+        })
+        fetchAssessments()
+      } else {
+        const errorData = await response.json()
+        alert(`Erro ao criar avaliação: ${errorData.detail || 'Erro desconhecido'}`)
+      }
+    } catch (error) {
+      console.error('Erro ao criar avaliação:', error)
+      alert('Erro ao criar avaliação')
+    }
+  }
+  
+  const handleInputChange = (e) => {
+    const { name, value, type, checked } = e.target
+    
+    if (type === 'checkbox') {
+      if (name === 'equipamentos_disponiveis') {
+        setFormData(prev => ({
+          ...prev,
+          equipamentos_disponiveis: checked
+            ? [...prev.equipamentos_disponiveis, value]
+            : prev.equipamentos_disponiveis.filter(item => item !== value)
+        }))
+      }
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        [name]: value
+      }))
+    }
+  }
+  
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'pendente':
+        return 'bg-yellow-100 text-yellow-800'
+      case 'em_andamento':
+        return 'bg-blue-100 text-blue-800'
+      case 'concluida':
+        return 'bg-green-100 text-green-800'
+      case 'cancelada':
+        return 'bg-red-100 text-red-800'
+      default:
+        return 'bg-gray-100 text-gray-800'
+    }
+  }
+  
+  const getStatusLabel = (status) => {
+    switch (status) {
+      case 'pendente':
+        return 'Pendente'
+      case 'em_andamento':
+        return 'Em Andamento'
+      case 'concluida':
+        return 'Concluída'
+      case 'cancelada':
+        return 'Cancelada'
+      default:
+        return 'Desconhecido'
+    }
+  }
+  
+  const equipmentOptions = [
+    'Halteres',
+    'Barras',
+    'Anilhas',
+    'Elásticos',
+    'Kettlebells',
+    'Bola de Pilates',
+    'Colchonete',
+    'Banco',
+    'Barra Fixa',
+    'Esteira',
+    'Bicicleta Ergométrica'
+  ]
+  
+  if (isLoading) {
     return (
       <div className="flex justify-center items-center h-64">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-600"></div>
@@ -131,269 +183,347 @@ const Assessments = () => {
   }
   
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Minhas Avaliações</h1>
-        <button className="btn btn-primary">Solicitar Nova Avaliação</button>
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h1 className="text-2xl font-bold">Avaliações</h1>
+        <button
+          onClick={() => setShowCreateForm(true)}
+          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+        >
+          <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+          </svg>
+          Nova Avaliação
+        </button>
       </div>
       
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Lista de avaliações */}
-        <div className="lg:col-span-1">
-          <div className="card p-4">
-            <h2 className="text-lg font-medium mb-4">Histórico</h2>
-            <div className="space-y-2">
-              {assessments.map(assessment => (
-                <button
-                  key={assessment.id}
-                  onClick={() => setSelectedAssessment(assessment)}
-                  className={`w-full text-left p-3 rounded-lg transition ${
-                    selectedAssessment?.id === assessment.id
-                      ? 'bg-primary-100 text-primary-800'
-                      : 'hover:bg-gray-100'
-                  }`}
-                >
-                  <div className="font-medium">{formatDate(assessment.date)}</div>
-                  <div className="text-sm text-gray-500">
-                    Avaliação {assessment.type} • {assessment.trainer}
+      {/* Abas */}
+      <div className="border-b border-gray-200">
+        <nav className="-mb-px flex space-x-8">
+          <button
+            onClick={() => setActiveTab('list')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+              activeTab === 'list'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            Minhas Avaliações
+          </button>
+          <button
+            onClick={() => setActiveTab('history')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+              activeTab === 'history'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            Histórico
+          </button>
+        </nav>
+      </div>
+      
+      {/* Conteúdo das abas */}
+      {activeTab === 'list' && (
+        <div className="space-y-4">
+          {assessments.length > 0 ? (
+            assessments.map((assessment) => (
+              <div key={assessment.id} className="bg-white rounded-lg shadow-md p-6">
+                <div className="flex justify-between items-start">
+                  <div className="flex-1">
+                    <div className="flex items-center space-x-3">
+                      <h3 className="text-lg font-semibold text-gray-900">
+                        Avaliação {assessment.tipo_avaliacao}
+                      </h3>
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(assessment.status)}`}>
+                        {getStatusLabel(assessment.status)}
+                      </span>
+                    </div>
+                    <p className="text-sm text-gray-500 mt-1">
+                      Criada em {new Date(assessment.data_criacao).toLocaleDateString('pt-BR')}
+                    </p>
+                    {assessment.data_avaliacao && (
+                      <p className="text-sm text-gray-500">
+                        Data da avaliação: {new Date(assessment.data_avaliacao).toLocaleDateString('pt-BR')}
+                      </p>
+                    )}
                   </div>
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-        
-        {/* Detalhes da avaliação selecionada */}
-        <div className="lg:col-span-3">
-          {selectedAssessment ? (
-            <div className="card p-6">
-              <div className="flex justify-between items-start mb-6">
-                <div>
-                  <h2 className="text-xl font-bold">Avaliação de {formatDate(selectedAssessment.date)}</h2>
-                  <p className="text-gray-500">Realizada por {selectedAssessment.trainer}</p>
-                </div>
-                <div className="flex space-x-2">
-                  <button className="btn btn-outline btn-sm">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                    </svg>
-                    Exportar PDF
+                  <button
+                    onClick={() => setSelectedAssessment(assessment)}
+                    className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                  >
+                    Ver Detalhes
                   </button>
                 </div>
-              </div>
-              
-              {/* Métricas principais */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-                <div className="card p-4 bg-gray-50">
-                  <div className="text-sm text-gray-500 mb-1">Peso</div>
-                  <div className="text-xl font-bold">{selectedAssessment.metrics.weight} kg</div>
-                  {assessments[1] && (
-                    <div className="text-xs mt-1">
-                      {calculateDifference(selectedAssessment.metrics, assessments[1].metrics, 'weight').isNegative ? (
-                        <span className="text-green-600">
-                          ↓ {calculateDifference(selectedAssessment.metrics, assessments[1].metrics, 'weight').value} kg
-                        </span>
-                      ) : (
-                        <span className="text-red-600">
-                          ↑ {calculateDifference(selectedAssessment.metrics, assessments[1].metrics, 'weight').value} kg
-                        </span>
-                      )}
-                    </div>
-                  )}
-                </div>
                 
-                <div className="card p-4 bg-gray-50">
-                  <div className="text-sm text-gray-500 mb-1">IMC</div>
-                  <div className="text-xl font-bold">{selectedAssessment.metrics.bmi}</div>
-                  {assessments[1] && (
-                    <div className="text-xs mt-1">
-                      {calculateDifference(selectedAssessment.metrics, assessments[1].metrics, 'bmi').isNegative ? (
-                        <span className="text-green-600">
-                          ↓ {calculateDifference(selectedAssessment.metrics, assessments[1].metrics, 'bmi').value}
-                        </span>
-                      ) : (
-                        <span className="text-red-600">
-                          ↑ {calculateDifference(selectedAssessment.metrics, assessments[1].metrics, 'bmi').value}
-                        </span>
-                      )}
-                    </div>
-                  )}
-                </div>
-                
-                <div className="card p-4 bg-gray-50">
-                  <div className="text-sm text-gray-500 mb-1">% Gordura</div>
-                  <div className="text-xl font-bold">{selectedAssessment.metrics.bodyFat}%</div>
-                  {assessments[1] && (
-                    <div className="text-xs mt-1">
-                      {calculateDifference(selectedAssessment.metrics, assessments[1].metrics, 'bodyFat').isNegative ? (
-                        <span className="text-green-600">
-                          ↓ {calculateDifference(selectedAssessment.metrics, assessments[1].metrics, 'bodyFat').value}%
-                        </span>
-                      ) : (
-                        <span className="text-red-600">
-                          ↑ {calculateDifference(selectedAssessment.metrics, assessments[1].metrics, 'bodyFat').value}%
-                        </span>
-                      )}
-                    </div>
-                  )}
-                </div>
-                
-                <div className="card p-4 bg-gray-50">
-                  <div className="text-sm text-gray-500 mb-1">Massa Muscular</div>
-                  <div className="text-xl font-bold">{selectedAssessment.metrics.muscleMass} kg</div>
-                  {assessments[1] && (
-                    <div className="text-xs mt-1">
-                      {calculateDifference(selectedAssessment.metrics, assessments[1].metrics, 'muscleMass').isPositive ? (
-                        <span className="text-green-600">
-                          ↑ {calculateDifference(selectedAssessment.metrics, assessments[1].metrics, 'muscleMass').value} kg
-                        </span>
-                      ) : (
-                        <span className="text-red-600">
-                          ↓ {calculateDifference(selectedAssessment.metrics, assessments[1].metrics, 'muscleMass').value} kg
-                        </span>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-              
-              {/* Tabs para diferentes seções */}
-              <div className="mb-6">
-                <div className="border-b border-gray-200">
-                  <nav className="-mb-px flex space-x-8">
-                    <button className="py-4 px-1 border-b-2 border-primary-600 text-primary-600 font-medium text-sm">
-                      Detalhes
-                    </button>
-                    <button className="py-4 px-1 border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 font-medium text-sm">
-                      Comparar
-                    </button>
-                  </nav>
-                </div>
-              </div>
-              
-              {/* Métricas detalhadas */}
-              <div className="mb-8">
-                <h3 className="text-lg font-medium mb-4">Métricas Detalhadas</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <table className="min-w-full">
-                      <tbody className="divide-y divide-gray-200">
-                        <tr>
-                          <td className="py-2 text-sm text-gray-500">Altura</td>
-                          <td className="py-2 text-sm font-medium text-right">{selectedAssessment.metrics.height} cm</td>
-                        </tr>
-                        <tr>
-                          <td className="py-2 text-sm text-gray-500">Peso</td>
-                          <td className="py-2 text-sm font-medium text-right">{selectedAssessment.metrics.weight} kg</td>
-                        </tr>
-                        <tr>
-                          <td className="py-2 text-sm text-gray-500">IMC</td>
-                          <td className="py-2 text-sm font-medium text-right">{selectedAssessment.metrics.bmi}</td>
-                        </tr>
-                        <tr>
-                          <td className="py-2 text-sm text-gray-500">% de Gordura</td>
-                          <td className="py-2 text-sm font-medium text-right">{selectedAssessment.metrics.bodyFat}%</td>
-                        </tr>
-                      </tbody>
-                    </table>
+                {assessment.objetivos_especificos && (
+                  <div className="mt-4">
+                    <p className="text-sm text-gray-600">
+                      <span className="font-medium">Objetivos:</span> {assessment.objetivos_especificos}
+                    </p>
                   </div>
-                  <div>
-                    <table className="min-w-full">
-                      <tbody className="divide-y divide-gray-200">
-                        <tr>
-                          <td className="py-2 text-sm text-gray-500">Massa Muscular</td>
-                          <td className="py-2 text-sm font-medium text-right">{selectedAssessment.metrics.muscleMass} kg</td>
-                        </tr>
-                        <tr>
-                          <td className="py-2 text-sm text-gray-500">Metabolismo Basal</td>
-                          <td className="py-2 text-sm font-medium text-right">{selectedAssessment.metrics.restingMetabolism} kcal</td>
-                        </tr>
-                        <tr>
-                          <td className="py-2 text-sm text-gray-500">Gordura Visceral</td>
-                          <td className="py-2 text-sm font-medium text-right">Nível {selectedAssessment.metrics.visceralFat}</td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
+                )}
               </div>
-              
-              {/* Medidas */}
-              <div className="mb-8">
-                <h3 className="text-lg font-medium mb-4">Medidas Corporais</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <table className="min-w-full">
-                      <tbody className="divide-y divide-gray-200">
-                        <tr>
-                          <td className="py-2 text-sm text-gray-500">Tórax</td>
-                          <td className="py-2 text-sm font-medium text-right">{selectedAssessment.measurements.chest} cm</td>
-                        </tr>
-                        <tr>
-                          <td className="py-2 text-sm text-gray-500">Cintura</td>
-                          <td className="py-2 text-sm font-medium text-right">{selectedAssessment.measurements.waist} cm</td>
-                        </tr>
-                        <tr>
-                          <td className="py-2 text-sm text-gray-500">Abdômen</td>
-                          <td className="py-2 text-sm font-medium text-right">{selectedAssessment.measurements.abdomen} cm</td>
-                        </tr>
-                        <tr>
-                          <td className="py-2 text-sm text-gray-500">Quadril</td>
-                          <td className="py-2 text-sm font-medium text-right">{selectedAssessment.measurements.hips} cm</td>
-                        </tr>
-                        <tr>
-                          <td className="py-2 text-sm text-gray-500">Braço Direito</td>
-                          <td className="py-2 text-sm font-medium text-right">{selectedAssessment.measurements.rightArm} cm</td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                  <div>
-                    <table className="min-w-full">
-                      <tbody className="divide-y divide-gray-200">
-                        <tr>
-                          <td className="py-2 text-sm text-gray-500">Braço Esquerdo</td>
-                          <td className="py-2 text-sm font-medium text-right">{selectedAssessment.measurements.leftArm} cm</td>
-                        </tr>
-                        <tr>
-                          <td className="py-2 text-sm text-gray-500">Coxa Direita</td>
-                          <td className="py-2 text-sm font-medium text-right">{selectedAssessment.measurements.rightThigh} cm</td>
-                        </tr>
-                        <tr>
-                          <td className="py-2 text-sm text-gray-500">Coxa Esquerda</td>
-                          <td className="py-2 text-sm font-medium text-right">{selectedAssessment.measurements.leftThigh} cm</td>
-                        </tr>
-                        <tr>
-                          <td className="py-2 text-sm text-gray-500">Panturrilha Direita</td>
-                          <td className="py-2 text-sm font-medium text-right">{selectedAssessment.measurements.rightCalf} cm</td>
-                        </tr>
-                        <tr>
-                          <td className="py-2 text-sm text-gray-500">Panturrilha Esquerda</td>
-                          <td className="py-2 text-sm font-medium text-right">{selectedAssessment.measurements.leftCalf} cm</td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Observações */}
-              <div>
-                <h3 className="text-lg font-medium mb-4">Observações do Profissional</h3>
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <p className="text-gray-700">{selectedAssessment.notes}</p>
-                </div>
-              </div>
-            </div>
+            ))
           ) : (
-            <div className="card p-6 text-center">
-              <p className="text-gray-500">Selecione uma avaliação para visualizar os detalhes.</p>
+            <div className="bg-white rounded-lg shadow-md p-8 text-center">
+              <svg className="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">Nenhuma avaliação encontrada</h3>
+              <p className="text-gray-500 mb-6">
+                Você ainda não possui avaliações. Crie sua primeira avaliação para começar.
+              </p>
+              <button
+                onClick={() => setShowCreateForm(true)}
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
+              >
+                Criar Primeira Avaliação
+              </button>
             </div>
           )}
         </div>
-      </div>
+      )}
+      
+      {activeTab === 'history' && (
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <h3 className="text-lg font-semibold mb-4">Histórico de Avaliações</h3>
+          {assessments.filter(a => a.status === 'concluida').length > 0 ? (
+            <div className="space-y-4">
+              {assessments
+                .filter(a => a.status === 'concluida')
+                .map((assessment) => (
+                  <div key={assessment.id} className="border-l-4 border-green-400 pl-4">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <h4 className="font-medium">Avaliação {assessment.tipo_avaliacao}</h4>
+                        <p className="text-sm text-gray-500">
+                          Concluída em {new Date(assessment.data_atualizacao).toLocaleDateString('pt-BR')}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => setSelectedAssessment(assessment)}
+                        className="text-blue-600 hover:text-blue-800 text-sm"
+                      >
+                        Ver Detalhes
+                      </button>
+                    </div>
+                  </div>
+                ))}
+            </div>
+          ) : (
+            <p className="text-gray-500 text-center py-8">Nenhuma avaliação concluída ainda.</p>
+          )}
+        </div>
+      )}
+      
+      {/* Modal de detalhes da avaliação */}
+      {selectedAssessment && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-5 border w-11/12 md:w-3/4 lg:w-1/2 shadow-lg rounded-md bg-white">
+            <div className="mt-3">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-medium text-gray-900">
+                  Detalhes da Avaliação {selectedAssessment.tipo_avaliacao}
+                </h3>
+                <button
+                  onClick={() => setSelectedAssessment(null)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Status</label>
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(selectedAssessment.status)}`}>
+                      {getStatusLabel(selectedAssessment.status)}
+                    </span>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Data da Avaliação</label>
+                    <p className="text-sm text-gray-900">
+                      {selectedAssessment.data_avaliacao 
+                        ? new Date(selectedAssessment.data_avaliacao).toLocaleDateString('pt-BR')
+                        : 'Não definida'}
+                    </p>
+                  </div>
+                </div>
+                
+                {selectedAssessment.restricoes_medicas && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Restrições Médicas</label>
+                    <p className="text-sm text-gray-900">{selectedAssessment.restricoes_medicas}</p>
+                  </div>
+                )}
+                
+                {selectedAssessment.experiencia_exercicio && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Experiência com Exercícios</label>
+                    <p className="text-sm text-gray-900">{selectedAssessment.experiencia_exercicio}</p>
+                  </div>
+                )}
+                
+                {selectedAssessment.objetivos_especificos && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Objetivos Específicos</label>
+                    <p className="text-sm text-gray-900">{selectedAssessment.objetivos_especificos}</p>
+                  </div>
+                )}
+                
+                {selectedAssessment.expectativas && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Expectativas</label>
+                    <p className="text-sm text-gray-900">{selectedAssessment.expectativas}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Modal de criar avaliação */}
+      {showCreateForm && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-5 border w-11/12 md:w-3/4 lg:w-2/3 shadow-lg rounded-md bg-white">
+            <div className="mt-3">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-medium text-gray-900">Nova Avaliação</h3>
+                <button
+                  onClick={() => setShowCreateForm(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Tipo de Avaliação</label>
+                    <select
+                      name="tipo_avaliacao"
+                      value={formData.tipo_avaliacao}
+                      onChange={handleInputChange}
+                      className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                      required
+                    >
+                      <option value="inicial">Inicial</option>
+                      <option value="reavaliacao">Reavaliação</option>
+                      <option value="final">Final</option>
+                    </select>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Data da Avaliação</label>
+                    <input
+                      type="date"
+                      name="data_avaliacao"
+                      value={formData.data_avaliacao}
+                      onChange={handleInputChange}
+                      className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Restrições Médicas</label>
+                  <textarea
+                    name="restricoes_medicas"
+                    value={formData.restricoes_medicas}
+                    onChange={handleInputChange}
+                    rows={3}
+                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Descreva qualquer restrição médica ou condição de saúde..."
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Experiência com Exercícios</label>
+                  <textarea
+                    name="experiencia_exercicio"
+                    value={formData.experiencia_exercicio}
+                    onChange={handleInputChange}
+                    rows={3}
+                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Descreva sua experiência anterior com exercícios..."
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Objetivos Específicos</label>
+                  <textarea
+                    name="objetivos_especificos"
+                    value={formData.objetivos_especificos}
+                    onChange={handleInputChange}
+                    rows={3}
+                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Quais são seus objetivos com o treinamento?"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Equipamentos Disponíveis</label>
+                  <div className="mt-2 grid grid-cols-2 md:grid-cols-3 gap-2">
+                    {equipmentOptions.map((equipment) => (
+                      <label key={equipment} className="flex items-center">
+                        <input
+                          type="checkbox"
+                          name="equipamentos_disponiveis"
+                          value={equipment}
+                          checked={formData.equipamentos_disponiveis.includes(equipment)}
+                          onChange={handleInputChange}
+                          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                        />
+                        <span className="ml-2 text-sm text-gray-700">{equipment}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Expectativas</label>
+                  <textarea
+                    name="expectativas"
+                    value={formData.expectativas}
+                    onChange={handleInputChange}
+                    rows={3}
+                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="O que você espera alcançar com este programa?"
+                  />
+                </div>
+                
+                <div className="flex justify-end space-x-3 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateForm(false)}
+                    className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                  >
+                    Criar Avaliação
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
 
 export default Assessments
+
