@@ -3,9 +3,6 @@ import { useAuth } from '../../hooks/useAuth'
 import { supabase } from '../../supabaseClient'
 import { EvolutionChart, ComparisonChart, DistributionChart, StatCard } from '../../components/charts/ChartComponents'
 
-// URL base da API
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
-
 const AdminDashboard = () => {
   const { user, userProfile } = useAuth()
   const [isLoading, setIsLoading] = useState(true)
@@ -100,69 +97,62 @@ const AdminDashboard = () => {
     }
   }, [activeTab, usersPagination.page, searchTerm])
   
-  const getAuthToken = async () => {
-    try {
-      // Tentar obter token da sessão do Supabase
-      const { data: { session }, error } = await supabase.auth.getSession()
-      
-      if (error) {
-        console.error('Erro ao obter sessão:', error)
-        return null
-      }
-      
-      if (session?.access_token) {
-        return session.access_token
-      }
-      
-      // Fallback para localStorage/sessionStorage
-      return localStorage.getItem('access_token') || sessionStorage.getItem('access_token')
-    } catch (error) {
-      console.error('Erro ao obter token:', error)
-      return null
-    }
-  }
-  
   const fetchOverview = async () => {
     try {
-      const token = await getAuthToken()
+      console.log('Carregando overview administrativo usando Supabase')
       
-      if (!token) {
-        console.warn('Token não encontrado - usando dados mock')
-        setAdminData(prev => ({ 
-          ...prev, 
-          overview: {
-            total_users: 156,
-            active_users: 89,
-            user_growth_rate: 12.5,
-            active_subscriptions: 67,
-            total_revenue: 13450.00
-          }
-        }))
-        return
-      }
+      // Buscar estatísticas reais do Supabase
+      let totalUsers = 0
+      let activeUsers = 0
+      let activeSubscriptions = 0
       
-      const response = await fetch(`${API_URL}/admin/stats/overview`, {
-        headers: {
-          Authorization: `Bearer ${token}`
+      // Total de usuários
+      try {
+        const { count, error: usersError } = await supabase
+          .from('profiles')
+          .select('*', { count: 'exact', head: true })
+        
+        if (!usersError) {
+          totalUsers = count || 0
         }
-      })
-      
-      if (response.ok) {
-        const data = await response.json()
-        setAdminData(prev => ({ ...prev, overview: data }))
-      } else {
-        console.log('API não disponível, usando dados mock')
-        setAdminData(prev => ({ 
-          ...prev, 
-          overview: {
-            total_users: 156,
-            active_users: 89,
-            user_growth_rate: 12.5,
-            active_subscriptions: 67,
-            total_revenue: 13450.00
-          }
-        }))
+      } catch (error) {
+        console.log('Erro ao buscar total de usuários:', error)
       }
+      
+      // Usuários ativos (com perfil completo)
+      try {
+        const { count, error: activeError } = await supabase
+          .from('profiles')
+          .select('*', { count: 'exact', head: true })
+          .not('nome', 'is', null)
+          .not('objetivo', 'is', null)
+        
+        if (!activeError) {
+          activeUsers = count || 0
+        }
+      } catch (error) {
+        console.log('Erro ao buscar usuários ativos:', error)
+      }
+      
+      // Assinaturas ativas (mock por enquanto)
+      activeSubscriptions = Math.floor(activeUsers * 0.75) // 75% dos usuários ativos
+      
+      // Receita total (mock baseado nas assinaturas)
+      const totalRevenue = activeSubscriptions * 197.00
+      
+      setAdminData(prev => ({ 
+        ...prev, 
+        overview: {
+          total_users: totalUsers,
+          active_users: activeUsers,
+          user_growth_rate: 12.5, // Mock
+          active_subscriptions: activeSubscriptions,
+          total_revenue: totalRevenue
+        }
+      }))
+      
+      console.log('Overview carregado:', { totalUsers, activeUsers, activeSubscriptions, totalRevenue })
+      
     } catch (error) {
       console.error('Erro ao buscar overview:', error)
       // Usar dados mock em caso de erro
@@ -181,82 +171,42 @@ const AdminDashboard = () => {
   
   const fetchUsers = async () => {
     try {
-      const token = await getAuthToken()
+      console.log('Carregando usuários do Supabase')
       
-      if (!token) {
-        console.warn('Token não encontrado - usando dados mock')
-        setAdminData(prev => ({ 
-          ...prev, 
-          users: [
-            {
-              id: '1',
-              nome: 'Felipe Cordeiro Ferreira',
-              email: 'felpcordeirofcf@gmail.com',
-              role: 'admin',
-              created_at: new Date().toISOString()
-            },
-            {
-              id: '2',
-              nome: 'Cliente Exemplo',
-              email: 'cliente@exemplo.com',
-              role: 'cliente',
-              created_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
-            }
-          ]
-        }))
-        setUsersPagination({
-          page: 1,
-          limit: 20,
-          total: 2,
-          pages: 1
-        })
-        setIsLoading(false)
-        return
-      }
+      let query = supabase
+        .from('profiles')
+        .select('*')
+        .order('created_at', { ascending: false })
       
-      const params = new URLSearchParams({
-        page: usersPagination.page.toString(),
-        limit: usersPagination.limit.toString()
-      })
-      
+      // Aplicar filtro de busca se existir
       if (searchTerm) {
-        params.append('search', searchTerm)
+        query = query.or(`nome.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%`)
       }
       
-      const response = await fetch(`${API_URL}/admin/users?${params}`, {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      })
+      // Aplicar paginação
+      const from = (usersPagination.page - 1) * usersPagination.limit
+      const to = from + usersPagination.limit - 1
       
-      if (response.ok) {
-        const data = await response.json()
-        setAdminData(prev => ({ ...prev, users: data.users }))
-        setUsersPagination(data.pagination)
-      } else {
-        console.log('API não disponível, usando dados mock')
-        setAdminData(prev => ({ 
-          ...prev, 
-          users: [
-            {
-              id: '1',
-              nome: 'Felipe Cordeiro Ferreira',
-              email: 'felpcordeirofcf@gmail.com',
-              role: 'admin',
-              created_at: new Date().toISOString()
-            },
-            {
-              id: '2',
-              nome: 'Cliente Exemplo',
-              email: 'cliente@exemplo.com',
-              role: 'cliente',
-              created_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
-            }
-          ]
-        }))
+      const { data: users, error, count } = await query
+        .range(from, to)
+        .select('*', { count: 'exact' })
+      
+      if (error) {
+        throw error
       }
+      
+      setAdminData(prev => ({ ...prev, users: users || [] }))
+      setUsersPagination(prev => ({
+        ...prev,
+        total: count || 0,
+        pages: Math.ceil((count || 0) / prev.limit)
+      }))
+      
+      console.log('Usuários carregados:', users?.length || 0)
+      
     } catch (error) {
       console.error('Erro ao buscar usuários:', error)
+      // Usar dados mock em caso de erro
       setAdminData(prev => ({ 
         ...prev, 
         users: [
@@ -266,9 +216,22 @@ const AdminDashboard = () => {
             email: 'felpcordeirofcf@gmail.com',
             role: 'admin',
             created_at: new Date().toISOString()
+          },
+          {
+            id: '2',
+            nome: 'Cliente Exemplo',
+            email: 'cliente@exemplo.com',
+            role: 'cliente',
+            created_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
           }
         ]
       }))
+      setUsersPagination({
+        page: 1,
+        limit: 20,
+        total: 2,
+        pages: 1
+      })
     } finally {
       setIsLoading(false)
     }
@@ -276,57 +239,33 @@ const AdminDashboard = () => {
   
   const fetchRecentActivity = async () => {
     try {
-      const token = await getAuthToken()
+      console.log('Carregando atividades recentes')
       
-      if (!token) {
-        setAdminData(prev => ({ 
-          ...prev, 
-          recentActivity: [
-            {
-              type: 'new_user',
-              title: 'Novo usuário cadastrado',
-              description: 'Felipe Cordeiro Ferreira se cadastrou na plataforma',
-              date: new Date().toISOString()
-            },
-            {
-              type: 'training_sent',
-              title: 'Treino enviado',
-              description: 'Treino personalizado enviado para cliente',
-              date: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()
-            },
-            {
-              type: 'progress_logged',
-              title: 'Progresso registrado',
-              description: 'Cliente registrou evolução de peso',
-              date: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString()
-            }
-          ]
-        }))
-        return
-      }
+      // Por enquanto usar dados mock, mas pode ser expandido para buscar do Supabase
+      setAdminData(prev => ({ 
+        ...prev, 
+        recentActivity: [
+          {
+            type: 'new_user',
+            title: 'Novo usuário cadastrado',
+            description: 'Felipe Cordeiro Ferreira se cadastrou na plataforma',
+            date: new Date().toISOString()
+          },
+          {
+            type: 'profile_updated',
+            title: 'Perfil atualizado',
+            description: 'Usuário completou informações do perfil',
+            date: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()
+          },
+          {
+            type: 'admin_access',
+            title: 'Acesso administrativo',
+            description: 'Admin acessou o painel de controle',
+            date: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString()
+          }
+        ]
+      }))
       
-      const response = await fetch(`${API_URL}/admin/recent-activity?limit=20`, {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      })
-      
-      if (response.ok) {
-        const data = await response.json()
-        setAdminData(prev => ({ ...prev, recentActivity: data }))
-      } else {
-        setAdminData(prev => ({ 
-          ...prev, 
-          recentActivity: [
-            {
-              type: 'new_user',
-              title: 'Novo usuário cadastrado',
-              description: 'Felipe Cordeiro Ferreira se cadastrou na plataforma',
-              date: new Date().toISOString()
-            }
-          ]
-        }))
-      }
     } catch (error) {
       console.error('Erro ao buscar atividades recentes:', error)
     }
@@ -334,67 +273,33 @@ const AdminDashboard = () => {
   
   const fetchAnalytics = async () => {
     try {
-      const token = await getAuthToken()
-      
-      const response = await fetch(`${API_URL}/admin/analytics/users`, {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      })
-      
-      if (response.ok) {
-        const data = await response.json()
-        setAdminData(prev => ({ ...prev, analytics: data }))
-      }
+      console.log('Carregando analytics')
+      // Analytics podem ser implementados futuramente
+      setAdminData(prev => ({ ...prev, analytics: null }))
     } catch (error) {
       console.error('Erro ao buscar analytics:', error)
     }
   }
   
-  const fetchUserDetails = async (userId) => {
-    try {
-      const token = await getAuthToken()
-      
-      const response = await fetch(`${API_URL}/admin/users/${userId}/details`, {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      })
-      
-      if (response.ok) {
-        const data = await response.json()
-        setSelectedUser(data)
-      }
-    } catch (error) {
-      console.error('Erro ao buscar detalhes do usuário:', error)
-    }
-  }
-  
   const updateUserRole = async (userId, newRole) => {
     try {
-      const token = await getAuthToken()
+      console.log('Atualizando role do usuário:', userId, 'para:', newRole)
       
-      const response = await fetch(`${API_URL}/admin/users/${userId}/role`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({ role: newRole })
-      })
+      const { error } = await supabase
+        .from('profiles')
+        .update({ role: newRole })
+        .eq('id', userId)
       
-      if (response.ok) {
-        alert('Papel do usuário atualizado com sucesso!')
-        fetchUsers()
-        if (selectedUser && selectedUser.user.id === userId) {
-          fetchUserDetails(userId)
-        }
-      } else {
-        alert('Erro ao atualizar papel do usuário')
+      if (error) {
+        throw error
       }
+      
+      alert('Papel do usuário atualizado com sucesso!')
+      fetchUsers() // Recarregar lista
+      
     } catch (error) {
       console.error('Erro ao atualizar papel:', error)
-      alert('Erro ao atualizar papel do usuário')
+      alert('Erro ao atualizar papel do usuário: ' + error.message)
     }
   }
   
@@ -406,22 +311,16 @@ const AdminDashboard = () => {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
           </svg>
         )
-      case 'training_sent':
+      case 'profile_updated':
         return (
           <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
         )
-      case 'progress_logged':
+      case 'admin_access':
         return (
           <svg className="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-          </svg>
-        )
-      case 'message_sent':
-        return (
-          <svg className="w-4 h-4 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
           </svg>
         )
       default:
@@ -483,51 +382,62 @@ const AdminDashboard = () => {
         <div className="space-y-6">
           {/* Cards de estatísticas */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <StatCard
-              title="Total de Usuários"
-              value={adminData.overview.total_users}
-              icon={
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
-                </svg>
-              }
-              color="blue"
-            />
+            <div className="bg-white p-6 rounded-lg shadow-md">
+              <div className="flex items-center">
+                <div className="p-3 bg-blue-100 rounded-full">
+                  <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
+                  </svg>
+                </div>
+                <div className="ml-4">
+                  <p className="text-sm font-medium text-gray-600">Total de Usuários</p>
+                  <p className="text-2xl font-bold text-gray-900">{adminData.overview.total_users}</p>
+                </div>
+              </div>
+            </div>
             
-            <StatCard
-              title="Usuários Ativos"
-              value={adminData.overview.active_users}
-              change={`${adminData.overview.user_growth_rate}%`}
-              changeType="positive"
-              icon={
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                </svg>
-              }
-              color="green"
-            />
+            <div className="bg-white p-6 rounded-lg shadow-md">
+              <div className="flex items-center">
+                <div className="p-3 bg-green-100 rounded-full">
+                  <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                </div>
+                <div className="ml-4">
+                  <p className="text-sm font-medium text-gray-600">Usuários Ativos</p>
+                  <p className="text-2xl font-bold text-gray-900">{adminData.overview.active_users}</p>
+                  <p className="text-xs text-green-600">+{adminData.overview.user_growth_rate}%</p>
+                </div>
+              </div>
+            </div>
             
-            <StatCard
-              title="Assinaturas Ativas"
-              value={adminData.overview.active_subscriptions}
-              icon={
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
-                </svg>
-              }
-              color="purple"
-            />
+            <div className="bg-white p-6 rounded-lg shadow-md">
+              <div className="flex items-center">
+                <div className="p-3 bg-purple-100 rounded-full">
+                  <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
+                  </svg>
+                </div>
+                <div className="ml-4">
+                  <p className="text-sm font-medium text-gray-600">Assinaturas Ativas</p>
+                  <p className="text-2xl font-bold text-gray-900">{adminData.overview.active_subscriptions}</p>
+                </div>
+              </div>
+            </div>
             
-            <StatCard
-              title="Receita Total"
-              value={`R$ ${adminData.overview.total_revenue.toFixed(2)}`}
-              icon={
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-                </svg>
-              }
-              color="yellow"
-            />
+            <div className="bg-white p-6 rounded-lg shadow-md">
+              <div className="flex items-center">
+                <div className="p-3 bg-yellow-100 rounded-full">
+                  <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                  </svg>
+                </div>
+                <div className="ml-4">
+                  <p className="text-sm font-medium text-gray-600">Receita Total</p>
+                  <p className="text-2xl font-bold text-gray-900">R$ {adminData.overview.total_revenue.toFixed(2)}</p>
+                </div>
+              </div>
+            </div>
           </div>
           
           {/* Atividades recentes */}
@@ -609,11 +519,11 @@ const AdminDashboard = () => {
                           </select>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {new Date(user.created_at).toLocaleDateString('pt-BR')}
+                          {user.created_at ? new Date(user.created_at).toLocaleDateString('pt-BR') : 'N/A'}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                           <button
-                            onClick={() => fetchUserDetails(user.id)}
+                            onClick={() => setSelectedUser(user)}
                             className="text-blue-600 hover:text-blue-900 mr-3"
                           >
                             Ver Detalhes

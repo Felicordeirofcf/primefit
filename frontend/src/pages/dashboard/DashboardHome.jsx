@@ -26,9 +26,6 @@ ChartJS.register(
   Legend
 )
 
-// URL base da API
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
-
 const DashboardHome = () => {
   const { user, userProfile } = useAuth()
   const [isLoading, setIsLoading] = useState(true)
@@ -46,121 +43,124 @@ const DashboardHome = () => {
       setIsLoading(true)
       
       try {
-        // Obter token da sessão atual do Supabase
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+        console.log('Carregando dados do dashboard para:', userProfile?.nome || user.email)
         
-        if (sessionError) {
-          console.error('Erro ao obter sessão:', sessionError)
-          return
-        }
+        // Usar apenas dados do Supabase e dados mock
+        // Não fazer chamadas para localhost:8000
         
-        let token = null
-        
-        if (session?.access_token) {
-          token = session.access_token
-          console.log('Token obtido da sessão Supabase:', token ? 'Token encontrado' : 'Token não encontrado')
-        } else {
-          // Fallback: tentar obter token do localStorage/sessionStorage
-          token = localStorage.getItem('access_token') || sessionStorage.getItem('access_token')
-          console.log('Token obtido do storage:', token ? 'Token encontrado' : 'Token não encontrado')
-        }
-        
-        if (!token) {
-          console.warn('Token não encontrado - usando dados mock para desenvolvimento')
-          // Usar dados mock para desenvolvimento quando não há backend
-          setDashboardData({
-            userSummary: {
-              total_treinos: 3,
-              total_progresso: 8,
-              mensagens_nao_lidas: 2,
-              assinatura_ativa: {
-                plano_id: 'consultoria_completa',
-                data_fim: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-                valor_pago: '197.00'
-              }
-            },
-            recentActivity: [
-              {
-                type: 'treino',
-                title: 'Treino de Peito e Tríceps concluído',
-                date: new Date().toISOString()
-              },
-              {
-                type: 'progresso',
-                title: 'Peso registrado: 75kg',
-                date: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
-              },
-              {
-                type: 'mensagem',
-                title: 'Nova mensagem do personal trainer',
-                date: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
-              }
-            ],
-            quickStats: {
-              evolucao_peso: -2.5
-            },
-            progressData: [
-              { data_medicao: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(), peso: 77.5 },
-              { data_medicao: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(), peso: 76.8 },
-              { data_medicao: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(), peso: 76.2 },
-              { data_medicao: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(), peso: 75.0 }
-            ]
-          })
-          setIsLoading(false)
-          return
-        }
-        
-        // Configuração para requisições autenticadas
-        const config = {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json'
+        // Buscar dados de progresso do Supabase (se existir tabela de progresso)
+        let progressData = []
+        try {
+          const { data: progressFromDB, error: progressError } = await supabase
+            .from('progress')
+            .select('*')
+            .eq('user_id', user.id)
+            .order('data_medicao', { ascending: false })
+            .limit(10)
+          
+          if (!progressError && progressFromDB) {
+            progressData = progressFromDB
           }
-        }
-        
-        console.log('Fazendo requisições para o backend com token...')
-        
-        // Busca resumo do usuário
-        try {
-          const userSummaryResponse = await fetch(`${API_URL}/dashboard/user-summary`, config)
-          const userSummary = userSummaryResponse.ok ? await userSummaryResponse.json() : null
-          console.log('User summary response:', userSummaryResponse.status, userSummary)
         } catch (error) {
-          console.log('Erro na requisição user-summary:', error.message)
+          console.log('Tabela progress não existe, usando dados mock')
         }
         
-        // Busca atividades recentes
+        // Se não há dados de progresso no banco, usar dados mock baseados no perfil
+        if (progressData.length === 0) {
+          const pesoInicial = userProfile?.peso_inicial || 75
+          progressData = [
+            { data_medicao: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(), peso: pesoInicial + 2 },
+            { data_medicao: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(), peso: pesoInicial + 1 },
+            { data_medicao: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(), peso: pesoInicial },
+            { data_medicao: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(), peso: pesoInicial - 1 }
+          ]
+        }
+        
+        // Buscar dados de treinos do Supabase (se existir tabela de treinos)
+        let totalTreinos = 0
         try {
-          const recentActivityResponse = await fetch(`${API_URL}/dashboard/recent-activity`, config)
-          const recentActivity = recentActivityResponse.ok ? await recentActivityResponse.json() : []
-          console.log('Recent activity response:', recentActivityResponse.status, recentActivity)
+          const { count, error: treinosError } = await supabase
+            .from('treinos')
+            .select('*', { count: 'exact', head: true })
+            .eq('user_id', user.id)
+          
+          if (!treinosError) {
+            totalTreinos = count || 0
+          }
         } catch (error) {
-          console.log('Erro na requisição recent-activity:', error.message)
+          console.log('Tabela treinos não existe, usando dados mock')
+          totalTreinos = 3 // Valor mock
         }
         
-        // Busca estatísticas rápidas
+        // Buscar mensagens não lidas do Supabase (se existir tabela de mensagens)
+        let mensagensNaoLidas = 0
         try {
-          const quickStatsResponse = await fetch(`${API_URL}/dashboard/quick-stats`, config)
-          const quickStats = quickStatsResponse.ok ? await quickStatsResponse.json() : null
-          console.log('Quick stats response:', quickStatsResponse.status, quickStats)
+          const { count, error: mensagensError } = await supabase
+            .from('mensagens')
+            .select('*', { count: 'exact', head: true })
+            .eq('destinatario_id', user.id)
+            .eq('lida', false)
+          
+          if (!mensagensError) {
+            mensagensNaoLidas = count || 0
+          }
         } catch (error) {
-          console.log('Erro na requisição quick-stats:', error.message)
+          console.log('Tabela mensagens não existe, usando dados mock')
+          mensagensNaoLidas = 2 // Valor mock
         }
         
-        // Busca dados de progresso para gráficos
-        try {
-          const progressResponse = await fetch(`${API_URL}/progress?limit=10`, config)
-          const progressData = progressResponse.ok ? await progressResponse.json() : []
-          console.log('Progress response:', progressResponse.status, progressData)
-        } catch (error) {
-          console.log('Erro na requisição progress:', error.message)
+        // Calcular evolução de peso
+        let evolucaoPeso = 0
+        if (progressData.length >= 2) {
+          const pesoAtual = progressData[0].peso
+          const pesoAnterior = progressData[progressData.length - 1].peso
+          evolucaoPeso = pesoAtual - pesoAnterior
         }
         
-        // Por enquanto, usar dados mock até o backend estar configurado
+        // Montar dados do dashboard
+        setDashboardData({
+          userSummary: {
+            total_treinos: totalTreinos,
+            total_progresso: progressData.length,
+            mensagens_nao_lidas: mensagensNaoLidas,
+            assinatura_ativa: {
+              plano_id: 'consultoria_completa',
+              data_fim: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+              valor_pago: '197.00'
+            }
+          },
+          recentActivity: [
+            {
+              type: 'treino',
+              title: 'Treino de Peito e Tríceps concluído',
+              date: new Date().toISOString()
+            },
+            {
+              type: 'progresso',
+              title: `Peso registrado: ${progressData[0]?.peso || userProfile?.peso_inicial || 75}kg`,
+              date: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+            },
+            {
+              type: 'mensagem',
+              title: 'Nova mensagem do personal trainer',
+              date: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
+            }
+          ],
+          quickStats: {
+            evolucao_peso: evolucaoPeso
+          },
+          progressData: progressData
+        })
+        
+        console.log('Dashboard carregado com sucesso usando dados do Supabase e mock')
+        
+      } catch (error) {
+        console.error('Erro ao buscar dados do dashboard:', error)
+        // Em caso de erro, usar dados mock completos
         setDashboardData({
           userSummary: {
             total_treinos: 3,
-            total_progresso: 8,
+            total_progresso: 4,
             mensagens_nao_lidas: 2,
             assinatura_ativa: {
               plano_id: 'consultoria_completa',
@@ -195,27 +195,13 @@ const DashboardHome = () => {
             { data_medicao: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(), peso: 75.0 }
           ]
         })
-        
-      } catch (error) {
-        console.error('Erro ao buscar dados do dashboard:', error)
-        // Em caso de erro, usar dados mock
-        setDashboardData({
-          userSummary: {
-            total_treinos: 0,
-            total_progresso: 0,
-            mensagens_nao_lidas: 0
-          },
-          recentActivity: [],
-          quickStats: null,
-          progressData: []
-        })
       } finally {
         setIsLoading(false)
       }
     }
     
     fetchDashboardData()
-  }, [user])
+  }, [user, userProfile])
   
   // Configuração do gráfico de peso
   const weightChartData = {
