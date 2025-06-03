@@ -133,21 +133,21 @@ const DashboardHome = () => {
   return (
     <div className="space-y-6">
       {/* Cabeçalho de boas-vindas */}
-      <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-6 rounded-lg">
-        <h1 className="text-2xl font-bold mb-2">
+      <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-4 md:p-6 rounded-lg">
+        <h1 className="text-xl md:text-2xl font-bold mb-2">
           Bem-vindo de volta, {userProfile?.nome || user?.email}!
         </h1>
-        <p className="text-blue-100">
+        <p className="text-blue-100 text-sm md:text-base">
           Aqui está um resumo do seu progresso e atividades recentes.
         </p>
       </div>
       
       {/* Cards de estatísticas rápidas */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
         {/* Card de treinos */}
-        <div className="bg-white p-6 rounded-lg shadow-md">
+        <div className="bg-white p-4 md:p-6 rounded-lg shadow-md">
           <div className="flex items-center">
-            <div className="p-3 bg-blue-100 rounded-full">
+            <div className="p-2 md:p-3 bg-blue-100 rounded-full flex-shrink-0">
               <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
               </svg>

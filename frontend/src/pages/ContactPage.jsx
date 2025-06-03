@@ -74,7 +74,7 @@ const ContactPage = () => {
               </div>
               <div>
                 <h3 className="text-lg font-medium mb-1">Telefone</h3>
-                <p className="text-gray-600">(11) 99999-9999</p>
+                <p className="text-gray-600">(21) 98770-8652</p>
                 <p className="text-gray-600">Segunda a Sexta, 8h às 20h</p>
               </div>
             </div>
@@ -87,7 +87,7 @@ const ContactPage = () => {
               </div>
               <div>
                 <h3 className="text-lg font-medium mb-1">Email</h3>
-                <p className="text-gray-600">contato@primefit.com.br</p>
+                <p className="text-gray-600">felipecordeirofcf@gmail.com</p>
                 <p className="text-gray-600">Respondemos em até 24 horas</p>
               </div>
             </div>
@@ -261,7 +261,7 @@ const ContactPage = () => {
             <h3 className="text-lg font-bold mb-2">Como posso agendar uma avaliação física?</h3>
             <p className="text-gray-600">
               Você pode agendar uma avaliação física gratuita através do nosso formulário de contato,
-              ligando para o número (11) 99999-9999 ou enviando um email para contato@primefit.com.br.
+              ligando para o número (21) 98770-8652 ou enviando um email para felipecordeirofcf@gmail.com.
             </p>
           </div>
           

@@ -2,7 +2,7 @@ import React from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 
-const DashboardSidebar = () => {
+const DashboardSidebar = ({ className = '', isMobile = false, onClose }) => {
   const { pathname } = useLocation()
   const { user } = useAuth()
   
@@ -61,14 +61,31 @@ const DashboardSidebar = () => {
     }
   }
   
+  const handleLinkClick = () => {
+    if (isMobile && onClose) {
+      onClose()
+    }
+  }
+  
   return (
-    <div className="bg-white w-64 shadow-lg hidden md:block">
+    <div className={`bg-white w-64 shadow-lg ${className} ${isMobile ? 'h-full' : ''}`}>
       <div className="flex flex-col h-full">
-        {/* Logo */}
-        <div className="flex items-center justify-center h-16 border-b">
+        {/* Logo e botão fechar (mobile) */}
+        <div className="flex items-center justify-between h-16 border-b px-4">
           <Link to="/" className="text-2xl font-display font-bold text-primary-600">
             PrimeFit
           </Link>
+          {isMobile && (
+            <button
+              onClick={onClose}
+              className="p-2 rounded-md text-gray-500 hover:text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
+              aria-label="Fechar menu"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          )}
         </div>
         
         {/* Perfil do usuário */}
@@ -77,27 +94,28 @@ const DashboardSidebar = () => {
             <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center text-primary-600 font-bold">
               {user?.name?.charAt(0) || 'U'}
             </div>
-            <div className="ml-3">
-              <p className="font-medium text-gray-800">{user?.name || 'Usuário'}</p>
-              <p className="text-sm text-gray-500">{user?.email || 'email@exemplo.com'}</p>
+            <div className="ml-3 min-w-0 flex-1">
+              <p className="font-medium text-gray-800 truncate">{user?.name || 'Usuário'}</p>
+              <p className="text-sm text-gray-500 truncate">{user?.email || 'email@exemplo.com'}</p>
             </div>
           </div>
         </div>
         
         {/* Links de navegação */}
-        <nav className="flex-1 p-4 space-y-1">
+        <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
           {navLinks.map((link) => (
             <Link
               key={link.path}
               to={link.path}
+              onClick={handleLinkClick}
               className={`flex items-center px-4 py-3 rounded-lg transition-colors ${
                 pathname === link.path
                   ? 'bg-primary-50 text-primary-600'
                   : 'text-gray-700 hover:bg-gray-100'
               }`}
             >
-              <span className="mr-3">{renderIcon(link.icon)}</span>
-              {link.name}
+              <span className="mr-3 flex-shrink-0">{renderIcon(link.icon)}</span>
+              <span className="truncate">{link.name}</span>
             </Link>
           ))}
         </nav>
@@ -106,14 +124,15 @@ const DashboardSidebar = () => {
         <div className="p-4 border-t">
           <Link
             to="/"
+            onClick={handleLinkClick}
             className="flex items-center px-4 py-3 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
           >
-            <span className="mr-3">
+            <span className="mr-3 flex-shrink-0">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M3 3a1 1 0 00-1 1v12a1 1 0 102 0V4a1 1 0 00-1-1zm10.293 9.293a1 1 0 001.414 1.414l3-3a1 1 0 000-1.414l-3-3a1 1 0 10-1.414 1.414L14.586 9H7a1 1 0 100 2h7.586l-1.293 1.293z" clipRule="evenodd" />
               </svg>
             </span>
-            Voltar ao Site
+            <span className="truncate">Voltar ao Site</span>
           </Link>
         </div>
       </div>
@@ -122,3 +141,4 @@ const DashboardSidebar = () => {
 }
 
 export default DashboardSidebar
+
