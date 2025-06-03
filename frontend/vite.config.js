@@ -10,6 +10,17 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
-    sourcemap: true
+    sourcemap: true,
+    chunkSizeWarningLimit: 800, // aumenta limite antes de avisar
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // Quebra o bundle principal em partes menores
+          react: ['react', 'react-dom'],
+          supabase: ['@supabase/supabase-js'],
+          chart: ['chart.js'],
+        }
+      }
+    }
   }
 })

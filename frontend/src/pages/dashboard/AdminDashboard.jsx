@@ -15,14 +15,25 @@ const AdminDashboard = () => {
   const [activities, setActivities] = useState([])
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedUser, setSelectedUser] = useState(null)
-  
+
   useEffect(() => {
-    if (user && isAdmin) {
+    console.log('useEffect → user:', user)
+    console.log('useEffect → isAdmin:', isAdmin)
+
+    if (user && isAdmin === true) {
       loadAdminData()
     }
   }, [user, isAdmin])
-  
-  // Verificação de acesso admin
+
+  // ⛔️ Evita renderizar acesso negado antes da verificação
+  if (isAdmin === null || typeof isAdmin === 'undefined') {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    )
+  }
+
   if (!isAdmin) {
     return (
       <div className="flex items-center justify-center h-64">
