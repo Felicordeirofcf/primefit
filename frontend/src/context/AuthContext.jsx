@@ -17,6 +17,10 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true)
   const [isAdmin, setIsAdmin] = useState(false)
 
+  // Propriedades derivadas para compatibilidade com ProtectedRoute
+  const isAuthenticated = !!user
+  const isProfileComplete = !!(userProfile?.nome && userProfile?.objetivo)
+
   useEffect(() => {
     // Verificar sessão inicial
     const getInitialSession = async () => {
@@ -285,6 +289,8 @@ export const AuthProvider = ({ children }) => {
     userProfile,
     loading,
     isAdmin,
+    isAuthenticated,     // ✅ Adicionado para compatibilidade
+    isProfileComplete,   // ✅ Adicionado para compatibilidade
     signIn,
     signUp,
     signOut,
