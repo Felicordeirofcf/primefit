@@ -1,13 +1,10 @@
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '../../hooks/useAuth'
 import { supabase } from '../../supabaseClient'
-import { EvolutionChart, ComparisonChart, DistributionChart, StatCard } from '../../components/charts/ChartComponents'
 
 const AdminDashboard = () => {
-  const { user, userProfile } = useAuth()
+  const { user, userProfile, isAdmin } = useAuth() // ✅ Usar isAdmin do AuthContext
   const [isLoading, setIsLoading] = useState(true)
-  const [isAdmin, setIsAdmin] = useState(false)
-  const [adminCheckLoading, setAdminCheckLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('overview')
   const [adminData, setAdminData] = useState({
     overview: null,
@@ -24,51 +21,7 @@ const AdminDashboard = () => {
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedUser, setSelectedUser] = useState(null)
   
-  // Verificar se o usuário é admin usando a função do Supabase
-  useEffect(() => {
-    const checkAdminStatus = async () => {
-      if (!user?.email) {
-        setAdminCheckLoading(false)
-        return
-      }
-      
-      try {
-        console.log('Verificando status admin para:', user.email)
-        
-        // Usar a função is_admin_by_email que já está funcionando
-        const { data, error } = await supabase.rpc('is_admin_by_email', {
-          user_email: user.email
-        })
-        
-        if (error) {
-          console.error('Erro ao verificar admin:', error)
-          setIsAdmin(false)
-        } else {
-          console.log('Resultado verificação admin:', data)
-          setIsAdmin(data === true)
-        }
-      } catch (error) {
-        console.error('Erro na verificação de admin:', error)
-        setIsAdmin(false)
-      } finally {
-        setAdminCheckLoading(false)
-      }
-    }
-    
-    checkAdminStatus()
-  }, [user?.email])
-  
-  // Mostrar loading enquanto verifica admin
-  if (adminCheckLoading) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-600"></div>
-        <span className="ml-3 text-gray-600">Verificando permissões...</span>
-      </div>
-    )
-  }
-  
-  // Verificar se o usuário é admin
+  // ✅ CORREÇÃO: Verificar se o usuário é admin usando isAdmin do AuthContext
   if (!isAdmin) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -78,213 +31,129 @@ const AdminDashboard = () => {
           </svg>
           <h3 className="text-lg font-medium text-gray-900 mb-2">Acesso Negado</h3>
           <p className="text-gray-500">Você não tem permissão para acessar o painel administrativo.</p>
-          <div className="mt-4 text-sm text-gray-400">
-            <p>Email: {user?.email}</p>
-            <p>Status Admin: {isAdmin ? 'Sim' : 'Não'}</p>
-          </div>
         </div>
       </div>
     )
   }
   
   useEffect(() => {
-    if (activeTab === 'overview') {
-      fetchOverview()
-      fetchRecentActivity()
-      fetchAnalytics()
-    } else if (activeTab === 'users') {
-      fetchUsers()
-    }
+    console.log('Carregando overview administrativo usando Supabase')
+    loadAdminData()
   }, [activeTab, usersPagination.page, searchTerm])
   
-  const fetchOverview = async () => {
+  const loadAdminData = async () => {
     try {
-      console.log('Carregando overview administrativo usando Supabase')
+      setIsLoading(true)
       
-      // Buscar estatísticas reais do Supabase
-      let totalUsers = 0
-      let activeUsers = 0
-      let activeSubscriptions = 0
-      
-      // Total de usuários
-      try {
-        const { count, error: usersError } = await supabase
-          .from('profiles')
-          .select('*', { count: 'exact', head: true })
-        
-        if (!usersError) {
-          totalUsers = count || 0
-        }
-      } catch (error) {
-        console.log('Erro ao buscar total de usuários:', error)
+      if (activeTab === 'overview') {
+        await fetchOverviewFromSupabase()
+        await fetchRecentActivityMock()
+      } else if (activeTab === 'users') {
+        await fetchUsersFromSupabase()
       }
-      
-      // Usuários ativos (com perfil completo)
-      try {
-        const { count, error: activeError } = await supabase
-          .from('profiles')
-          .select('*', { count: 'exact', head: true })
-          .not('nome', 'is', null)
-          .not('objetivo', 'is', null)
-        
-        if (!activeError) {
-          activeUsers = count || 0
-        }
-      } catch (error) {
-        console.log('Erro ao buscar usuários ativos:', error)
-      }
-      
-      // Assinaturas ativas (mock por enquanto)
-      activeSubscriptions = Math.floor(activeUsers * 0.75) // 75% dos usuários ativos
-      
-      // Receita total (mock baseado nas assinaturas)
-      const totalRevenue = activeSubscriptions * 197.00
-      
-      setAdminData(prev => ({ 
-        ...prev, 
-        overview: {
-          total_users: totalUsers,
-          active_users: activeUsers,
-          user_growth_rate: 12.5, // Mock
-          active_subscriptions: activeSubscriptions,
-          total_revenue: totalRevenue
-        }
-      }))
-      
-      console.log('Overview carregado:', { totalUsers, activeUsers, activeSubscriptions, totalRevenue })
-      
     } catch (error) {
-      console.error('Erro ao buscar overview:', error)
-      // Usar dados mock em caso de erro
-      setAdminData(prev => ({ 
-        ...prev, 
-        overview: {
-          total_users: 156,
-          active_users: 89,
-          user_growth_rate: 12.5,
-          active_subscriptions: 67,
-          total_revenue: 13450.00
-        }
-      }))
-    }
-  }
-  
-  const fetchUsers = async () => {
-    try {
-      console.log('Carregando usuários do Supabase')
-      
-      let query = supabase
-        .from('profiles')
-        .select('*')
-        .order('created_at', { ascending: false })
-      
-      // Aplicar filtro de busca se existir
-      if (searchTerm) {
-        query = query.or(`nome.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%`)
-      }
-      
-      // Aplicar paginação
-      const from = (usersPagination.page - 1) * usersPagination.limit
-      const to = from + usersPagination.limit - 1
-      
-      const { data: users, error, count } = await query
-        .range(from, to)
-        .select('*', { count: 'exact' })
-      
-      if (error) {
-        throw error
-      }
-      
-      setAdminData(prev => ({ ...prev, users: users || [] }))
-      setUsersPagination(prev => ({
-        ...prev,
-        total: count || 0,
-        pages: Math.ceil((count || 0) / prev.limit)
-      }))
-      
-      console.log('Usuários carregados:', users?.length || 0)
-      
-    } catch (error) {
-      console.error('Erro ao buscar usuários:', error)
-      // Usar dados mock em caso de erro
-      setAdminData(prev => ({ 
-        ...prev, 
-        users: [
-          {
-            id: '1',
-            nome: 'Felipe Cordeiro Ferreira',
-            email: 'felpcordeirofcf@gmail.com',
-            role: 'admin',
-            created_at: new Date().toISOString()
-          },
-          {
-            id: '2',
-            nome: 'Cliente Exemplo',
-            email: 'cliente@exemplo.com',
-            role: 'cliente',
-            created_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
-          }
-        ]
-      }))
-      setUsersPagination({
-        page: 1,
-        limit: 20,
-        total: 2,
-        pages: 1
-      })
+      console.error('Erro ao carregar dados admin:', error)
     } finally {
       setIsLoading(false)
     }
   }
   
-  const fetchRecentActivity = async () => {
+  const fetchOverviewFromSupabase = async () => {
     try {
-      console.log('Carregando atividades recentes')
+      // ✅ Buscar dados reais do Supabase
+      const { data: profiles, error } = await supabase
+        .from('profiles')
+        .select('*')
       
-      // Por enquanto usar dados mock, mas pode ser expandido para buscar do Supabase
-      setAdminData(prev => ({ 
-        ...prev, 
-        recentActivity: [
-          {
-            type: 'new_user',
-            title: 'Novo usuário cadastrado',
-            description: 'Felipe Cordeiro Ferreira se cadastrou na plataforma',
-            date: new Date().toISOString()
-          },
-          {
-            type: 'profile_updated',
-            title: 'Perfil atualizado',
-            description: 'Usuário completou informações do perfil',
-            date: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()
-          },
-          {
-            type: 'admin_access',
-            title: 'Acesso administrativo',
-            description: 'Admin acessou o painel de controle',
-            date: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString()
-          }
-        ]
-      }))
+      if (error) {
+        console.error('Erro ao buscar perfis:', error)
+        return
+      }
       
+      const totalUsers = profiles?.length || 0
+      const activeUsers = profiles?.filter(p => p.nome && p.objetivo)?.length || 0
+      const activeSubscriptions = profiles?.filter(p => p.plano_ativo === 'ativo')?.length || 0
+      
+      console.log(`Total de usuários: ${totalUsers}, Usuários ativos: ${activeUsers}`)
+      
+      const overview = {
+        total_users: totalUsers,
+        active_users: activeUsers,
+        active_subscriptions: activeSubscriptions,
+        total_revenue: activeSubscriptions * 97.0, // R$ 97 por assinatura
+        user_growth_rate: 15.2 // Mock
+      }
+      
+      setAdminData(prev => ({ ...prev, overview }))
     } catch (error) {
-      console.error('Erro ao buscar atividades recentes:', error)
+      console.error('Erro ao buscar overview:', error)
     }
   }
   
-  const fetchAnalytics = async () => {
+  const fetchUsersFromSupabase = async () => {
     try {
-      console.log('Carregando analytics')
-      // Analytics podem ser implementados futuramente
-      setAdminData(prev => ({ ...prev, analytics: null }))
+      let query = supabase
+        .from('profiles')
+        .select('*')
+        .order('created_at', { ascending: false })
+      
+      // Aplicar filtro de busca se houver
+      if (searchTerm) {
+        query = query.or(`nome.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%`)
+      }
+      
+      const { data: users, error } = await query
+      
+      if (error) {
+        console.error('Erro ao buscar usuários:', error)
+        return
+      }
+      
+      setAdminData(prev => ({ ...prev, users: users || [] }))
+      setUsersPagination(prev => ({
+        ...prev,
+        total: users?.length || 0,
+        pages: Math.ceil((users?.length || 0) / prev.limit)
+      }))
     } catch (error) {
-      console.error('Erro ao buscar analytics:', error)
+      console.error('Erro ao buscar usuários:', error)
     }
+  }
+  
+  const fetchRecentActivityMock = async () => {
+    // ✅ Dados mock para atividades recentes
+    const recentActivity = [
+      {
+        type: 'new_user',
+        title: 'Novo usuário cadastrado',
+        description: 'Felipe Cordeiro Ferreira se cadastrou na plataforma',
+        date: new Date().toISOString()
+      },
+      {
+        type: 'progress_logged',
+        title: 'Progresso registrado',
+        description: 'Usuário atualizou seu peso e medidas',
+        date: new Date(Date.now() - 3600000).toISOString()
+      },
+      {
+        type: 'training_sent',
+        title: 'Treino enviado',
+        description: 'Novo plano de treino personalizado criado',
+        date: new Date(Date.now() - 7200000).toISOString()
+      },
+      {
+        type: 'message_sent',
+        title: 'Mensagem enviada',
+        description: 'Consultor enviou orientações nutricionais',
+        date: new Date(Date.now() - 10800000).toISOString()
+      }
+    ]
+    
+    setAdminData(prev => ({ ...prev, recentActivity }))
   }
   
   const updateUserRole = async (userId, newRole) => {
     try {
-      console.log('Atualizando role do usuário:', userId, 'para:', newRole)
-      
       const { error } = await supabase
         .from('profiles')
         .update({ role: newRole })
@@ -295,11 +164,10 @@ const AdminDashboard = () => {
       }
       
       alert('Papel do usuário atualizado com sucesso!')
-      fetchUsers() // Recarregar lista
-      
+      await fetchUsersFromSupabase()
     } catch (error) {
       console.error('Erro ao atualizar papel:', error)
-      alert('Erro ao atualizar papel do usuário: ' + error.message)
+      alert('Erro ao atualizar papel do usuário')
     }
   }
   
@@ -311,16 +179,22 @@ const AdminDashboard = () => {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
           </svg>
         )
-      case 'profile_updated':
+      case 'training_sent':
         return (
           <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
           </svg>
         )
-      case 'admin_access':
+      case 'progress_logged':
         return (
           <svg className="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+          </svg>
+        )
+      case 'message_sent':
+        return (
+          <svg className="w-4 h-4 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
           </svg>
         )
       default:
@@ -330,6 +204,14 @@ const AdminDashboard = () => {
           </svg>
         )
     }
+  }
+  
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-600"></div>
+      </div>
+    )
   }
   
   return (
@@ -382,59 +264,59 @@ const AdminDashboard = () => {
         <div className="space-y-6">
           {/* Cards de estatísticas */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div className="bg-white p-6 rounded-lg shadow-md">
+            <div className="bg-white rounded-lg shadow-md p-6">
               <div className="flex items-center">
-                <div className="p-3 bg-blue-100 rounded-full">
+                <div className="p-3 rounded-full bg-blue-100">
                   <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
                   </svg>
                 </div>
                 <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600">Total de Usuários</p>
-                  <p className="text-2xl font-bold text-gray-900">{adminData.overview.total_users}</p>
+                  <p className="text-sm font-medium text-gray-500">Total de Usuários</p>
+                  <p className="text-2xl font-semibold text-gray-900">{adminData.overview.total_users}</p>
                 </div>
               </div>
             </div>
             
-            <div className="bg-white p-6 rounded-lg shadow-md">
+            <div className="bg-white rounded-lg shadow-md p-6">
               <div className="flex items-center">
-                <div className="p-3 bg-green-100 rounded-full">
+                <div className="p-3 rounded-full bg-green-100">
                   <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                   </svg>
                 </div>
                 <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600">Usuários Ativos</p>
-                  <p className="text-2xl font-bold text-gray-900">{adminData.overview.active_users}</p>
-                  <p className="text-xs text-green-600">+{adminData.overview.user_growth_rate}%</p>
+                  <p className="text-sm font-medium text-gray-500">Usuários Ativos</p>
+                  <p className="text-2xl font-semibold text-gray-900">{adminData.overview.active_users}</p>
+                  <p className="text-sm text-green-600">+{adminData.overview.user_growth_rate}%</p>
                 </div>
               </div>
             </div>
             
-            <div className="bg-white p-6 rounded-lg shadow-md">
+            <div className="bg-white rounded-lg shadow-md p-6">
               <div className="flex items-center">
-                <div className="p-3 bg-purple-100 rounded-full">
+                <div className="p-3 rounded-full bg-purple-100">
                   <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
                   </svg>
                 </div>
                 <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600">Assinaturas Ativas</p>
-                  <p className="text-2xl font-bold text-gray-900">{adminData.overview.active_subscriptions}</p>
+                  <p className="text-sm font-medium text-gray-500">Assinaturas Ativas</p>
+                  <p className="text-2xl font-semibold text-gray-900">{adminData.overview.active_subscriptions}</p>
                 </div>
               </div>
             </div>
             
-            <div className="bg-white p-6 rounded-lg shadow-md">
+            <div className="bg-white rounded-lg shadow-md p-6">
               <div className="flex items-center">
-                <div className="p-3 bg-yellow-100 rounded-full">
+                <div className="p-3 rounded-full bg-yellow-100">
                   <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
                   </svg>
                 </div>
                 <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600">Receita Total</p>
-                  <p className="text-2xl font-bold text-gray-900">R$ {adminData.overview.total_revenue.toFixed(2)}</p>
+                  <p className="text-sm font-medium text-gray-500">Receita Total</p>
+                  <p className="text-2xl font-semibold text-gray-900">R$ {adminData.overview.total_revenue.toFixed(2)}</p>
                 </div>
               </div>
             </div>
@@ -516,6 +398,7 @@ const AdminDashboard = () => {
                           >
                             <option value="cliente">Cliente</option>
                             <option value="admin">Admin</option>
+                            <option value="consultor">Consultor</option>
                           </select>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -524,9 +407,9 @@ const AdminDashboard = () => {
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                           <button
                             onClick={() => setSelectedUser(user)}
-                            className="text-blue-600 hover:text-blue-900 mr-3"
+                            className="text-blue-600 hover:text-blue-900"
                           >
-                            Ver Detalhes
+                            Ver detalhes
                           </button>
                         </td>
                       </tr>
@@ -542,12 +425,37 @@ const AdminDashboard = () => {
       )}
       
       {activeTab === 'analytics' && (
-        <div className="space-y-6">
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <h3 className="text-lg font-semibold mb-4">Análises e Relatórios</h3>
-            <p className="text-gray-500 text-center py-8">
-              Funcionalidade de análises em desenvolvimento
-            </p>
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <h3 className="text-lg font-semibold mb-4">Análises e Relatórios</h3>
+          <p className="text-gray-500 text-center py-8">
+            Funcionalidade de análises em desenvolvimento
+          </p>
+        </div>
+      )}
+      
+      {/* Modal de detalhes do usuário */}
+      {selectedUser && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div className="mt-3">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">Detalhes do Usuário</h3>
+              <div className="space-y-2">
+                <p><strong>Nome:</strong> {selectedUser.nome || 'N/A'}</p>
+                <p><strong>Email:</strong> {selectedUser.email}</p>
+                <p><strong>Telefone:</strong> {selectedUser.telefone || 'N/A'}</p>
+                <p><strong>Objetivo:</strong> {selectedUser.objetivo || 'N/A'}</p>
+                <p><strong>Plano:</strong> {selectedUser.plano_ativo || 'inativo'}</p>
+                <p><strong>Papel:</strong> {selectedUser.role || 'cliente'}</p>
+              </div>
+              <div className="flex justify-end mt-4">
+                <button
+                  onClick={() => setSelectedUser(null)}
+                  className="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
+                >
+                  Fechar
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

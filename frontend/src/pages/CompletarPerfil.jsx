@@ -19,6 +19,7 @@ export default function CompletarPerfil() {
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   
   // Preencher o formulário com dados existentes, se houver
   useEffect(() => {
@@ -30,7 +31,7 @@ export default function CompletarPerfil() {
         goal: userProfile.objetivo || '',
         height: userProfile.altura ? Math.round(userProfile.altura * 100) : '', // Converter de metros para cm
         weight: userProfile.peso_inicial || '',
-        health_conditions: '' // Campo não existe na tabela ainda
+        health_conditions: userProfile.condicoes_saude || ''
       });
     }
   }, [userProfile]);
@@ -50,6 +51,7 @@ export default function CompletarPerfil() {
     e.preventDefault();
     setIsSubmitting(true);
     setError('');
+    setSuccess('');
     
     try {
       // Validar campos obrigatórios
@@ -59,13 +61,21 @@ export default function CompletarPerfil() {
       
       const result = await updateProfile(form);
       
-      if (result.success) {
-        // Redirecionar para o dashboard após completar o perfil
-        navigate('/dashboard');
+      // ✅ CORREÇÃO: Verificar se result.error é null (sucesso) em vez de result.success
+      if (!result.error) {
+        setSuccess('Perfil atualizado com sucesso!');
+        
+        // Aguardar um pouco para mostrar a mensagem de sucesso
+        setTimeout(() => {
+          // Redirecionar para o dashboard após completar o perfil
+          navigate('/dashboard');
+        }, 1500);
       } else {
-        setError(result.message || 'Erro ao atualizar perfil');
+        // Se há erro, mostrar a mensagem de erro
+        setError(result.error.message || 'Erro ao atualizar perfil');
       }
     } catch (err) {
+      console.error('Erro no handleSubmit:', err);
       setError(err.message || 'Ocorreu um erro ao processar sua solicitação');
     } finally {
       setIsSubmitting(false);
@@ -89,6 +99,8 @@ export default function CompletarPerfil() {
           Para uma melhor experiência, precisamos de algumas informações adicionais.
         </p>
         
+        {/* ✅ CORREÇÃO: Mostrar mensagem de sucesso */}
+        {success && <div className="success-message">{success}</div>}
         {error && <div className="error-message">{error}</div>}
         
         <form onSubmit={handleSubmit}>
@@ -186,12 +198,13 @@ export default function CompletarPerfil() {
           <button 
             type="submit" 
             className="btn-primario" 
-            disabled={isSubmitting}
+            disabled={isSubmitting || success}
           >
-            {isSubmitting ? 'Salvando...' : 'Salvar e Continuar'}
+            {isSubmitting ? 'Salvando...' : success ? 'Redirecionando...' : 'Salvar e Continuar'}
           </button>
         </form>
       </div>
     </div>
   );
 }
+
