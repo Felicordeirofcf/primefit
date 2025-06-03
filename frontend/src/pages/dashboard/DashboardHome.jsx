@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '../../hooks/useAuth'
-import { supabase } from '../../lib/supabase'
+import { supabase } from '../../supabaseClient'
 import { Line, Bar } from 'react-chartjs-2'
 import {
   Chart as ChartJS,
