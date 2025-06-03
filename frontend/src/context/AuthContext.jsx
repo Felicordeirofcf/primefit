@@ -16,7 +16,7 @@ export const AuthProvider = ({ children }) => {
       try {
         setIsLoading(true)
         
-        // Verificar sessão atual
+        // Verificar sessão atual primeiro
         const { data: { session }, error: sessionError } = await supabase.auth.getSession()
         
         if (sessionError) {
@@ -31,8 +31,8 @@ export const AuthProvider = ({ children }) => {
           console.log('Sessão encontrada para usuário:', session.user.id)
           setUser(session.user)
           
-          // Buscar perfil com método simplificado
-          await fetchUserProfileSimple(session.user.id)
+          // Buscar perfil com timeout reduzido e retry
+          await fetchUserProfileWithRetry(session.user.id)
         } else {
           console.log('Nenhuma sessão ativa encontrada')
           setUser(null)
@@ -49,14 +49,14 @@ export const AuthProvider = ({ children }) => {
 
     getUser()
 
-    // Listener para mudanças de sessão
+    // Listener para mudanças de sessão (login/logout)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('Auth state changed:', event, session?.user?.id)
       
       try {
         if (session?.user) {
           setUser(session.user)
-          await fetchUserProfileSimple(session.user.id)
+          await fetchUserProfileWithRetry(session.user.id)
         } else {
           setUser(null)
           setUserProfile(null)
@@ -74,17 +74,47 @@ export const AuthProvider = ({ children }) => {
     }
   }, [])
 
-  // Função simplificada para buscar perfil (sem RLS complexo)
-  const fetchUserProfileSimple = async (userId) => {
+  // Função para buscar perfil com retry e timeout reduzido
+  const fetchUserProfileWithRetry = async (userId, maxRetries = 3) => {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`Tentativa ${attempt} de buscar perfil para usuário:`, userId)
+        
+        const profile = await fetchUserProfileSingle(userId)
+        if (profile) {
+          return profile
+        }
+        
+        // Se não encontrou perfil, tentar criar um básico
+        if (attempt === maxRetries) {
+          console.log('Criando perfil básico após todas as tentativas...')
+          return await createBasicProfile(userId)
+        }
+        
+      } catch (error) {
+        console.error(`Erro na tentativa ${attempt}:`, error)
+        
+        if (attempt === maxRetries) {
+          console.error('Todas as tentativas falharam')
+          setUserProfile(null)
+          setIsProfileComplete(false)
+          return null
+        }
+        
+        // Aguardar antes da próxima tentativa
+        await new Promise(resolve => setTimeout(resolve, 1000 * attempt))
+      }
+    }
+  }
+
+  // Função para buscar perfil (versão simplificada)
+  const fetchUserProfileSingle = async (userId) => {
     try {
-      console.log('Buscando perfil para usuário:', userId)
-      
-      // Usar timeout mais curto
+      // Timeout de 5 segundos para cada tentativa
       const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Timeout na busca do perfil')), 3000)
+        setTimeout(() => reject(new Error('Timeout na busca do perfil')), 5000)
       )
       
-      // Buscar perfil diretamente
       const fetchPromise = supabase
         .from('profiles')
         .select('*')
@@ -94,14 +124,6 @@ export const AuthProvider = ({ children }) => {
       const { data, error } = await Promise.race([fetchPromise, timeoutPromise])
 
       if (error) {
-        console.error('Erro ao buscar perfil:', error.message)
-        
-        // Se perfil não existe, criar um básico
-        if (error.code === 'PGRST116' || error.message.includes('no rows')) {
-          console.log('Perfil não encontrado, criando perfil básico...')
-          return await createBasicProfileSimple(userId)
-        }
-        
         throw error
       }
 
@@ -110,42 +132,33 @@ export const AuthProvider = ({ children }) => {
         console.log('Role do usuário:', data.role)
         setUserProfile(data)
         
+        // Verificar se o perfil está completo
         const isComplete = data && data.nome && data.nome.trim() !== ''
         setIsProfileComplete(isComplete)
         
         return data
-      } else {
-        console.log('Nenhum perfil encontrado, criando perfil básico...')
-        return await createBasicProfileSimple(userId)
-      }
-    } catch (error) {
-      console.error('Erro ao processar perfil:', error.message)
-      
-      // Se der erro de recursão, tentar criar perfil básico
-      if (error.message.includes('infinite recursion')) {
-        console.log('Erro de recursão detectado, criando perfil básico...')
-        return await createBasicProfileSimple(userId)
       }
       
-      setUserProfile(null)
-      setIsProfileComplete(false)
       return null
+    } catch (error) {
+      console.error('Erro ao buscar perfil:', error.message)
+      throw error
     }
   }
 
-  // Função para criar perfil básico (método direto)
-  const createBasicProfileSimple = async (userId) => {
+  // Função para criar perfil básico
+  const createBasicProfile = async (userId) => {
     try {
       console.log('Criando perfil básico para usuário:', userId)
       
+      // Buscar dados do usuário autenticado
       const { data: userData } = await supabase.auth.getUser()
       const email = userData?.user?.email || ''
       const name = userData?.user?.user_metadata?.full_name || ''
 
-      // Usar upsert para evitar conflitos
       const { data, error } = await supabase
         .from('profiles')
-        .upsert([
+        .insert([
           {
             id: userId,
             email: email,
@@ -153,10 +166,7 @@ export const AuthProvider = ({ children }) => {
             role: 'cliente',
             plano_ativo: 'inativo'
           }
-        ], { 
-          onConflict: 'id',
-          ignoreDuplicates: false 
-        })
+        ])
         .select()
         .single()
 
@@ -165,7 +175,8 @@ export const AuthProvider = ({ children }) => {
         throw error
       }
 
-      console.log('Perfil básico criado/atualizado:', data)
+      console.log('Perfil básico criado:', data)
+      console.log('Role definido como:', data.role)
       setUserProfile(data)
       setIsProfileComplete(data.nome && data.nome.trim() !== '')
       
@@ -175,26 +186,6 @@ export const AuthProvider = ({ children }) => {
       setUserProfile(null)
       setIsProfileComplete(false)
       throw error
-    }
-  }
-
-  // Função para verificar se é admin (usando função SQL)
-  const checkIsAdmin = async () => {
-    try {
-      if (!user) return false
-      
-      const { data, error } = await supabase
-        .rpc('is_admin', { user_id: user.id })
-      
-      if (error) {
-        console.error('Erro ao verificar admin:', error)
-        return false
-      }
-      
-      return data === true
-    } catch (error) {
-      console.error('Erro ao verificar admin:', error)
-      return false
     }
   }
 
@@ -234,6 +225,39 @@ export const AuthProvider = ({ children }) => {
     return mappedData
   }
 
+  // Função para mapear campos do backend para o frontend
+  const mapFieldsFromDatabase = (profileData) => {
+    if (!profileData) return {}
+    
+    const fieldMapping = {
+      'nome': 'full_name',
+      'data_nascimento': 'birth_date',
+      'telefone': 'phone',
+      'objetivo': 'goal',
+      'altura': 'height',
+      'peso_inicial': 'weight'
+    }
+
+    const mappedData = {}
+    
+    Object.keys(profileData).forEach(key => {
+      const frontendField = fieldMapping[key]
+      if (frontendField) {
+        let value = profileData[key]
+        
+        if (key === 'altura' && value && value < 10) {
+          value = Math.round(value * 100)
+        }
+        
+        mappedData[frontendField] = value
+      } else {
+        mappedData[key] = profileData[key]
+      }
+    })
+
+    return mappedData
+  }
+
   // Função de login
   const login = async (email, password) => {
     try {
@@ -255,8 +279,8 @@ export const AuthProvider = ({ children }) => {
 
       console.log('Login realizado com sucesso:', data.user.id)
       
-      // Buscar perfil
-      await fetchUserProfileSimple(data.user.id)
+      // Buscar perfil do usuário com retry
+      await fetchUserProfileWithRetry(data.user.id)
       
       return { success: true, user: data.user }
     } catch (error) {
@@ -363,11 +387,23 @@ export const AuthProvider = ({ children }) => {
     }
   }
 
-  // Função para verificar se o usuário é admin (local)
+  // Função para verificar se o usuário é admin
   const isAdmin = () => {
     console.log('Verificando se é admin. UserProfile:', userProfile)
     console.log('Role atual:', userProfile?.role)
     return userProfile?.role === 'admin'
+  }
+
+  // Função para recarregar perfil manualmente
+  const refreshProfile = async () => {
+    if (user) {
+      setIsLoading(true)
+      try {
+        await fetchUserProfileWithRetry(user.id)
+      } finally {
+        setIsLoading(false)
+      }
+    }
   }
 
   const value = {
@@ -379,10 +415,10 @@ export const AuthProvider = ({ children }) => {
     register,
     logout,
     updateProfile,
-    fetchUserProfile: fetchUserProfileSimple,
+    fetchUserProfile: fetchUserProfileWithRetry,
     isAdmin,
-    checkIsAdmin,
-    mapFieldsToDatabase
+    refreshProfile,
+    mapFieldsFromDatabase
   }
 
   return (
