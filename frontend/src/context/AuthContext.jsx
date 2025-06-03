@@ -299,3 +299,6 @@ export const AuthProvider = ({ children }) => {
   )
 }
 
+// Exportar o AuthContext para compatibilidade com useAuth.js
+export { AuthContext }
+
