@@ -1,12 +1,12 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-import { visualizer } from 'rollup-plugin-visualizer'; // Optional: to analyze bundle size
+// import { visualizer } from 'rollup-plugin-visualizer'; // Removido - não necessário para produção
 
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [
     react(),
-    visualizer({ open: true, gzipSize: true, brotliSize: true }), // Optional: Helps visualize chunk sizes after build
+    // visualizer({ open: true, gzipSize: true, brotliSize: true }), // Removido - usado apenas para análise local
   ],
   server: {
     port: 5173,
