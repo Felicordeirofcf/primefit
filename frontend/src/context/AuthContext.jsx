@@ -1,5 +1,3 @@
-// src/context/AuthContext.jsx
-
 import React, { createContext, useState, useEffect, useContext } from 'react'
 import { supabase } from '../supabaseClient'
 
@@ -18,30 +16,32 @@ export const AuthProvider = ({ children }) => {
       try {
         setIsLoading(true)
         
-        // Timeout de segurança para evitar carregamento infinito
-        const timeoutId = setTimeout(() => {
-          console.warn('Timeout na verificação de usuário')
-          setIsLoading(false)
-        }, 10000) // 10 segundos
+        // Verificar sessão atual
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
         
-        const { data, error } = await supabase.auth.getUser()
-        
-        clearTimeout(timeoutId) // Limpar timeout se a operação completar
-        
-        if (data?.user && !error) {
-          setUser(data.user)
-          // Buscar dados do perfil do usuário
-          await fetchUserProfile(data.user.id)
-        } else {
+        if (sessionError) {
+          console.error('Erro ao obter sessão:', sessionError)
           setUser(null)
           setUserProfile(null)
-          setIsProfileComplete(true)
+          setIsLoading(false)
+          return
+        }
+
+        if (session?.user) {
+          console.log('Sessão encontrada para usuário:', session.user.id)
+          setUser(session.user)
+          
+          // Buscar perfil com método simplificado
+          await fetchUserProfileSimple(session.user.id)
+        } else {
+          console.log('Nenhuma sessão ativa encontrada')
+          setUser(null)
+          setUserProfile(null)
         }
       } catch (error) {
         console.error('Erro ao verificar usuário:', error)
         setUser(null)
         setUserProfile(null)
-        setIsProfileComplete(true)
       } finally {
         setIsLoading(false)
       }
@@ -49,14 +49,14 @@ export const AuthProvider = ({ children }) => {
 
     getUser()
 
-    // Listener para mudanças de sessão (login/logout)
-    const { data: listener } = supabase.auth.onAuthStateChange(async (event, session) => {
+    // Listener para mudanças de sessão
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('Auth state changed:', event, session?.user?.id)
       
       try {
         if (session?.user) {
           setUser(session.user)
-          await fetchUserProfile(session.user.id)
+          await fetchUserProfileSimple(session.user.id)
         } else {
           setUser(null)
           setUserProfile(null)
@@ -65,61 +65,136 @@ export const AuthProvider = ({ children }) => {
       } catch (error) {
         console.error('Erro no listener de auth:', error)
       } finally {
-        // Sempre definir loading como false após mudança de estado
         setIsLoading(false)
       }
     })
 
     return () => {
-      listener.subscription.unsubscribe()
+      subscription.unsubscribe()
     }
   }, [])
 
-  // Função para buscar o perfil do usuário
-  const fetchUserProfile = async (userId) => {
+  // Função simplificada para buscar perfil (sem RLS complexo)
+  const fetchUserProfileSimple = async (userId) => {
     try {
       console.log('Buscando perfil para usuário:', userId)
       
-      const { data, error } = await supabase
+      // Usar timeout mais curto
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Timeout na busca do perfil')), 3000)
+      )
+      
+      // Buscar perfil diretamente
+      const fetchPromise = supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
-        .maybeSingle() // Use maybeSingle() ao invés de single() para evitar erro quando não há dados
+        .maybeSingle()
+      
+      const { data, error } = await Promise.race([fetchPromise, timeoutPromise])
 
       if (error) {
         console.error('Erro ao buscar perfil:', error.message)
         
-        // Se o perfil não existe, criar um básico
-        if (error.code === 'PGRST116') {
+        // Se perfil não existe, criar um básico
+        if (error.code === 'PGRST116' || error.message.includes('no rows')) {
           console.log('Perfil não encontrado, criando perfil básico...')
-          const newProfile = await createBasicProfile(userId)
-          return newProfile
+          return await createBasicProfileSimple(userId)
         }
         
-        setUserProfile(null)
-        setIsProfileComplete(false)
-        return null
+        throw error
       }
 
       if (data) {
         console.log('Perfil encontrado:', data)
+        console.log('Role do usuário:', data.role)
         setUserProfile(data)
         
-        // Verificar se o perfil está completo
         const isComplete = data && data.nome && data.nome.trim() !== ''
         setIsProfileComplete(isComplete)
         
         return data
       } else {
         console.log('Nenhum perfil encontrado, criando perfil básico...')
-        const newProfile = await createBasicProfile(userId)
-        return newProfile
+        return await createBasicProfileSimple(userId)
       }
     } catch (error) {
       console.error('Erro ao processar perfil:', error.message)
+      
+      // Se der erro de recursão, tentar criar perfil básico
+      if (error.message.includes('infinite recursion')) {
+        console.log('Erro de recursão detectado, criando perfil básico...')
+        return await createBasicProfileSimple(userId)
+      }
+      
       setUserProfile(null)
       setIsProfileComplete(false)
       return null
+    }
+  }
+
+  // Função para criar perfil básico (método direto)
+  const createBasicProfileSimple = async (userId) => {
+    try {
+      console.log('Criando perfil básico para usuário:', userId)
+      
+      const { data: userData } = await supabase.auth.getUser()
+      const email = userData?.user?.email || ''
+      const name = userData?.user?.user_metadata?.full_name || ''
+
+      // Usar upsert para evitar conflitos
+      const { data, error } = await supabase
+        .from('profiles')
+        .upsert([
+          {
+            id: userId,
+            email: email,
+            nome: name,
+            role: 'cliente',
+            plano_ativo: 'inativo'
+          }
+        ], { 
+          onConflict: 'id',
+          ignoreDuplicates: false 
+        })
+        .select()
+        .single()
+
+      if (error) {
+        console.error('Erro ao criar perfil básico:', error.message)
+        throw error
+      }
+
+      console.log('Perfil básico criado/atualizado:', data)
+      setUserProfile(data)
+      setIsProfileComplete(data.nome && data.nome.trim() !== '')
+      
+      return data
+    } catch (error) {
+      console.error('Erro ao criar perfil básico:', error.message)
+      setUserProfile(null)
+      setIsProfileComplete(false)
+      throw error
+    }
+  }
+
+  // Função para verificar se é admin (usando função SQL)
+  const checkIsAdmin = async () => {
+    try {
+      if (!user) return false
+      
+      const { data, error } = await supabase
+        .rpc('is_admin', { user_id: user.id })
+      
+      if (error) {
+        console.error('Erro ao verificar admin:', error)
+        return false
+      }
+      
+      return data === true
+    } catch (error) {
+      console.error('Erro ao verificar admin:', error)
+      return false
     }
   }
 
@@ -132,102 +207,31 @@ export const AuthProvider = ({ children }) => {
       'goal': 'objetivo',
       'height': 'altura',
       'weight': 'peso_inicial'
-      // 'health_conditions' não existe na tabela, removido por enquanto
     }
 
     const mappedData = {}
     
     Object.keys(profileData).forEach(key => {
       const dbField = fieldMapping[key]
-      if (dbField) { // Só mapear campos que existem na tabela
+      if (dbField) {
         let value = profileData[key]
         
-        // Converter valores numéricos se necessário
         if ((dbField === 'altura' || dbField === 'peso_inicial') && value) {
           value = parseFloat(value)
         }
         
-        // Converter altura de cm para metros se necessário
-        if (dbField === 'altura' && value > 10) {
-          value = value / 100 // Converter de cm para metros
+        if (dbField === 'altura' && value && value > 10) {
+          value = value / 100
         }
         
         mappedData[dbField] = value
       }
     })
+
+    console.log('Dados originais do formulário:', profileData)
+    console.log('Dados mapeados para o banco:', mappedData)
     
     return mappedData
-  }
-
-  // Função para mapear campos do backend para o frontend
-  const mapFieldsFromDatabase = (profileData) => {
-    if (!profileData) return {}
-    
-    const fieldMapping = {
-      'nome': 'full_name',
-      'data_nascimento': 'birth_date',
-      'telefone': 'phone',
-      'objetivo': 'goal',
-      'altura': 'height',
-      'peso_inicial': 'weight'
-    }
-
-    const mappedData = {}
-    
-    Object.keys(profileData).forEach(key => {
-      const frontendField = fieldMapping[key]
-      if (frontendField) {
-        let value = profileData[key]
-        
-        // Converter altura de metros para cm para exibição
-        if (key === 'altura' && value) {
-          value = Math.round(value * 100) // Converter de metros para cm
-        }
-        
-        mappedData[frontendField] = value
-      }
-    })
-    
-    return mappedData
-  }
-  const createBasicProfile = async (userId) => {
-    try {
-      const { data: userData } = await supabase.auth.getUser()
-      const email = userData?.user?.email || ''
-      const name = userData?.user?.user_metadata?.name || userData?.user?.user_metadata?.full_name || ''
-
-      console.log('Criando perfil básico para:', { userId, email, name })
-
-      const { data, error } = await supabase
-        .from('profiles')
-        .insert([
-          {
-            id: userId,
-            email: email,
-            nome: name,
-            plano_ativo: 'inativo'
-          }
-        ])
-        .select()
-        .single()
-
-      if (error) {
-        console.error('Erro ao criar perfil básico:', error.message)
-        setUserProfile(null)
-        setIsProfileComplete(false)
-        return
-      }
-
-      console.log('Perfil básico criado:', data)
-      setUserProfile(data)
-      setIsProfileComplete(data.nome && data.nome.trim() !== '')
-      
-      return data
-    } catch (error) {
-      console.error('Erro ao criar perfil básico:', error.message)
-      setUserProfile(null)
-      setIsProfileComplete(false)
-    }
   }
 
   // Função de login
@@ -250,115 +254,49 @@ export const AuthProvider = ({ children }) => {
       }
 
       console.log('Login realizado com sucesso:', data.user.id)
-      setUser(data.user)
       
-      // Buscar perfil do usuário após login
-      const profile = await fetchUserProfile(data.user.id)
+      // Buscar perfil
+      await fetchUserProfileSimple(data.user.id)
       
-      // Verificar se o perfil está completo
-      const profileComplete = profile && profile.nome && profile.nome.trim() !== ''
-      
-      return { 
-        success: true, 
-        profileComplete: profileComplete 
-      }
+      return { success: true, user: data.user }
     } catch (error) {
-      console.error('Erro inesperado no login:', error.message)
-      return { success: false, message: 'Erro ao processar login. Tente novamente.' }
+      console.error('Erro no login:', error.message)
+      return { success: false, message: 'Erro interno do servidor' }
     } finally {
       setIsLoading(false)
     }
   }
 
   // Função de cadastro
-  const register = async (name, email, password) => {
+  const register = async (email, password, fullName) => {
     try {
       setIsLoading(true)
       
-      console.log('Iniciando cadastro:', { name, email })
-
-      // 1. Registrar usuário no Auth do Supabase
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: {
-            name: name,
-            full_name: name
+            full_name: fullName
           }
         }
       })
 
       if (error) {
-        console.error('Erro ao registrar:', error.message)
+        console.error('Erro ao fazer cadastro:', error.message)
         return { success: false, message: error.message }
       }
 
-      // Verificar se o usuário foi criado corretamente
-      if (!data.user || !data.user.id) {
-        console.error('Erro: Usuário não foi criado corretamente')
-        return { success: false, message: 'Erro ao criar usuário. Tente novamente.' }
+      if (!data.user) {
+        return { success: false, message: 'Erro ao processar cadastro' }
       }
 
-      console.log('Usuário criado no Auth:', data.user.id)
-
-      // 2. O perfil será criado automaticamente pelo trigger ou pela função fetchUserProfile
-      // Não precisamos criar manualmente aqui
-
-      return { 
-        success: true,
-        message: data.user.email_confirmed_at ? 
-          'Cadastro realizado com sucesso!' : 
-          'Cadastro realizado! Verifique seu email para confirmar a conta.'
-      }
+      console.log('Cadastro realizado com sucesso:', data.user.id)
+      
+      return { success: true, user: data.user }
     } catch (error) {
-      console.error('Erro inesperado no cadastro:', error)
-      return { success: false, message: 'Erro ao processar cadastro. Tente novamente.' }
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  // Função para atualizar o perfil do usuário
-  const updateProfile = async (profileData) => {
-    if (!user) return { success: false, message: 'Usuário não autenticado' }
-
-    try {
-      setIsLoading(true)
-      
-      console.log('Dados originais do formulário:', profileData)
-      
-      // Mapear campos do frontend para o banco de dados
-      const mappedData = mapFieldsToDatabase(profileData)
-      
-      console.log('Dados mapeados para o banco:', mappedData)
-
-      // Atualizar dados na tabela profiles
-      const { data, error } = await supabase
-        .from('profiles')
-        .update({ 
-          ...mappedData,
-          data_atualizacao: new Date().toISOString()
-        })
-        .eq('id', user.id)
-        .select()
-        .single()
-
-      if (error) {
-        console.error('Erro ao atualizar perfil:', error.message)
-        return { success: false, message: error.message }
-      }
-
-      console.log('Perfil atualizado no banco:', data)
-      
-      // Atualizar o estado local
-      setUserProfile(data)
-      setIsProfileComplete(data.nome && data.nome.trim() !== '')
-      
-      return { success: true, data }
-    } catch (error) {
-      console.error('Erro ao processar atualização:', error)
-      return { success: false, message: 'Erro ao processar atualização' }
+      console.error('Erro no cadastro:', error.message)
+      return { success: false, message: 'Erro interno do servidor' }
     } finally {
       setIsLoading(false)
     }
@@ -368,35 +306,83 @@ export const AuthProvider = ({ children }) => {
   const logout = async () => {
     try {
       setIsLoading(true)
-      await supabase.auth.signOut()
+      
+      const { error } = await supabase.auth.signOut()
+      
+      if (error) {
+        console.error('Erro ao fazer logout:', error.message)
+        return { success: false, message: error.message }
+      }
+
       setUser(null)
       setUserProfile(null)
       setIsProfileComplete(true)
       
-      // Limpar tokens do localStorage
-      localStorage.removeItem('access_token')
-      sessionStorage.removeItem('access_token')
-      
-      console.log('Logout realizado com sucesso')
+      return { success: true }
     } catch (error) {
-      console.error('Erro ao fazer logout:', error)
+      console.error('Erro no logout:', error.message)
+      return { success: false, message: 'Erro interno do servidor' }
     } finally {
       setIsLoading(false)
     }
   }
 
-  // Valores do contexto
+  // Função para atualizar perfil
+  const updateProfile = async (profileData) => {
+    try {
+      if (!user) {
+        throw new Error('Usuário não autenticado')
+      }
+
+      console.log('Atualizando perfil:', profileData)
+      
+      const mappedData = mapFieldsToDatabase(profileData)
+      
+      const { data, error } = await supabase
+        .from('profiles')
+        .update(mappedData)
+        .eq('id', user.id)
+        .select()
+        .single()
+
+      if (error) {
+        console.error('Erro ao atualizar perfil:', error.message)
+        throw error
+      }
+
+      console.log('Perfil atualizado no banco:', data)
+      setUserProfile(data)
+      
+      const isComplete = data && data.nome && data.nome.trim() !== ''
+      setIsProfileComplete(isComplete)
+      
+      return { success: true, profile: data }
+    } catch (error) {
+      console.error('Erro ao atualizar perfil:', error.message)
+      return { success: false, message: error.message }
+    }
+  }
+
+  // Função para verificar se o usuário é admin (local)
+  const isAdmin = () => {
+    console.log('Verificando se é admin. UserProfile:', userProfile)
+    console.log('Role atual:', userProfile?.role)
+    return userProfile?.role === 'admin'
+  }
+
   const value = {
     user,
     userProfile,
-    isAuthenticated: !!user,
     isLoading,
     isProfileComplete,
     login,
     register,
     logout,
     updateProfile,
-    fetchUserProfile
+    fetchUserProfile: fetchUserProfileSimple,
+    isAdmin,
+    checkIsAdmin,
+    mapFieldsToDatabase
   }
 
   return (
@@ -406,7 +392,7 @@ export const AuthProvider = ({ children }) => {
   )
 }
 
-// Hook customizado para usar o contexto
+// Hook personalizado para usar o contexto
 export const useAuth = () => {
   const context = useContext(AuthContext)
   if (!context) {
