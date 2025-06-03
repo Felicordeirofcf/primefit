@@ -15,26 +15,40 @@ export const AuthProvider = ({ children }) => {
   // Verifica se há usuário autenticado
   useEffect(() => {
     const getUser = async () => {
-      const { data, error } = await supabase.auth.getUser()
-      if (data?.user) {
-        setUser(data.user)
-        // Buscar dados do perfil do usuário
-        await fetchUserProfile(data.user.id)
+      try {
+        const { data, error } = await supabase.auth.getUser()
+        if (data?.user && !error) {
+          setUser(data.user)
+          // Buscar dados do perfil do usuário
+          await fetchUserProfile(data.user.id)
+        } else {
+          setUser(null)
+          setUserProfile(null)
+        }
+      } catch (error) {
+        console.error('Erro ao verificar usuário:', error)
+        setUser(null)
+        setUserProfile(null)
+      } finally {
+        setIsLoading(false)
       }
-      setIsLoading(false)
     }
 
     getUser()
 
     // Listener para mudanças de sessão (login/logout)
-    const { data: listener } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      setUser(session?.user || null)
+    const { data: listener } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('Auth state changed:', event, session?.user?.id)
+      
       if (session?.user) {
+        setUser(session.user)
         await fetchUserProfile(session.user.id)
       } else {
+        setUser(null)
         setUserProfile(null)
         setIsProfileComplete(true)
       }
+      setIsLoading(false)
     })
 
     return () => {
@@ -45,28 +59,85 @@ export const AuthProvider = ({ children }) => {
   // Função para buscar o perfil do usuário
   const fetchUserProfile = async (userId) => {
     try {
+      console.log('Buscando perfil para usuário:', userId)
+      
       const { data, error } = await supabase
-        .from('users')
+        .from('profiles')
         .select('*')
         .eq('id', userId)
-        .single()
+        .maybeSingle() // Use maybeSingle() ao invés de single() para evitar erro quando não há dados
 
       if (error) {
         console.error('Erro ao buscar perfil:', error.message)
+        
+        // Se o perfil não existe, criar um básico
+        if (error.code === 'PGRST116') {
+          console.log('Perfil não encontrado, criando perfil básico...')
+          await createBasicProfile(userId)
+          return
+        }
+        
         setUserProfile(null)
         setIsProfileComplete(false)
         return
       }
 
+      if (data) {
+        console.log('Perfil encontrado:', data)
+        setUserProfile(data)
+        
+        // Verificar se o perfil está completo
+        const isComplete = data && data.nome && data.nome.trim() !== ''
+        setIsProfileComplete(isComplete)
+        
+        return data
+      } else {
+        console.log('Nenhum perfil encontrado, criando perfil básico...')
+        await createBasicProfile(userId)
+      }
+    } catch (error) {
+      console.error('Erro ao processar perfil:', error.message)
+      setUserProfile(null)
+      setIsProfileComplete(false)
+    }
+  }
+
+  // Função para criar perfil básico quando não existe
+  const createBasicProfile = async (userId) => {
+    try {
+      const { data: userData } = await supabase.auth.getUser()
+      const email = userData?.user?.email || ''
+      const name = userData?.user?.user_metadata?.name || userData?.user?.user_metadata?.full_name || ''
+
+      console.log('Criando perfil básico para:', { userId, email, name })
+
+      const { data, error } = await supabase
+        .from('profiles')
+        .insert([
+          {
+            id: userId,
+            email: email,
+            nome: name,
+            plano_ativo: 'inativo'
+          }
+        ])
+        .select()
+        .single()
+
+      if (error) {
+        console.error('Erro ao criar perfil básico:', error.message)
+        setUserProfile(null)
+        setIsProfileComplete(false)
+        return
+      }
+
+      console.log('Perfil básico criado:', data)
       setUserProfile(data)
-      
-      // Verificar se o perfil está completo
-      const isComplete = data && data.full_name && data.full_name.trim() !== ''
-      setIsProfileComplete(isComplete)
+      setIsProfileComplete(data.nome && data.nome.trim() !== '')
       
       return data
     } catch (error) {
-      console.error('Erro ao processar perfil:', error.message)
+      console.error('Erro ao criar perfil básico:', error.message)
       setUserProfile(null)
       setIsProfileComplete(false)
     }
@@ -75,20 +146,30 @@ export const AuthProvider = ({ children }) => {
   // Função de login
   const login = async (email, password) => {
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+      setIsLoading(true)
+      
+      const { data, error } = await supabase.auth.signInWithPassword({ 
+        email, 
+        password 
+      })
 
       if (error) {
         console.error('Erro ao fazer login:', error.message)
         return { success: false, message: error.message }
       }
 
+      if (!data.user) {
+        return { success: false, message: 'Erro ao processar login' }
+      }
+
+      console.log('Login realizado com sucesso:', data.user.id)
       setUser(data.user)
       
       // Buscar perfil do usuário após login
       const profile = await fetchUserProfile(data.user.id)
       
       // Verificar se o perfil está completo
-      const profileComplete = profile && profile.full_name && profile.full_name.trim() !== ''
+      const profileComplete = profile && profile.nome && profile.nome.trim() !== ''
       
       return { 
         success: true, 
@@ -97,19 +178,26 @@ export const AuthProvider = ({ children }) => {
     } catch (error) {
       console.error('Erro inesperado no login:', error.message)
       return { success: false, message: 'Erro ao processar login. Tente novamente.' }
+    } finally {
+      setIsLoading(false)
     }
   }
 
   // Função de cadastro
   const register = async (name, email, password) => {
     try {
+      setIsLoading(true)
+      
+      console.log('Iniciando cadastro:', { name, email })
+
       // 1. Registrar usuário no Auth do Supabase
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: {
-            name // será armazenado no user_metadata
+            name: name,
+            full_name: name
           }
         }
       })
@@ -125,29 +213,22 @@ export const AuthProvider = ({ children }) => {
         return { success: false, message: 'Erro ao criar usuário. Tente novamente.' }
       }
 
-      // 2. Inserir dados na tabela public.users
-      const { error: insertError } = await supabase
-        .from('users')
-        .insert([
-          { 
-            id: data.user.id, 
-            email: email,
-            full_name: name || '',
-            role: 'client',
-          }
-        ])
+      console.log('Usuário criado no Auth:', data.user.id)
 
-      if (insertError) {
-        console.error('Erro ao inserir na tabela users:', insertError.message)
-        // Mesmo com erro na inserção na tabela users, o usuário foi criado no Auth
-        // Então retornamos sucesso, mas logamos o erro
-        console.warn('Usuário criado no Auth, mas não na tabela users')
+      // 2. O perfil será criado automaticamente pelo trigger ou pela função fetchUserProfile
+      // Não precisamos criar manualmente aqui
+
+      return { 
+        success: true,
+        message: data.user.email_confirmed_at ? 
+          'Cadastro realizado com sucesso!' : 
+          'Cadastro realizado! Verifique seu email para confirmar a conta.'
       }
-
-      return { success: true }
     } catch (error) {
       console.error('Erro inesperado no cadastro:', error)
       return { success: false, message: 'Erro ao processar cadastro. Tente novamente.' }
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -156,36 +237,60 @@ export const AuthProvider = ({ children }) => {
     if (!user) return { success: false, message: 'Usuário não autenticado' }
 
     try {
-      // Atualizar dados na tabela users
-      const { error } = await supabase
-        .from('users')
+      setIsLoading(true)
+      
+      console.log('Atualizando perfil:', profileData)
+
+      // Atualizar dados na tabela profiles
+      const { data, error } = await supabase
+        .from('profiles')
         .update({ 
           ...profileData,
-          profile_completed: true 
+          data_atualizacao: new Date().toISOString()
         })
         .eq('id', user.id)
+        .select()
+        .single()
 
       if (error) {
         console.error('Erro ao atualizar perfil:', error.message)
         return { success: false, message: error.message }
       }
 
-      // Atualizar o estado local
-      await fetchUserProfile(user.id)
+      console.log('Perfil atualizado:', data)
       
-      return { success: true }
+      // Atualizar o estado local
+      setUserProfile(data)
+      setIsProfileComplete(data.nome && data.nome.trim() !== '')
+      
+      return { success: true, data }
     } catch (error) {
       console.error('Erro ao processar atualização:', error)
       return { success: false, message: 'Erro ao processar atualização' }
+    } finally {
+      setIsLoading(false)
     }
   }
 
   // Função de logout
   const logout = async () => {
-    await supabase.auth.signOut()
-    setUser(null)
-    setUserProfile(null)
-    setIsProfileComplete(true)
+    try {
+      setIsLoading(true)
+      await supabase.auth.signOut()
+      setUser(null)
+      setUserProfile(null)
+      setIsProfileComplete(true)
+      
+      // Limpar tokens do localStorage
+      localStorage.removeItem('access_token')
+      sessionStorage.removeItem('access_token')
+      
+      console.log('Logout realizado com sucesso')
+    } catch (error) {
+      console.error('Erro ao fazer logout:', error)
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   // Valores do contexto
@@ -210,4 +315,11 @@ export const AuthProvider = ({ children }) => {
 }
 
 // Hook customizado para usar o contexto
-export const useAuth = () => useContext(AuthContext)
+export const useAuth = () => {
+  const context = useContext(AuthContext)
+  if (!context) {
+    throw new Error('useAuth deve ser usado dentro de um AuthProvider')
+  }
+  return context
+}
+

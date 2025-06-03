@@ -46,17 +46,16 @@ def get_password_hash(password):
 
 async def authenticate_user(email: str, password: str):
     try:
-        # Busca usuário pelo email
-        response = supabase.table("users").select("*").eq("email", email).execute()
+        # Busca usuário pelo email na tabela profiles
+        response = supabase.table("profiles").select("*").eq("email", email).execute()
         
         if not response.data or len(response.data) == 0:
             return False
         
         user = response.data[0]
         
-        if not verify_password(password, user["password"]):
-            return False
-        
+        # Como estamos usando Supabase Auth, não verificamos senha aqui
+        # A autenticação é feita pelo Supabase Auth
         return user
     except Exception as e:
         print(f"Erro ao autenticar usuário: {e}")
@@ -95,7 +94,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
         raise credentials_exception
     
     try:
-        response = supabase.table("users").select("*").eq("id", token_data.user_id).execute()
+        response = supabase.table("profiles").select("*").eq("id", token_data.user_id).execute()
         
         if not response.data or len(response.data) == 0:
             raise credentials_exception
@@ -110,7 +109,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
 async def register_user(user: UserCreate):
     try:
         # Verifica se o email já existe
-        response = supabase.table("users").select("*").eq("email", user.email).execute()
+        response = supabase.table("profiles").select("*").eq("email", user.email).execute()
         
         if response.data and len(response.data) > 0:
             raise HTTPException(
@@ -118,33 +117,15 @@ async def register_user(user: UserCreate):
                 detail="Email já cadastrado"
             )
         
-        # Cria hash da senha
-        hashed_password = get_password_hash(user.password)
+        # Como estamos usando Supabase Auth, não criamos usuário aqui
+        # O usuário deve ser criado através do Supabase Auth no frontend
+        # Este endpoint é apenas para verificação
         
-        # Prepara dados para inserção
-        user_data = {
-            "email": user.email,
-            "password": hashed_password,
-            "full_name": user.full_name, # Corrigido de name para full_name
-            "role": "client",  # Por padrão, novos usuários são clientes
-            "created_at": datetime.utcnow().isoformat()
-        }
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Use o sistema de autenticação do Supabase para registro"
+        )
         
-        # Insere usuário no Supabase
-        response = supabase.table("users").insert(user_data).execute()
-        
-        if not response.data or len(response.data) == 0:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Erro ao criar usuário"
-            )
-        
-        created_user = response.data[0]
-        
-        # Remove senha do retorno
-        created_user.pop("password", None)
-        
-        return created_user
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -164,7 +145,7 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
     
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": user["email"], "user_id": user["id"], "role": user["role"]},
+        data={"sub": user["email"], "user_id": user["id"], "role": user.get("plano_ativo", "inativo")},
         expires_delta=access_token_expires
     )
     
@@ -172,12 +153,10 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
         "access_token": access_token,
         "token_type": "bearer",
         "user_id": user["id"],
-        "user_role": user["role"]
+        "user_role": user.get("plano_ativo", "inativo")
     }
 
 @router.get("/me", response_model=UserResponse)
 async def read_users_me(current_user = Depends(get_current_user)):
-    # Remove senha do retorno
-    user_data = dict(current_user)
-    user_data.pop("password", None)
-    return user_data
+    # Retorna dados do usuário da tabela profiles
+    return current_user
