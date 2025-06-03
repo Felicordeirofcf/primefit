@@ -2,13 +2,15 @@ import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { toast } from 'react-toastify'
+import { supabase } from '../supabaseClient'
 
 const RegisterPage = () => {
-  const [name, setName] = useState('')
+  const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState('')
   
   const { register, login } = useAuth()
   const navigate = useNavigate()
@@ -16,21 +18,51 @@ const RegisterPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault()
     
-    if (!name || !email || !password || !confirmPassword) {
+    // Limpar erro anterior
+    setError('')
+    
+    if (!fullName || !email || !password || !confirmPassword) {
+      setError('Por favor, preencha todos os campos')
       toast.error('Por favor, preencha todos os campos')
       return
     }
     
     if (password !== confirmPassword) {
+      setError('As senhas não coincidem')
       toast.error('As senhas não coincidem')
+      return
+    }
+    
+    // Validar força da senha
+    if (password.length < 6) {
+      setError('A senha deve ter pelo menos 6 caracteres')
+      toast.error('A senha deve ter pelo menos 6 caracteres')
       return
     }
     
     setIsLoading(true)
     
     try {
+      // Verificar se o email já está em uso
+      const { data: existingUsers, error: checkError } = await supabase
+        .from('users')
+        .select('email')
+        .eq('email', email)
+        .maybeSingle()
+      
+      if (checkError) {
+        console.error('Erro ao verificar email:', checkError)
+      }
+      
+      if (existingUsers) {
+        setError('Este email já está em uso')
+        toast.error('Este email já está em uso')
+        setIsLoading(false)
+        return
+      }
+      
       // Registra o usuário
-      const registerResult = await register(name, email, password)
+      const registerResult = await register(fullName, email, password)
       
       if (registerResult.success) {
         toast.success('Cadastro realizado com sucesso!')
@@ -39,15 +71,22 @@ const RegisterPage = () => {
         const loginResult = await login(email, password)
         
         if (loginResult.success) {
-          navigate('/dashboard')
+          // Se o perfil precisa ser completado, redireciona para a página de completar perfil
+          if (!loginResult.profileComplete) {
+            navigate('/completar-perfil')
+          } else {
+            navigate('/dashboard')
+          }
         } else {
           navigate('/login')
         }
       } else {
+        setError(registerResult.message || 'Erro ao criar conta')
         toast.error(registerResult.message || 'Erro ao criar conta')
       }
     } catch (error) {
       console.error('Erro ao registrar:', error)
+      setError('Erro ao criar conta. Tente novamente.')
       toast.error('Erro ao criar conta. Tente novamente.')
     } finally {
       setIsLoading(false)
@@ -70,20 +109,26 @@ const RegisterPage = () => {
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
         <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
+          {error && (
+            <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative" role="alert">
+              <span className="block sm:inline">{error}</span>
+            </div>
+          )}
+          
           <form className="space-y-6" onSubmit={handleSubmit}>
             <div>
-              <label htmlFor="name" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="full_name" className="block text-sm font-medium text-gray-700">
                 Nome completo
               </label>
               <div className="mt-1">
                 <input
-                  id="name"
-                  name="name"
+                  id="full_name"
+                  name="full_name"
                   type="text"
                   autoComplete="name"
                   required
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
                   className="input"
                 />
               </div>
@@ -123,6 +168,7 @@ const RegisterPage = () => {
                   className="input"
                 />
               </div>
+              <p className="mt-1 text-xs text-gray-500">A senha deve ter pelo menos 6 caracteres</p>
             </div>
 
             <div>
@@ -170,12 +216,16 @@ const RegisterPage = () => {
                 className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
               >
                 {isLoading ? (
-                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                ) : null}
-                Criar conta
+                  <>
+                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Processando...
+                  </>
+                ) : (
+                  "Criar conta"
+                )}
               </button>
             </div>
           </form>

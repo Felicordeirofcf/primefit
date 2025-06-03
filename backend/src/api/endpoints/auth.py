@@ -125,7 +125,7 @@ async def register_user(user: UserCreate):
         user_data = {
             "email": user.email,
             "password": hashed_password,
-            "name": user.name,
+            "full_name": user.full_name, # Corrigido de name para full_name
             "role": "client",  # Por padrão, novos usuários são clientes
             "created_at": datetime.utcnow().isoformat()
         }
