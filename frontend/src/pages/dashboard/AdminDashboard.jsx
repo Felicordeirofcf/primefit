@@ -453,7 +453,7 @@ const ModalUserDetails = ({ user, onClose }) => {
   );
 };
 
-// DetailItem Compsonent (Internal)
+// DetailItem Component (Internal)
 const DetailItem = ({ label, value, capitalize = false }) => (
   <div className="flex justify-between border-b border-gray-100 py-1.5">
     <dt className="font-medium text-gray-500">{label}:</dt>
