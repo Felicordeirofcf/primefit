@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { useAuth } from '../hooks/useAuth'
+import { useAuth } from '../context/AuthContext'
 import { toast } from 'react-toastify'
 import { supabase } from '../supabaseClient'
 
@@ -11,37 +11,37 @@ const RegisterPage = () => {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
-  
-  const { register, login } = useAuth()
+
+  const { signUp, signIn } = useAuth()
   const navigate = useNavigate()
-  
+
   const handleSubmit = async (e) => {
     e.preventDefault()
-    
+
     // Limpar erro anterior
     setError('')
-    
+
     if (!fullName || !email || !password || !confirmPassword) {
       setError('Por favor, preencha todos os campos')
       toast.error('Por favor, preencha todos os campos')
       return
     }
-    
+
     if (password !== confirmPassword) {
       setError('As senhas não coincidem')
       toast.error('As senhas não coincidem')
       return
     }
-    
+
     // Validar força da senha
     if (password.length < 6) {
       setError('A senha deve ter pelo menos 6 caracteres')
       toast.error('A senha deve ter pelo menos 6 caracteres')
       return
     }
-    
+
     setIsLoading(true)
-    
+
     try {
       // Verificar se o email já está em uso
       const { data: existingUsers, error: checkError } = await supabase
@@ -49,223 +49,136 @@ const RegisterPage = () => {
         .select('email')
         .eq('email', email)
         .maybeSingle()
-      
+
       if (checkError) {
         console.error('Erro ao verificar email:', checkError)
       }
-      
+
       if (existingUsers) {
         setError('Este email já está em uso')
         toast.error('Este email já está em uso')
         setIsLoading(false)
         return
       }
-      
+
       // Registra o usuário
-      const registerResult = await register(fullName, email, password)
-      
-      if (registerResult.success) {
+      const registerResult = await signUp(email, password, { full_name: fullName })
+
+      if (registerResult.data && !registerResult.error) {
         toast.success('Cadastro realizado com sucesso!')
-        
+
         // Faz login automaticamente
-        const loginResult = await login(email, password)
-        
-        if (loginResult.success) {
-          // Se o perfil precisa ser completado, redireciona para a página de completar perfil
-          if (!loginResult.profileComplete) {
-            navigate('/completar-perfil')
-          } else {
-            navigate('/dashboard')
-          }
+        const loginResult = await signIn(email, password)
+
+        if (loginResult.data && !loginResult.error) {
+          navigate('/dashboard')
         } else {
           navigate('/login')
         }
       } else {
-        setError(registerResult.message || 'Erro ao criar conta')
-        toast.error(registerResult.message || 'Erro ao criar conta')
+        setError(registerResult.error || 'Erro ao criar conta')
+        toast.error(registerResult.error || 'Erro ao criar conta')
       }
     } catch (error) {
-      console.error('Erro ao registrar:', error)
-      setError('Erro ao criar conta. Tente novamente.')
-      toast.error('Erro ao criar conta. Tente novamente.')
+      console.error('Erro no registro:', error)
+      setError('Erro interno do servidor')
+      toast.error('Erro interno do servidor')
     } finally {
       setIsLoading(false)
     }
   }
-  
+
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-          Crie sua conta
-        </h2>
-        <p className="mt-2 text-center text-sm text-gray-600">
-          Ou{' '}
-          <Link to="/login" className="font-medium text-primary-600 hover:text-primary-500">
-            acesse sua conta existente
-          </Link>
-        </p>
-      </div>
+    <div className="min-h-screen bg-gradient-to-br from-blue-900 via-purple-900 to-indigo-900 flex items-center justify-center p-4">
+      <div className="bg-white/10 backdrop-blur-lg rounded-2xl shadow-2xl p-8 w-full max-w-md border border-white/20">
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-bold text-white mb-2">Criar Conta</h1>
+          <p className="text-gray-300">Junte-se ao PrimeFit hoje</p>
+        </div>
 
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
-          {error && (
-            <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative" role="alert">
-              <span className="block sm:inline">{error}</span>
-            </div>
-          )}
-          
-          <form className="space-y-6" onSubmit={handleSubmit}>
-            <div>
-              <label htmlFor="full_name" className="block text-sm font-medium text-gray-700">
-                Nome completo
-              </label>
-              <div className="mt-1">
-                <input
-                  id="full_name"
-                  name="full_name"
-                  type="text"
-                  autoComplete="name"
-                  required
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  className="input"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                Email
-              </label>
-              <div className="mt-1">
-                <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  autoComplete="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="input"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-                Senha
-              </label>
-              <div className="mt-1">
-                <input
-                  id="password"
-                  name="password"
-                  type="password"
-                  autoComplete="new-password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="input"
-                />
-              </div>
-              <p className="mt-1 text-xs text-gray-500">A senha deve ter pelo menos 6 caracteres</p>
-            </div>
-
-            <div>
-              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">
-                Confirme a senha
-              </label>
-              <div className="mt-1">
-                <input
-                  id="confirmPassword"
-                  name="confirmPassword"
-                  type="password"
-                  autoComplete="new-password"
-                  required
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="input"
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center">
-              <input
-                id="terms"
-                name="terms"
-                type="checkbox"
-                required
-                className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-              />
-              <label htmlFor="terms" className="ml-2 block text-sm text-gray-900">
-                Eu concordo com os{' '}
-                <a href="#" className="font-medium text-primary-600 hover:text-primary-500">
-                  Termos de Serviço
-                </a>{' '}
-                e{' '}
-                <a href="#" className="font-medium text-primary-600 hover:text-primary-500">
-                  Política de Privacidade
-                </a>
-              </label>
-            </div>
-
-            <div>
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-              >
-                {isLoading ? (
-                  <>
-                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    Processando...
-                  </>
-                ) : (
-                  "Criar conta"
-                )}
-              </button>
-            </div>
-          </form>
-
-          <div className="mt-6">
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-300"></div>
-              </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-white text-gray-500">Ou continue com</span>
-              </div>
-            </div>
-
-            <div className="mt-6 grid grid-cols-2 gap-3">
-              <div>
-                <a
-                  href="#"
-                  className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
-                >
-                  <span className="sr-only">Cadastrar com Google</span>
-                  <svg className="w-5 h-5" aria-hidden="true" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M12.48 10.92v3.28h7.84c-.24 1.84-.853 3.187-1.787 4.133-1.147 1.147-2.933 2.4-6.053 2.4-4.827 0-8.6-3.893-8.6-8.72s3.773-8.72 8.6-8.72c2.6 0 4.507 1.027 5.907 2.347l2.307-2.307C18.747 1.44 16.133 0 12.48 0 5.867 0 .307 5.387.307 12s5.56 12 12.173 12c3.573 0 6.267-1.173 8.373-3.36 2.16-2.16 2.84-5.213 2.84-7.667 0-.76-.053-1.467-.173-2.053H12.48z" />
-                  </svg>
-                </a>
-              </div>
-
-              <div>
-                <a
-                  href="#"
-                  className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
-                >
-                  <span className="sr-only">Cadastrar com Facebook</span>
-                  <svg className="w-5 h-5" aria-hidden="true" fill="currentColor" viewBox="0 0 24 24">
-                    <path fillRule="evenodd" d="M22 12c0-5.523-4.477-10-10-10S2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.878v-6.987h-2.54V12h2.54V9.797c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562V12h2.773l-.443 2.89h-2.33v6.988C18.343 21.128 22 16.991 22 12z" clipRule="evenodd" />
-                  </svg>
-                </a>
-              </div>
-            </div>
+        {error && (
+          <div className="bg-red-500/20 border border-red-500/50 text-red-100 px-4 py-3 rounded-lg mb-6">
+            {error}
           </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div>
+            <label htmlFor="fullName" className="block text-sm font-medium text-gray-300 mb-2">
+              Nome Completo
+            </label>
+            <input
+              type="text"
+              id="fullName"
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="Seu nome completo"
+              required
+            />
+          </div>
+
+          <div>
+            <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-2">
+              Email
+            </label>
+            <input
+              type="email"
+              id="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="seu@email.com"
+              required
+            />
+          </div>
+
+          <div>
+            <label htmlFor="password" className="block text-sm font-medium text-gray-300 mb-2">
+              Senha
+            </label>
+            <input
+              type="password"
+              id="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="Sua senha"
+              required
+            />
+          </div>
+
+          <div>
+            <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-300 mb-2">
+              Confirmar Senha
+            </label>
+            <input
+              type="password"
+              id="confirmPassword"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="Confirme sua senha"
+              required
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={isLoading}
+            className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 px-4 rounded-lg font-semibold hover:from-blue-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-900 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+          >
+            {isLoading ? 'Criando conta...' : 'Criar Conta'}
+          </button>
+        </form>
+
+        <div className="mt-6 text-center">
+          <p className="text-gray-300">
+            Já tem uma conta?{' '}
+            <Link to="/login" className="text-blue-400 hover:text-blue-300 font-semibold">
+              Faça login
+            </Link>
+          </p>
         </div>
       </div>
     </div>
@@ -273,3 +186,4 @@ const RegisterPage = () => {
 }
 
 export default RegisterPage
+
