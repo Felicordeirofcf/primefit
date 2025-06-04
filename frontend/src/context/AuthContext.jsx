@@ -14,45 +14,40 @@ export const useAuth = () => {
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [userProfile, setUserProfile] = useState(null);
-  const [loading, setLoading] = useState(true); // Start as true
-  const [isAdmin, setIsAdmin] = useState(null); // Start as null to indicate unknown status
-  const [isLoggingOut, setIsLoggingOut] = useState(false); // Flag to prevent multiple logout calls
+  // Start loading as true only for the very initial load
+  const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(null);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
-  // Derived properties
   const isAuthenticated = !!user;
   const isProfileComplete = !!(userProfile?.nome && userProfile?.objetivo);
 
-  // --- Fetch User Profile and Admin Status --- 
   const fetchUserProfileAndAdminStatus = useCallback(async (userId, userEmail) => {
     if (!userId || !userEmail) {
       setUserProfile(null);
       setIsAdmin(false);
-      return; // No user, clear profile and admin status
+      return;
     }
 
     try {
       console.log('Buscando perfil e status de admin para:', userId);
-      // Fetch profile and admin status in parallel
       const [profileResponse, adminResponse] = await Promise.all([
         supabase.from('profiles').select('*').eq('id', userId).single(),
         supabase.rpc('is_admin_by_email', { user_email: userEmail })
       ]);
 
-      // Process Profile Response
-      if (profileResponse.error) {
-        if (profileResponse.error.code === 'PGRST116') {
-          console.log('Perfil não encontrado, usando perfil básico');
-          setUserProfile({ id: userId, email: userEmail, nome: userEmail.split('@')[0] || 'Usuário', role: 'cliente' });
-        } else {
-          console.error('Erro ao buscar perfil:', profileResponse.error);
-          setUserProfile({ id: userId, email: userEmail, nome: userEmail.split('@')[0] || 'Usuário', role: 'cliente' }); // Fallback
-        }
-      } else {
+      if (profileResponse.error && profileResponse.error.code !== 'PGRST116') {
+        console.error('Erro ao buscar perfil:', profileResponse.error);
+        // Use fallback profile but keep existing role if available
+        setUserProfile(prev => ({ ...prev, id: userId, email: userEmail, nome: userEmail.split('@')[0] || 'Usuário' }));
+      } else if (profileResponse.data) {
         console.log('Perfil encontrado:', profileResponse.data);
         setUserProfile(profileResponse.data);
+      } else {
+         console.log('Perfil não encontrado, usando perfil básico');
+         setUserProfile({ id: userId, email: userEmail, nome: userEmail.split('@')[0] || 'Usuário', role: 'cliente' });
       }
 
-      // Process Admin Status Response
       if (adminResponse.error) {
         console.error('Erro ao verificar admin:', adminResponse.error);
         setIsAdmin(false);
@@ -63,22 +58,19 @@ export const AuthProvider = ({ children }) => {
 
     } catch (error) {
       console.error('Erro geral ao buscar perfil/admin:', error);
-      setUserProfile({ id: userId, email: userEmail, nome: userEmail.split('@')[0] || 'Usuário', role: 'cliente' }); // Fallback
+      setUserProfile(prev => ({ ...prev, id: userId, email: userEmail, nome: userEmail.split('@')[0] || 'Usuário', role: 'cliente' }));
       setIsAdmin(false);
     }
-  }, []); // useCallback dependencies are empty as it uses args
+  }, []);
 
-  // --- Effect for Session Handling --- 
   useEffect(() => {
-    let isMounted = true; // Flag to prevent state updates on unmounted component
-    setLoading(true); // Ensure loading is true when effect runs
+    let isMounted = true;
+    setLoading(true); // Start loading for initial check
 
-    const checkSessionAndSetupListener = async () => {
+    const checkInitialSession = async () => {
       try {
-        // 1. Check initial session
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-
-        if (!isMounted) return; // Exit if component unmounted
+        if (!isMounted) return;
 
         if (sessionError) {
           console.error('Erro ao obter sessão inicial:', sessionError);
@@ -90,7 +82,7 @@ export const AuthProvider = ({ children }) => {
           setUser(session.user);
           await fetchUserProfileAndAdminStatus(session.user.id, session.user.email);
         } else {
-          // No initial session
+          console.log('Nenhuma sessão inicial encontrada.');
           setUser(null);
           setUserProfile(null);
           setIsAdmin(false);
@@ -104,132 +96,161 @@ export const AuthProvider = ({ children }) => {
         }
       } finally {
         if (isMounted) {
-          // *** CRITICAL: Set loading false ONLY after initial check AND profile fetch attempt ***
+          // Set loading false ONLY after the initial check is complete
           setLoading(false);
         }
       }
+    };
 
-      // 2. Setup Auth State Change Listener
-      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-        if (!isMounted) return; // Exit if component unmounted
+    checkInitialSession();
 
-        console.log('Auth state changed:', event, session?.user?.id);
-        setLoading(true); // Set loading true during state change processing
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!isMounted) return;
 
-        if (event === 'SIGNED_IN' && session?.user) {
+      console.log('Auth state changed:', event, session?.user?.id);
+
+      // --- Handle different auth events --- 
+      if (event === 'SIGNED_IN') {
+        // Set loading true only if user is changing significantly or profile needs fetch
+        setLoading(true);
+        setUser(session.user);
+        await fetchUserProfileAndAdminStatus(session.user.id, session.user.email);
+        setLoading(false);
+      } else if (event === 'SIGNED_OUT') {
+        // Don't set loading=true here, logout should be quick state clear
+        setUser(null);
+        setUserProfile(null);
+        setIsAdmin(null); // Reset admin status on logout
+        // setLoading(false); // Ensure loading is false if it was somehow true
+      } else if (event === 'TOKEN_REFRESHED') {
+        if (session?.user) {
+          console.log('Token refreshed for user:', session.user.id);
+          // Only update user object if it's different, avoid unnecessary state changes
+          setUser(currentUser => {
+            if (JSON.stringify(currentUser) !== JSON.stringify(session.user)) {
+              return session.user;
+            }
+            return currentUser;
+          });
+          // ** CRITICAL CHANGE: Do NOT set loading to true/false here **
+          // Token refresh should happen in the background without disrupting the UI
+          // If profile *must* be refetched based on token claims, do it here, but
+          // be mindful it could cause loading states.
+          // await fetchUserProfileAndAdminStatus(session.user.id, session.user.email);
+        } else {
+           // If TOKEN_REFRESHED event occurs but session is null, treat as sign out
+           console.warn('TOKEN_REFRESHED event with null session, treating as SIGNED_OUT.');
+           setUser(null);
+           setUserProfile(null);
+           setIsAdmin(null);
+        }
+      } else if (event === 'INITIAL_SESSION') {
+        // This event might fire alongside SIGNED_IN or TOKEN_REFRESHED after initial load
+        // Usually, we rely on getSession() for the initial state.
+        // If session exists here, ensure user state is consistent.
+        console.log('INITIAL_SESSION event received.');
+        if (session?.user && !user) { // Only act if user isn't already set
+          console.log('Setting user based on INITIAL_SESSION event.');
+          setLoading(true);
           setUser(session.user);
           await fetchUserProfileAndAdminStatus(session.user.id, session.user.email);
-        } else if (event === 'SIGNED_OUT') {
-          setUser(null);
-          setUserProfile(null);
-          setIsAdmin(false);
-        } else if (event === 'TOKEN_REFRESHED' && session?.user) {
-          // Update user state if needed on token refresh, profile likely unchanged
-          setUser(session.user);
-          // Optionally re-fetch profile if it might change based on token claims
-          // await fetchUserProfileAndAdminStatus(session.user.id, session.user.email);
+          setLoading(false);
+        } else if (!session?.user && user) {
+           // If INITIAL_SESSION has no user but we thought we had one, sign out
+           console.warn('INITIAL_SESSION event with null session, signing out.');
+           setUser(null);
+           setUserProfile(null);
+           setIsAdmin(null);
         }
-        // Add handling for other events like USER_UPDATED if necessary
+      } else if (event === 'USER_UPDATED') {
+          if (session?.user) {
+              console.log('USER_UPDATED event for:', session.user.id);
+              setUser(session.user);
+              // Optionally refetch profile if needed after user update
+              // setLoading(true);
+              // await fetchUserProfileAndAdminStatus(session.user.id, session.user.email);
+              // setLoading(false);
+          }
+      }
+      // Add handling for other events like PASSWORD_RECOVERY if needed
+    });
 
-        setLoading(false); // Set loading false after processing the event
-      });
-
-      // Return cleanup function for the listener
-      return () => {
-        isMounted = false;
-        subscription?.unsubscribe();
-      };
-    };
-
-    checkSessionAndSetupListener();
-
-    // Cleanup function for the useEffect itself
     return () => {
       isMounted = false;
+      subscription?.unsubscribe();
+      console.log('Auth listener unsubscribed.');
     };
-  }, [fetchUserProfileAndAdminStatus]); // Add dependency
+  }, [fetchUserProfileAndAdminStatus, user]); // Added 'user' to dependency array to react correctly if INITIAL_SESSION finds no user when 'user' state was previously set.
 
   // --- Auth Actions --- 
 
   const signIn = async (email, password) => {
-    setLoading(true);
+    // setLoading(true); // Let onAuthStateChange handle loading
     try {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
-      console.log('Login realizado com sucesso:', data.user.id);
-      // onAuthStateChange will handle setting user and profile
+      console.log('Login request successful for:', email);
+      // onAuthStateChange will handle setting user, profile and loading state
       return { data, error: null };
     } catch (error) {
       console.error('Erro no login:', error);
-      setLoading(false); // Ensure loading is false on error
+      // setLoading(false); // Ensure loading is false on error if not handled by listener
       return { data: null, error };
-    } 
-    // setLoading(false) is handled by onAuthStateChange listener
+    }
   };
 
   const signUp = async (email, password, userData = {}) => {
-    setLoading(true);
+    setLoading(true); // Set loading during signup process
     try {
       const { data, error } = await supabase.auth.signUp({ email, password, options: { data: userData } });
       if (error) throw error;
-      // User might need email confirmation, onAuthStateChange might not fire SIGNED_IN immediately
-      // Depending on flow, might need manual user/profile setting or rely on confirmation redirect
+      console.log('Signup request successful for:', email);
+      // User might need email confirmation. State might not change until confirmation.
       return { data, error: null };
     } catch (error) {
       console.error('Erro no cadastro:', error);
       return { data: null, error };
     } finally {
-      setLoading(false); // Set loading false after signup attempt
+      setLoading(false);
     }
   };
 
   const signOut = async () => {
-    // Prevent multiple simultaneous logout calls
-    if (isLoggingOut) return { error: null }; 
-    
+    if (isLoggingOut) return { error: null };
     setIsLoggingOut(true);
-    setLoading(true); // Indicate loading during logout
+    // setLoading(true); // Let onAuthStateChange handle loading state if needed
     try {
       console.log("Attempting Supabase sign out...");
       const { error } = await supabase.auth.signOut();
-      if (error) {
-        // Log specific Supabase error but don't throw if it's session missing
-        if (error.message === 'Auth session missing!') {
-            console.warn('Supabase signOut warning:', error.message, '- Session might have already been cleared.');
-        } else {
-            console.error('Erro no Supabase signOut:', error);
-            // Decide if you want to throw other errors or just log them
-            // throw error; 
-        }
+      if (error && error.message !== 'Auth session missing!') {
+          console.error('Erro no Supabase signOut:', error);
+          // Don't throw, but log the error. State will be cleared locally anyway.
       }
-      console.log("Supabase sign out completed (or session was missing).");
-      // Manually clear local state regardless of Supabase error (idempotent)
+      console.log("Supabase sign out completed or session was missing.");
+      // Manually clear local state immediately for responsiveness
       setUser(null);
       setUserProfile(null);
-      setIsAdmin(false);
-      // onAuthStateChange will also fire SIGNED_OUT, potentially setting loading false
-      return { error: null }; // Return success even if session was already missing
+      setIsAdmin(null);
+      return { error: null };
     } catch (error) {
-      // Catch unexpected errors during the process
       console.error('Erro inesperado durante o logout:', error);
-      // Still clear local state in case of unexpected error
+      // Still clear local state
       setUser(null);
       setUserProfile(null);
-      setIsAdmin(false);
-      return { error }; // Return the caught error
+      setIsAdmin(null);
+      return { error };
     } finally {
-      setIsLoggingOut(false); // Allow logout again
-      setLoading(false); // Ensure loading is false after logout attempt
+      setIsLoggingOut(false);
+      // setLoading(false); // Ensure loading is false
       console.log("SignOut function finished.");
     }
   };
 
   const updateProfile = async (updates) => {
     if (!user) throw new Error('Usuário não autenticado');
-    
-    // setLoading(true); // Optional: indicate loading during profile update
+    // setLoading(true); // Optional: Indicate loading
     try {
-      console.log('Dados originais do formulário:', updates);
+      console.log('Atualizando perfil com:', updates);
       const profileData = {
         nome: updates.full_name || updates.nome,
         data_nascimento: updates.birth_date || updates.data_nascimento,
@@ -239,8 +260,14 @@ export const AuthProvider = ({ children }) => {
         peso_inicial: updates.weight ? parseFloat(updates.weight) : updates.peso_inicial,
         condicoes_saude: updates.health_conditions || updates.condicoes_saude
       };
-      Object.keys(profileData).forEach(key => (profileData[key] === undefined || profileData[key] === null) && delete profileData[key]);
-      console.log('Dados mapeados para o banco:', profileData);
+      Object.keys(profileData).forEach(key => (profileData[key] === undefined || profileData[key] === null || profileData[key] === '') && delete profileData[key]);
+
+      if (Object.keys(profileData).length === 0) {
+        console.log("Nenhum dado válido para atualizar o perfil.");
+        return { data: userProfile, error: null }; // Return current profile if no changes
+      }
+
+      console.log('Dados mapeados para update:', profileData);
 
       const { data, error } = await supabase
         .from('profiles')
@@ -252,13 +279,13 @@ export const AuthProvider = ({ children }) => {
       if (error) throw error;
 
       console.log('Perfil atualizado no banco:', data);
-      setUserProfile(data); // Update local profile state
+      setUserProfile(data);
       return { data, error: null };
     } catch (error) {
       console.error('Erro ao atualizar perfil:', error);
       return { data: null, error };
     } finally {
-      // setLoading(false); // Optional: stop loading indicator
+      // setLoading(false); // Optional: Stop loading
     }
   };
 
@@ -273,7 +300,6 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Function to get current token (might not be needed if session state is reliable)
   const getSessionToken = async () => {
     try {
       const { data: { session }, error } = await supabase.auth.getSession();
@@ -288,7 +314,6 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // --- Context Value --- 
   const value = {
     user,
     userProfile,
