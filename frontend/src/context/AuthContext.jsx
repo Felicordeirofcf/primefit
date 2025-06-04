@@ -14,7 +14,7 @@ export const useAuth = () => {
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [userProfile, setUserProfile] = useState(null);
-  // Loading state: true initially, managed during auth events.
+  // Loading state: true initially, false after initial check or auth event.
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(null);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -22,10 +22,9 @@ export const AuthProvider = ({ children }) => {
   const isAuthenticated = !!user;
   const isProfileComplete = !!(userProfile?.nome && userProfile?.objetivo);
 
-  // useCallback ensures this function has a stable reference unless dependencies change.
+  // useCallback ensures this function has a stable reference.
   // Fetches user profile and admin status from Supabase.
   const fetchUserProfileAndAdminStatus = useCallback(async (userId, userEmail) => {
-    // Clear profile/admin status if userId or userEmail is missing.
     if (!userId || !userEmail) {
       console.log('fetchUserProfileAndAdminStatus: userId or userEmail missing, clearing state.');
       setUserProfile(null);
@@ -35,32 +34,24 @@ export const AuthProvider = ({ children }) => {
 
     console.log(`fetchUserProfileAndAdminStatus: Fetching for userId: ${userId}`);
     try {
-      // Fetch profile and check admin status concurrently.
       const [profileResponse, adminResponse] = await Promise.all([
         supabase.from('profiles').select('*').eq('id', userId).single(),
         supabase.rpc('is_admin_by_email', { user_email: userEmail })
       ]);
 
-      // Handle profile response.
-      if (profileResponse.error && profileResponse.error.code !== 'PGRST116') { // PGRST116: No rows found
+      // Handle profile response
+      if (profileResponse.error && profileResponse.error.code !== 'PGRST116') {
         console.error('Erro ao buscar perfil:', profileResponse.error);
-        // Fallback: Keep previous profile data if available, but ensure basic info exists.
-        setUserProfile(prev => ({ 
-          ...(prev || {}), // Keep existing data if any
-          id: userId, 
-          email: userEmail, 
-          nome: prev?.nome || userEmail.split('@')[0] || 'Usuário' 
-        }));
+        setUserProfile(prev => ({ ...(prev || {}), id: userId, email: userEmail, nome: prev?.nome || userEmail.split('@')[0] || 'Usuário' }));
       } else if (profileResponse.data) {
         console.log('Perfil encontrado:', profileResponse.data);
         setUserProfile(profileResponse.data);
       } else {
          console.log('Perfil não encontrado, usando perfil básico');
-         // Set a basic profile if none exists.
          setUserProfile({ id: userId, email: userEmail, nome: userEmail.split('@')[0] || 'Usuário', role: 'cliente' });
       }
 
-      // Handle admin status response.
+      // Handle admin status response
       if (adminResponse.error) {
         console.error('Erro ao verificar admin:', adminResponse.error);
         setIsAdmin(false);
@@ -71,76 +62,54 @@ export const AuthProvider = ({ children }) => {
 
     } catch (error) {
       console.error('Erro geral ao buscar perfil/admin:', error);
-      // Fallback on general error.
-      setUserProfile(prev => ({ 
-        ...(prev || {}), 
-        id: userId, 
-        email: userEmail, 
-        nome: prev?.nome || userEmail.split('@')[0] || 'Usuário', 
-        role: prev?.role || 'cliente' 
-      }));
+      setUserProfile(prev => ({ ...(prev || {}), id: userId, email: userEmail, nome: prev?.nome || userEmail.split('@')[0] || 'Usuário', role: prev?.role || 'cliente' }));
       setIsAdmin(false);
     }
-  }, []); // Empty dependency array: This function reference is stable.
+  }, []); // Empty dependency array: Function reference is stable.
 
-  // Main effect for handling authentication state changes.
+  // Effect to handle initial session check and auth state changes.
   useEffect(() => {
     let isMounted = true;
-    console.log("AuthContext useEffect: Mounting and setting up listener.");
-    setLoading(true); // Indicate loading state on initial mount and setup.
+    let authSubscription = null;
+    console.log("AuthContext useEffect: Mounting. Setting up initial check and listener.");
+    setLoading(true);
 
-    // Function to check the initial session state when the component mounts.
-    const checkInitialSession = async () => {
-      console.log("checkInitialSession: Checking...");
-      try {
-        // Fetches the current session from Supabase.
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-        
-        // Don't update state if the component has unmounted.
-        if (!isMounted) {
-          console.log("checkInitialSession: Unmounted before session check completed.");
-          return;
-        }
-
-        if (sessionError) {
-          console.error('Erro ao obter sessão inicial:', sessionError);
-          setUser(null);
-          setUserProfile(null);
-          setIsAdmin(false);
-        } else if (session?.user) {
-          console.log('Sessão inicial encontrada:', session.user.id);
-          setUser(session.user);
-          // Fetch profile details for the logged-in user.
-          await fetchUserProfileAndAdminStatus(session.user.id, session.user.email);
-        } else {
-          console.log('Nenhuma sessão inicial encontrada.');
-          setUser(null);
-          setUserProfile(null);
-          setIsAdmin(false);
-        }
-      } catch (error) {
-        if (isMounted) {
-          console.error('Erro na verificação de sessão inicial:', error);
-          setUser(null);
-          setUserProfile(null);
-          setIsAdmin(false);
-        }
-      } finally {
-        // Ensure loading is set to false after the initial check completes.
-        if (isMounted) {
-          console.log("checkInitialSession: Finished, setting loading to false.");
-          setLoading(false);
-        }
+    // Check initial session state on mount
+    supabase.auth.getSession().then(async ({ data: { session }, error: sessionError }) => {
+      if (!isMounted) {
+        console.log("Initial getSession: Unmounted before completion.");
+        return;
       }
-    };
+      if (sessionError) {
+        console.error('Erro ao obter sessão inicial via getSession:', sessionError);
+        setUser(null);
+        setUserProfile(null);
+        setIsAdmin(false);
+      } else if (session?.user) {
+        console.log('Sessão inicial encontrada via getSession:', session.user.id);
+        setUser(session.user);
+        await fetchUserProfileAndAdminStatus(session.user.id, session.user.email);
+      } else {
+        console.log('Nenhuma sessão inicial encontrada via getSession.');
+        setUser(null);
+        setUserProfile(null);
+        setIsAdmin(false);
+      }
+      // Set loading to false ONLY after the initial session check is complete.
+      console.log("Initial getSession: Finished, setting loading to false.");
+      setLoading(false);
+    }).catch(error => {
+      if (isMounted) {
+        console.error('Erro catastrófico na verificação de sessão inicial (getSession):', error);
+        setUser(null);
+        setUserProfile(null);
+        setIsAdmin(false);
+        setLoading(false);
+      }
+    });
 
-    // Execute the initial session check.
-    checkInitialSession();
-
-    // Set up the listener for Supabase auth state changes.
-    console.log("Setting up supabase.auth.onAuthStateChange listener.");
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      // Prevent state updates if the component is unmounted.
+    // Set up the listener for subsequent auth state changes.
+    const { data } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!isMounted) {
         console.log(`onAuthStateChange: Received event ${event} but component unmounted.`);
         return;
@@ -148,20 +117,17 @@ export const AuthProvider = ({ children }) => {
 
       console.log(`onAuthStateChange: Event received - ${event}, User ID: ${session?.user?.id}`);
 
-      // Handle different authentication events.
       switch (event) {
         case 'SIGNED_IN':
           console.log('Handling SIGNED_IN event.');
-          // NOTE: Setting loading here might cause UI flicker if components react strongly.
-          // Consider if this is necessary or if loading should only be true on initial mount.
-          setLoading(true);
+          // Avoid setting loading here if getSession already handled it, unless necessary.
+          // setLoading(true); 
           setUser(session.user);
           await fetchUserProfileAndAdminStatus(session.user.id, session.user.email);
-          setLoading(false);
+          // setLoading(false);
           break;
         case 'SIGNED_OUT':
           console.log('Handling SIGNED_OUT event.');
-          // Clear user state immediately for responsiveness.
           setUser(null);
           setUserProfile(null);
           setIsAdmin(null);
@@ -178,11 +144,9 @@ export const AuthProvider = ({ children }) => {
               }
               return currentUser;
             });
-            // Re-fetching profile on token refresh is usually not needed unless
-            // specific claims changed that require profile update.
+            // Optionally re-fetch profile if needed based on token claims.
             // await fetchUserProfileAndAdminStatus(session.user.id, session.user.email);
           } else {
-            // If token refresh results in no user, treat as sign out.
             console.warn('TOKEN_REFRESHED event with null session, treating as SIGNED_OUT.');
             setUser(null);
             setUserProfile(null);
@@ -190,26 +154,6 @@ export const AuthProvider = ({ children }) => {
             setLoading(false);
           }
           break;
-        case 'INITIAL_SESSION':
-           console.log('Handling INITIAL_SESSION event.');
-           // This event might fire alongside SIGNED_IN after initial load.
-           // Rely primarily on checkInitialSession for the initial state.
-           if (session?.user && !user) { // Act only if we didn't have a user before.
-             console.log('Setting user based on INITIAL_SESSION event (user was previously null).');
-             // NOTE: Setting loading here might cause UI flicker.
-             setLoading(true);
-             setUser(session.user);
-             await fetchUserProfileAndAdminStatus(session.user.id, session.user.email);
-             setLoading(false);
-           } else if (!session?.user && user) {
-             // If INITIAL_SESSION has no user but we thought we had one, sign out.
-             console.warn('INITIAL_SESSION event with null session, signing out.');
-             setUser(null);
-             setUserProfile(null);
-             setIsAdmin(null);
-             setLoading(false);
-           }
-           break;
         case 'USER_UPDATED':
           console.log('Handling USER_UPDATED event.');
           if (session?.user) {
@@ -220,56 +164,64 @@ export const AuthProvider = ({ children }) => {
               // setLoading(false);
           }
           break;
-        // Add handling for other events like PASSWORD_RECOVERY if needed.
+        case 'PASSWORD_RECOVERY':
+          console.log('Handling PASSWORD_RECOVERY event.');
+          // Typically, no state change needed here, user follows email link.
+          break;
+        // INITIAL_SESSION is often redundant if getSession() is used reliably on mount.
+        // If needed, ensure it doesn't conflict with the initial getSession logic.
+        case 'INITIAL_SESSION':
+           console.log('Handling INITIAL_SESSION event (usually handled by getSession).');
+           // Avoid setting state here if getSession already did, prevents potential race conditions.
+           break;
         default:
           console.log(`Unhandled auth event: ${event}`);
       }
     });
 
-    // Cleanup function: This runs when the component unmounts.
+    authSubscription = data.subscription;
+
+    // Cleanup function: Runs when the component unmounts.
     return () => {
       console.log("AuthContext useEffect: Unmounting and cleaning up listener.");
       isMounted = false;
-      // Unsubscribe from the listener to prevent memory leaks.
-      if (subscription) {
-        subscription.unsubscribe();
+      if (authSubscription) {
+        authSubscription.unsubscribe();
         console.log('Auth listener unsubscribed successfully.');
       } else {
-        console.warn('Attempted to unsubscribe, but subscription was null.');
+        console.warn('Attempted to unsubscribe, but subscription was not properly set.');
       }
     };
-  // Dependency array: fetchUserProfileAndAdminStatus is stable due to useCallback([]).
-  // This effect should run only once when the component mounts.
-  // Removed 'user' from dependencies to prevent re-subscribing on user state change.
-  }, [fetchUserProfileAndAdminStatus]); 
+  // Corrected Dependency Array: Only include stable functions like fetchUserProfileAndAdminStatus.
+  // This ensures the effect runs only ONCE on mount and cleans up on unmount.
+  }, [fetchUserProfileAndAdminStatus]);
 
   // --- Auth Actions --- 
 
   const signIn = async (email, password) => {
     console.log(`signIn: Attempting login for ${email}`);
-    // Loading state is handled by onAuthStateChange ('SIGNED_IN').
+    // setLoading(true); // Let onAuthStateChange handle loading state.
     try {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
       console.log('Login request successful.');
-      // State updates (user, profile, loading) are handled by the onAuthStateChange listener.
+      // State updates handled by the listener.
       return { data, error: null };
     } catch (error) {
       console.error('Erro no login:', error);
-      // Ensure loading is false on error if not handled by listener.
-      setLoading(false);
+      setLoading(false); // Ensure loading is false on error.
       return { data: null, error };
     }
   };
 
   const signUp = async (email, password, userData = {}) => {
     console.log(`signUp: Attempting signup for ${email}`);
-    setLoading(true); // Indicate loading during the signup process.
+    setLoading(true);
     try {
       const { data, error } = await supabase.auth.signUp({ email, password, options: { data: userData } });
       if (error) throw error;
       console.log('Signup request successful.');
-      // User might need email confirmation. State changes might occur later via onAuthStateChange.
+      // State changes might occur later via listener (e.g., after email confirmation).
       return { data, error: null };
     } catch (error) {
       console.error('Erro no cadastro:', error);
@@ -280,37 +232,33 @@ export const AuthProvider = ({ children }) => {
   };
 
   const signOut = async () => {
-    // Prevent multiple simultaneous sign-out attempts.
     if (isLoggingOut) {
       console.log("signOut: Already logging out.");
       return { error: null };
     }
     console.log("signOut: Attempting...");
     setIsLoggingOut(true);
-    // Loading state changes are handled by onAuthStateChange ('SIGNED_OUT').
+    // setLoading(true); // Let listener handle SIGNED_OUT state.
     try {
       const { error } = await supabase.auth.signOut();
-      // Ignore 'Auth session missing!' error as it's not critical.
       if (error && error.message !== 'Auth session missing!') {
           console.error('Erro no Supabase signOut:', error);
-          // Don't throw, just log. Local state will be cleared anyway.
       }
       console.log("Supabase sign out completed or session was missing.");
-      // Manually clear local state immediately for better responsiveness.
+      // Manually clear state for responsiveness, listener will confirm.
       setUser(null);
       setUserProfile(null);
       setIsAdmin(null);
-      return { error: null }; // Return null error even if Supabase had a minor issue.
+      return { error: null };
     } catch (error) {
       console.error('Erro inesperado durante o logout:', error);
-      // Ensure local state is cleared even on unexpected errors.
       setUser(null);
       setUserProfile(null);
       setIsAdmin(null);
       return { error };
     } finally {
       setIsLoggingOut(false);
-      setLoading(false); // Ensure loading is false after sign out attempt.
+      setLoading(false); // Ensure loading is false.
       console.log("signOut: Function finished.");
     }
   };
@@ -320,49 +268,43 @@ export const AuthProvider = ({ children }) => {
       console.error("updateProfile: User not authenticated.");
       throw new Error('Usuário não autenticado');
     }
-    // setLoading(true); // Optional: Indicate loading during profile update.
+    // setLoading(true); // Optional loading indicator.
     try {
       console.log('updateProfile: Updating with:', updates);
-      // Map frontend field names to Supabase column names if necessary.
       const profileData = {
         nome: updates.full_name || updates.nome,
         data_nascimento: updates.birth_date || updates.data_nascimento,
         telefone: updates.phone || updates.telefone,
         objetivo: updates.goal || updates.objetivo,
-        // Ensure height/weight are stored correctly (e.g., height in meters).
         altura: updates.height ? parseFloat(updates.height) / 100 : updates.altura,
         peso_inicial: updates.weight ? parseFloat(updates.weight) : updates.peso_inicial,
         condicoes_saude: updates.health_conditions || updates.condicoes_saude
       };
-      // Remove undefined/null/empty fields to avoid overwriting existing data unintentionally.
       Object.keys(profileData).forEach(key => (profileData[key] === undefined || profileData[key] === null || profileData[key] === '') && delete profileData[key]);
 
       if (Object.keys(profileData).length === 0) {
         console.log("updateProfile: No valid data provided for update.");
-        return { data: userProfile, error: null }; // Return current profile if no changes.
+        return { data: userProfile, error: null };
       }
 
       console.log('updateProfile: Mapped data for Supabase:', profileData);
-
-      // Perform the update operation in Supabase.
       const { data, error } = await supabase
         .from('profiles')
         .update(profileData)
         .eq('id', user.id)
-        .select() // Select the updated row.
-        .single(); // Expect a single row.
+        .select()
+        .single();
 
       if (error) throw error;
 
       console.log('Perfil atualizado no banco:', data);
-      // Update the local profile state with the new data.
       setUserProfile(data);
       return { data, error: null };
     } catch (error) {
       console.error('Erro ao atualizar perfil:', error);
       return { data: null, error };
     } finally {
-      // setLoading(false); // Optional: Stop loading indicator.
+      // setLoading(false);
     }
   };
 
@@ -370,8 +312,7 @@ export const AuthProvider = ({ children }) => {
     console.log(`resetPassword: Requesting for email: ${email}`);
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        // Optional: Add redirect URL if needed
-        // redirectTo: 'http://localhost:5173/update-password',
+        // redirectTo: 'YOUR_PASSWORD_RESET_PAGE_URL',
       });
       if (error) throw error;
       console.log("Password reset email sent successfully.");
@@ -382,7 +323,6 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Function to get the current session's access token.
   const getSessionToken = async () => {
     console.log("getSessionToken: Attempting to get session token.");
     try {
@@ -400,7 +340,7 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Memoize the context value to prevent unnecessary re-renders for consumers.
+  // Memoize the context value to prevent unnecessary re-renders.
   const value = React.useMemo(() => ({
     user,
     userProfile,
@@ -414,11 +354,9 @@ export const AuthProvider = ({ children }) => {
     updateProfile,
     resetPassword,
     getSessionToken
-  // Ensure all state values and functions provided are listed as dependencies.
   }), [user, userProfile, loading, isAdmin, isAuthenticated, isProfileComplete, 
       signIn, signUp, signOut, updateProfile, resetPassword, getSessionToken]);
 
-  // Provide the authentication context to child components.
   return (
     <AuthContext.Provider value={value}>
       {children}
@@ -426,6 +364,5 @@ export const AuthProvider = ({ children }) => {
   );
 };
 
-// Export the context itself if needed for direct consumption.
 export { AuthContext };
 
