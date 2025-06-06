@@ -152,3 +152,21 @@ class SubscriptionResponse(BaseModel):
         from_attributes = True
 
 
+
+
+class MessageCreate(BaseModel):
+    usuario_id: str
+    assunto: str
+    conteudo: str
+
+class MessageResponse(BaseModel):
+    id: str
+    usuario_id: str
+    assunto: str
+    conteudo: str
+    enviado_em: datetime
+
+    class Config:
+        from_attributes = True
+
+
