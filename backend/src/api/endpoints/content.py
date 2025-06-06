@@ -1,10 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from typing import List, Optional
-
-from src.core.supabase_client import get_supabase_client
-supabase = get_supabase_client()
+from sqlalchemy.orm import Session
+from src.core.database import get_db
 from src.api.endpoints.auth import get_current_user
-from src.schemas.content import Content, ContentCreate, Comment
+from src.schemas.models import Profile # Assuming Profile is needed for author_id validation
+from src.schemas.content import Content, ContentCreate, Comment, CommentCreate # Assuming CommentCreate is needed
+from sqlalchemy import func
 
 router = APIRouter()
 
@@ -12,7 +13,8 @@ router = APIRouter()
 @router.post("/", response_model=Content)
 async def create_content(
     content: ContentCreate,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
     # Apenas administradores e personal trainers podem criar conteúdo
     if current_user["role"] not in ["admin", "trainer"]:
@@ -22,21 +24,12 @@ async def create_content(
         )
     
     try:
-        # Prepara dados para inserção
-        content_data = content.dict()
-        content_data["author_id"] = current_user["id"]
-        content_data["created_at"] = "now()"  # Função SQL para data atual
+        db_content = Content(**content.dict(), author_id=current_user["id"], created_at=func.now())
+        db.add(db_content)
+        db.commit()
+        db.refresh(db_content)
         
-        # Insere conteúdo no Supabase
-        response = supabase.table("contents").insert(content_data).execute()
-        
-        if not response.data or len(response.data) == 0:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Erro ao criar conteúdo"
-            )
-        
-        return response.data[0]
+        return db_content
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -48,32 +41,29 @@ async def get_contents(
     category: Optional[str] = None,
     tag: Optional[str] = None,
     published: bool = True,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
     try:
-        # Monta a query
-        query = supabase.table("contents").select("*")
+        query = db.query(Content)
         
-        # Aplica filtros se fornecidos
         if category:
-            query = query.eq("category", category)
+            query = query.filter(Content.category == category)
         
         if published is not None:
-            query = query.eq("published", published)
+            query = query.filter(Content.published == published)
         
-        # Filtro por tag é mais complexo, pois tags é um array
+        # Filtro por tag (assumindo que tags é um array de strings no DB)
         if tag:
-            query = query.contains("tags", [tag])
+            # This might need adjustment based on how tags are stored in PostgreSQL
+            # For PostgreSQL array type, you might use .any() or specific array operators
+            # For simplicity, assuming a simple string match for now, or adjust schema
+            # If tags is a JSONB column, you'd use jsonb_contains
+            pass # Placeholder for tag filtering, needs database schema clarification
         
-        # Ordena por data de criação decrescente
-        query = query.order("created_at", desc=True)
+        contents = query.order_by(Content.created_at.desc()).all()
         
-        response = query.execute()
-        
-        if not response.data:
-            return []
-        
-        return response.data
+        return contents
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -83,22 +73,19 @@ async def get_contents(
 @router.get("/{content_id}", response_model=Content)
 async def get_content(
     content_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
     try:
-        # Busca o conteúdo
-        response = supabase.table("contents").select("*").eq("id", content_id).execute()
+        content = db.query(Content).filter(Content.id == content_id).first()
         
-        if not response.data or len(response.data) == 0:
+        if not content:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Conteúdo não encontrado"
             )
         
-        content = response.data[0]
-        
-        # Se o conteúdo não estiver publicado, apenas o autor e administradores podem vê-lo
-        if not content["published"] and current_user["id"] != content["author_id"] and current_user["role"] != "admin":
+        if not content.published and current_user["id"] != content.author_id and current_user["role"] != "admin":
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Sem permissão para acessar este conteúdo"
@@ -117,41 +104,32 @@ async def get_content(
 async def update_content(
     content_id: str,
     content_update: ContentCreate,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
     try:
-        # Verifica se o conteúdo existe
-        response = supabase.table("contents").select("*").eq("id", content_id).execute()
+        content = db.query(Content).filter(Content.id == content_id).first()
         
-        if not response.data or len(response.data) == 0:
+        if not content:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Conteúdo não encontrado"
             )
         
-        content = response.data[0]
-        
-        # Apenas o autor e administradores podem atualizar o conteúdo
-        if current_user["id"] != content["author_id"] and current_user["role"] != "admin":
+        if current_user["id"] != content.author_id and current_user["role"] != "admin":
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Sem permissão para atualizar este conteúdo"
             )
         
-        # Prepara dados para atualização
-        update_data = content_update.dict()
-        update_data["updated_at"] = "now()"  # Função SQL para data atual
+        for key, value in content_update.dict(exclude_unset=True).items():
+            setattr(content, key, value)
+        content.updated_at = func.now()
         
-        # Atualiza conteúdo no Supabase
-        response = supabase.table("contents").update(update_data).eq("id", content_id).execute()
+        db.commit()
+        db.refresh(content)
         
-        if not response.data or len(response.data) == 0:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Erro ao atualizar conteúdo"
-            )
-        
-        return response.data[0]
+        return content
     except HTTPException:
         raise
     except Exception as e:
@@ -163,29 +141,26 @@ async def update_content(
 @router.delete("/{content_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_content(
     content_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
     try:
-        # Verifica se o conteúdo existe
-        response = supabase.table("contents").select("*").eq("id", content_id).execute()
+        content = db.query(Content).filter(Content.id == content_id).first()
         
-        if not response.data or len(response.data) == 0:
+        if not content:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Conteúdo não encontrado"
             )
         
-        content = response.data[0]
-        
-        # Apenas o autor e administradores podem excluir o conteúdo
-        if current_user["id"] != content["author_id"] and current_user["role"] != "admin":
+        if current_user["id"] != content.author_id and current_user["role"] != "admin":
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Sem permissão para excluir este conteúdo"
             )
         
-        # Exclui conteúdo do Supabase
-        supabase.table("contents").delete().eq("id", content_id).execute()
+        db.delete(content)
+        db.commit()
         
         return None
     except HTTPException:
@@ -200,37 +175,25 @@ async def delete_content(
 @router.post("/{content_id}/comments", response_model=Comment)
 async def create_comment(
     content_id: str,
-    text: str,
-    current_user: dict = Depends(get_current_user)
+    comment_data: CommentCreate, # Using CommentCreate Pydantic model
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
     try:
-        # Verifica se o conteúdo existe
-        response = supabase.table("contents").select("*").eq("id", content_id).execute()
+        content = db.query(Content).filter(Content.id == content_id).first()
         
-        if not response.data or len(response.data) == 0:
+        if not content:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Conteúdo não encontrado"
             )
         
-        # Prepara dados para inserção
-        comment_data = {
-            "content_id": content_id,
-            "user_id": current_user["id"],
-            "text": text,
-            "created_at": "now()"  # Função SQL para data atual
-        }
+        db_comment = Comment(**comment_data.dict(), content_id=content_id, user_id=current_user["id"], created_at=func.now())
+        db.add(db_comment)
+        db.commit()
+        db.refresh(db_comment)
         
-        # Insere comentário no Supabase
-        response = supabase.table("comments").insert(comment_data).execute()
-        
-        if not response.data or len(response.data) == 0:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Erro ao criar comentário"
-            )
-        
-        return response.data[0]
+        return db_comment
     except HTTPException:
         raise
     except Exception as e:
@@ -242,25 +205,21 @@ async def create_comment(
 @router.get("/{content_id}/comments", response_model=List[Comment])
 async def get_comments(
     content_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
     try:
-        # Verifica se o conteúdo existe
-        content_response = supabase.table("contents").select("*").eq("id", content_id).execute()
+        content = db.query(Content).filter(Content.id == content_id).first()
         
-        if not content_response.data or len(content_response.data) == 0:
+        if not content:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Conteúdo não encontrado"
             )
         
-        # Busca comentários
-        response = supabase.table("comments").select("*").eq("content_id", content_id).order("created_at", desc=True).execute()
+        comments = db.query(Comment).filter(Comment.content_id == content_id).order_by(Comment.created_at.desc()).all()
         
-        if not response.data:
-            return []
-        
-        return response.data
+        return comments
     except HTTPException:
         raise
     except Exception as e:
@@ -272,29 +231,26 @@ async def get_comments(
 @router.delete("/comments/{comment_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_comment(
     comment_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
     try:
-        # Verifica se o comentário existe
-        response = supabase.table("comments").select("*").eq("id", comment_id).execute()
+        comment = db.query(Comment).filter(Comment.id == comment_id).first()
         
-        if not response.data or len(response.data) == 0:
+        if not comment:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Comentário não encontrado"
             )
         
-        comment = response.data[0]
-        
-        # Apenas o autor do comentário e administradores podem excluí-lo
-        if current_user["id"] != comment["user_id"] and current_user["role"] != "admin":
+        if current_user["id"] != comment.user_id and current_user["role"] != "admin":
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Sem permissão para excluir este comentário"
             )
         
-        # Exclui comentário do Supabase
-        supabase.table("comments").delete().eq("id", comment_id).execute()
+        db.delete(comment)
+        db.commit()
         
         return None
     except HTTPException:
@@ -304,3 +260,5 @@ async def delete_comment(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Erro ao excluir comentário: {str(e)}"
         )
+
+

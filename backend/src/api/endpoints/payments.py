@@ -1,57 +1,47 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from typing import List, Optional
+from sqlalchemy.orm import Session
+from sqlalchemy import func
 
-from src.core.supabase_client import get_supabase_client
-supabase = get_supabase_client()
+from src.core.database import get_db
 from src.api.endpoints.auth import get_current_user
-from src.schemas.payment import Payment, PaymentCreate, Subscription, Plan
+from src.schemas.models import Payment, PaymentCreate, PaymentResponse, Plan, PlanResponse, Assinatura, SubscriptionResponse
 
 router = APIRouter()
 
 # Rotas para pagamentos
-@router.post("/", response_model=Payment)
+@router.post("/", response_model=PaymentResponse)
 async def create_payment(
-    payment: PaymentCreate,
-    current_user: dict = Depends(get_current_user)
+    payment_data: PaymentCreate,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
     # Usuários só podem criar pagamentos para si mesmos
-    if current_user["id"] != payment.user_id and current_user["role"] != "admin":
+    if current_user["id"] != payment_data.user_id and current_user["role"] != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Sem permissão para criar pagamentos para outros usuários"
         )
     
     try:
-        # Prepara dados para inserção
-        payment_data = payment.dict()
-        payment_data["status"] = "pending"  # Status inicial
-        payment_data["created_at"] = "now()"  # Função SQL para data atual
+        db_payment = Payment(**payment_data.dict(), status="pending", transaction_id=f"sim_{payment_data.payment_method}_{payment_data.amount}", created_at=func.now(), updated_at=func.now())
+        db.add(db_payment)
+        db.commit()
+        db.refresh(db_payment)
         
-        # Aqui seria integrado com o gateway de pagamento (PagBank)
-        # Por simplicidade, estamos apenas simulando
-        payment_data["transaction_id"] = f"sim_{payment.payment_method}_{payment.amount}"
-        
-        # Insere pagamento no Supabase
-        response = supabase.table("payments").insert(payment_data).execute()
-        
-        if not response.data or len(response.data) == 0:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Erro ao criar pagamento"
-            )
-        
-        return response.data[0]
+        return db_payment
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Erro ao criar pagamento: {str(e)}"
         )
 
-@router.get("/", response_model=List[Payment])
+@router.get("/", response_model=List[PaymentResponse])
 async def get_payments(
     user_id: Optional[str] = None,
-    status: Optional[str] = None,
-    current_user: dict = Depends(get_current_user)
+    status_filter: Optional[str] = None,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
     try:
         # Define o user_id para filtro
@@ -64,22 +54,14 @@ async def get_payments(
                 detail="Sem permissão para acessar pagamentos de outros usuários"
             )
         
-        # Monta a query
-        query = supabase.table("payments").select("*").eq("user_id", filter_user_id)
+        query = db.query(Payment).filter(Payment.user_id == filter_user_id)
         
-        # Aplica filtro de status se fornecido
-        if status:
-            query = query.eq("status", status)
+        if status_filter:
+            query = query.filter(Payment.status == status_filter)
         
-        # Ordena por data de criação decrescente
-        query = query.order("created_at", desc=True)
+        payments = query.order_by(Payment.created_at.desc()).all()
         
-        response = query.execute()
-        
-        if not response.data:
-            return []
-        
-        return response.data
+        return payments
     except HTTPException:
         raise
     except Exception as e:
@@ -88,10 +70,11 @@ async def get_payments(
             detail=f"Erro ao buscar pagamentos: {str(e)}"
         )
 
-@router.put("/{payment_id}/complete", response_model=Payment)
+@router.put("/{payment_id}/complete", response_model=PaymentResponse)
 async def complete_payment(
     payment_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
     # Apenas administradores podem marcar pagamentos como concluídos
     if current_user["role"] != "admin":
@@ -101,30 +84,20 @@ async def complete_payment(
         )
     
     try:
-        # Verifica se o pagamento existe
-        response = supabase.table("payments").select("*").eq("id", payment_id).execute()
+        payment = db.query(Payment).filter(Payment.id == payment_id).first()
         
-        if not response.data or len(response.data) == 0:
+        if not payment:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Pagamento não encontrado"
             )
         
-        # Atualiza o status do pagamento
-        update_data = {
-            "status": "completed",
-            "updated_at": "now()"  # Função SQL para data atual
-        }
+        payment.status = "completed"
+        payment.updated_at = func.now()
+        db.commit()
+        db.refresh(payment)
         
-        response = supabase.table("payments").update(update_data).eq("id", payment_id).execute()
-        
-        if not response.data or len(response.data) == 0:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Erro ao atualizar pagamento"
-            )
-        
-        return response.data[0]
+        return payment
     except HTTPException:
         raise
     except Exception as e:
@@ -134,10 +107,11 @@ async def complete_payment(
         )
 
 # Rotas para planos
-@router.post("/plans", response_model=Plan)
+@router.post("/plans", response_model=PlanResponse)
 async def create_plan(
-    plan: Plan,
-    current_user: dict = Depends(get_current_user)
+    plan_data: Plan,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
     # Apenas administradores podem criar planos
     if current_user["role"] != "admin":
@@ -147,44 +121,33 @@ async def create_plan(
         )
     
     try:
-        # Prepara dados para inserção
-        plan_data = plan.dict(exclude={"id"})
+        db_plan = Plan(**plan_data.dict())
+        db.add(db_plan)
+        db.commit()
+        db.refresh(db_plan)
         
-        # Insere plano no Supabase
-        response = supabase.table("plans").insert(plan_data).execute()
-        
-        if not response.data or len(response.data) == 0:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Erro ao criar plano"
-            )
-        
-        return response.data[0]
+        return db_plan
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Erro ao criar plano: {str(e)}"
         )
 
-@router.get("/plans", response_model=List[Plan])
+@router.get("/plans", response_model=List[PlanResponse])
 async def get_plans(
     is_active: Optional[bool] = True,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
     try:
-        # Monta a query
-        query = supabase.table("plans").select("*")
+        query = db.query(Plan)
         
-        # Aplica filtro de status se fornecido
         if is_active is not None:
-            query = query.eq("is_active", is_active)
+            query = query.filter(Plan.is_active == is_active)
         
-        response = query.execute()
+        plans = query.all()
         
-        if not response.data:
-            return []
-        
-        return response.data
+        return plans
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -192,72 +155,56 @@ async def get_plans(
         )
 
 # Rotas para assinaturas
-@router.post("/subscriptions", response_model=Subscription)
+@router.post("/subscriptions", response_model=SubscriptionResponse)
 async def create_subscription(
-    subscription: Subscription,
-    current_user: dict = Depends(get_current_user)
+    subscription_data: Assinatura,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
     # Usuários só podem criar assinaturas para si mesmos
-    if current_user["id"] != subscription.user_id and current_user["role"] != "admin":
+    if current_user["id"] != subscription_data.usuario_id and current_user["role"] != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Sem permissão para criar assinaturas para outros usuários"
         )
     
     try:
-        # Prepara dados para inserção
-        subscription_data = subscription.dict(exclude={"id"})
-        subscription_data["created_at"] = "now()"  # Função SQL para data atual
+        db_subscription = Assinatura(**subscription_data.dict())
+        db.add(db_subscription)
+        db.commit()
+        db.refresh(db_subscription)
         
-        # Insere assinatura no Supabase
-        response = supabase.table("subscriptions").insert(subscription_data).execute()
-        
-        if not response.data or len(response.data) == 0:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Erro ao criar assinatura"
-            )
-        
-        return response.data[0]
+        return db_subscription
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Erro ao criar assinatura: {str(e)}"
         )
 
-@router.get("/subscriptions", response_model=List[Subscription])
+@router.get("/subscriptions", response_model=List[SubscriptionResponse])
 async def get_subscriptions(
     user_id: Optional[str] = None,
-    status: Optional[str] = None,
-    current_user: dict = Depends(get_current_user)
+    status_filter: Optional[str] = None,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
     try:
-        # Define o user_id para filtro
         filter_user_id = user_id if user_id else current_user["id"]
         
-        # Usuários comuns só podem ver suas próprias assinaturas
         if current_user["role"] == "client" and current_user["id"] != filter_user_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Sem permissão para acessar assinaturas de outros usuários"
             )
         
-        # Monta a query
-        query = supabase.table("subscriptions").select("*").eq("user_id", filter_user_id)
+        query = db.query(Assinatura).filter(Assinatura.usuario_id == filter_user_id)
         
-        # Aplica filtro de status se fornecido
-        if status:
-            query = query.eq("status", status)
+        if status_filter:
+            query = query.filter(Assinatura.status == status_filter)
         
-        # Ordena por data de criação decrescente
-        query = query.order("created_at", desc=True)
+        subscriptions = query.order_by(Assinatura.data_inicio.desc()).all()
         
-        response = query.execute()
-        
-        if not response.data:
-            return []
-        
-        return response.data
+        return subscriptions
     except HTTPException:
         raise
     except Exception as e:
@@ -266,46 +213,34 @@ async def get_subscriptions(
             detail=f"Erro ao buscar assinaturas: {str(e)}"
         )
 
-@router.put("/subscriptions/{subscription_id}/cancel", response_model=Subscription)
+@router.put("/subscriptions/{subscription_id}/cancel", response_model=SubscriptionResponse)
 async def cancel_subscription(
     subscription_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
     try:
-        # Verifica se a assinatura existe
-        response = supabase.table("subscriptions").select("*").eq("id", subscription_id).execute()
+        subscription = db.query(Assinatura).filter(Assinatura.id == subscription_id).first()
         
-        if not response.data or len(response.data) == 0:
+        if not subscription:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Assinatura não encontrada"
             )
         
-        subscription = response.data[0]
-        
-        # Verifica permissões
-        if current_user["id"] != subscription["user_id"] and current_user["role"] != "admin":
+        if current_user["id"] != subscription.usuario_id and current_user["role"] != "admin":
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Sem permissão para cancelar esta assinatura"
             )
         
-        # Atualiza o status da assinatura
-        update_data = {
-            "status": "canceled",
-            "auto_renew": False,
-            "updated_at": "now()"  # Função SQL para data atual
-        }
+        subscription.status = "canceled"
+        subscription.auto_renew = False # Assuming auto_renew exists in Assinatura model
+        subscription.data_fim = func.now() # Assuming data_fim should be updated on cancel
+        db.commit()
+        db.refresh(subscription)
         
-        response = supabase.table("subscriptions").update(update_data).eq("id", subscription_id).execute()
-        
-        if not response.data or len(response.data) == 0:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Erro ao cancelar assinatura"
-            )
-        
-        return response.data[0]
+        return subscription
     except HTTPException:
         raise
     except Exception as e:
@@ -313,3 +248,5 @@ async def cancel_subscription(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Erro ao cancelar assinatura: {str(e)}"
         )
+
+

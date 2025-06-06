@@ -1,14 +1,15 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from typing import List, Optional
 from datetime import datetime, timedelta
-from src.core.supabase_client import get_supabase_client
+from sqlalchemy.orm import Session
+from src.core.database import get_db
 from src.api.endpoints.auth import get_current_user
-from src.schemas.models import PerfilResponse as UserProfile
+from src.schemas.models import PerfilResponse as UserProfile, Profile, TreinoEnviado, Progresso, Avaliacao, Mensagem, Assinatura
 
 router = APIRouter()
 
 @router.get("/stats/overview")
-async def get_admin_overview(current_user: UserProfile = Depends(get_current_user)):
+async def get_admin_overview(current_user: UserProfile = Depends(get_current_user), db: Session = Depends(get_db)):
     """
     Retorna estatísticas gerais para o painel administrativo
     """
@@ -19,41 +20,32 @@ async def get_admin_overview(current_user: UserProfile = Depends(get_current_use
             detail="Acesso negado. Apenas administradores podem acessar este endpoint."
         )
     
-    supabase = get_supabase_client()
-    
     try:
         # Total de usuários
-        users_response = supabase.table('profiles').select('id', count='exact').execute()
-        total_users = users_response.count or 0
+        total_users = db.query(Profile).count()
         
         # Usuários ativos (logaram nos últimos 30 dias)
-        thirty_days_ago = (datetime.now() - timedelta(days=30)).isoformat()
-        active_users_response = supabase.table('profiles').select('id', count='exact').gte('ultimo_login', thirty_days_ago).execute()
-        active_users = active_users_response.count or 0
+        thirty_days_ago = datetime.now() - timedelta(days=30)
+        active_users = db.query(Profile).filter(Profile.ultimo_login >= thirty_days_ago).count()
         
         # Total de treinos enviados
-        trainings_response = supabase.table('treinos_enviados').select('id', count='exact').execute()
-        total_trainings = trainings_response.count or 0
+        total_trainings = db.query(TreinoEnviado).count()
         
         # Total de registros de progresso
-        progress_response = supabase.table('progresso').select('id', count='exact').execute()
-        total_progress = progress_response.count or 0
+        total_progress = db.query(Progresso).count()
         
         # Total de avaliações
-        assessments_response = supabase.table('avaliacoes').select('id', count='exact').execute()
-        total_assessments = assessments_response.count or 0
+        total_assessments = db.query(Avaliacao).count()
         
         # Total de mensagens
-        messages_response = supabase.table('mensagens').select('id', count='exact').execute()
-        total_messages = messages_response.count or 0
+        total_messages = db.query(Mensagem).count()
         
         # Assinaturas ativas
-        active_subscriptions_response = supabase.table('assinaturas').select('id', count='exact').eq('status', 'ativa').execute()
-        active_subscriptions = active_subscriptions_response.count or 0
+        active_subscriptions = db.query(Assinatura).filter(Assinatura.status == 'ativa').count()
         
         # Receita total (soma dos valores pagos das assinaturas ativas)
-        revenue_response = supabase.table('assinaturas').select('valor_pago').eq('status', 'ativa').execute()
-        total_revenue = sum(float(sub['valor_pago'] or 0) for sub in revenue_response.data)
+        revenue_data = db.query(Assinatura.valor_pago).filter(Assinatura.status == 'ativa').all()
+        total_revenue = sum(float(sub[0] or 0) for sub in revenue_data)
         
         return {
             "total_users": total_users,
@@ -78,7 +70,8 @@ async def get_all_users(
     page: int = 1,
     limit: int = 20,
     search: Optional[str] = None,
-    current_user: UserProfile = Depends(get_current_user)
+    current_user: UserProfile = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
     """
     Lista todos os usuários com paginação e busca
@@ -89,32 +82,25 @@ async def get_all_users(
             detail="Acesso negado. Apenas administradores podem acessar este endpoint."
         )
     
-    supabase = get_supabase_client()
-    
     try:
         # Calcular offset para paginação
         offset = (page - 1) * limit
         
         # Construir query base
-        query = supabase.table('profiles').select('*')
+        query = db.query(Profile)
         
         # Aplicar filtro de busca se fornecido
         if search:
-            query = query.or_(f'nome.ilike.%{search}%,email.ilike.%{search}%')
-        
-        # Aplicar paginação e ordenação
-        response = query.order('criado_em', desc=True).range(offset, offset + limit - 1).execute()
+            query = query.filter(Profile.nome.ilike(f'%{search}%') | Profile.email.ilike(f'%{search}%'))
         
         # Buscar total de registros para paginação
-        count_query = supabase.table('profiles').select('id', count='exact')
-        if search:
-            count_query = count_query.or_(f'nome.ilike.%{search}%,email.ilike.%{search}%')
-        
-        count_response = count_query.execute()
-        total_count = count_response.count or 0
+        total_count = query.count()
+
+        # Aplicar paginação e ordenação
+        users = query.order_by(Profile.criado_em.desc()).offset(offset).limit(limit).all()
         
         return {
-            "users": response.data,
+            "users": users,
             "pagination": {
                 "page": page,
                 "limit": limit,
@@ -132,7 +118,8 @@ async def get_all_users(
 @router.get("/users/{user_id}/details")
 async def get_user_details(
     user_id: str,
-    current_user: UserProfile = Depends(get_current_user)
+    current_user: UserProfile = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
     """
     Retorna detalhes completos de um usuário específico
@@ -143,46 +130,44 @@ async def get_user_details(
             detail="Acesso negado. Apenas administradores podem acessar este endpoint."
         )
     
-    supabase = get_supabase_client()
-    
     try:
         # Buscar dados do usuário
-        user_response = supabase.table('profiles').select('*').eq('id', user_id).single().execute()
+        user = db.query(Profile).filter(Profile.id == user_id).first()
         
-        if not user_response.data:
+        if not user:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Usuário não encontrado"
             )
         
         # Buscar treinos do usuário
-        trainings_response = supabase.table('treinos_enviados').select('*').eq('usuario_id', user_id).execute()
+        trainings = db.query(TreinoEnviado).filter(TreinoEnviado.usuario_id == user_id).all()
         
         # Buscar progresso do usuário
-        progress_response = supabase.table('progresso').select('*').eq('usuario_id', user_id).order('data_medicao', desc=True).execute()
+        progress = db.query(Progresso).filter(Progresso.usuario_id == user_id).order_by(Progresso.data_medicao.desc()).all()
         
         # Buscar avaliações do usuário
-        assessments_response = supabase.table('avaliacoes').select('*').eq('usuario_id', user_id).execute()
+        assessments = db.query(Avaliacao).filter(Avaliacao.usuario_id == user_id).all()
         
         # Buscar mensagens do usuário
-        messages_response = supabase.table('mensagens').select('*').eq('usuario_id', user_id).order('enviado_em', desc=True).execute()
+        messages = db.query(Mensagem).filter(Mensagem.usuario_id == user_id).order_by(Mensagem.enviado_em.desc()).all()
         
         # Buscar assinaturas do usuário
-        subscriptions_response = supabase.table('assinaturas').select('*').eq('usuario_id', user_id).order('data_inicio', desc=True).execute()
+        subscriptions = db.query(Assinatura).filter(Assinatura.usuario_id == user_id).order_by(Assinatura.data_inicio.desc()).all()
         
         return {
-            "user": user_response.data,
-            "trainings": trainings_response.data,
-            "progress": progress_response.data,
-            "assessments": assessments_response.data,
-            "messages": messages_response.data,
-            "subscriptions": subscriptions_response.data,
+            "user": user,
+            "trainings": trainings,
+            "progress": progress,
+            "assessments": assessments,
+            "messages": messages,
+            "subscriptions": subscriptions,
             "summary": {
-                "total_trainings": len(trainings_response.data),
-                "total_progress": len(progress_response.data),
-                "total_assessments": len(assessments_response.data),
-                "total_messages": len(messages_response.data),
-                "active_subscription": any(sub['status'] == 'ativa' for sub in subscriptions_response.data)
+                "total_trainings": len(trainings),
+                "total_progress": len(progress),
+                "total_assessments": len(assessments),
+                "total_messages": len(messages),
+                "active_subscription": any(sub.status == 'ativa' for sub in subscriptions)
             }
         }
         
@@ -197,7 +182,8 @@ async def get_user_details(
 @router.get("/recent-activity")
 async def get_recent_activity(
     limit: int = 50,
-    current_user: UserProfile = Depends(get_current_user)
+    current_user: UserProfile = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
     """
     Retorna atividades recentes do sistema
@@ -208,55 +194,53 @@ async def get_recent_activity(
             detail="Acesso negado. Apenas administradores podem acessar este endpoint."
         )
     
-    supabase = get_supabase_client()
-    
     try:
         activities = []
         
         # Buscar registros recentes de diferentes tabelas
         
         # Novos usuários
-        users_response = supabase.table('profiles').select('id, nome, email, criado_em').order('criado_em', desc=True).limit(10).execute()
-        for user in users_response.data:
+        users = db.query(Profile).order_by(Profile.criado_em.desc()).limit(10).all()
+        for user in users:
             activities.append({
                 "type": "new_user",
-                "title": f"Novo usuário: {user['nome'] or user['email']}",
+                "title": f"Novo usuário: {user.nome or user.email}",
                 "description": "Usuário se cadastrou na plataforma",
-                "date": user['criado_em'],
-                "user_id": user['id']
+                "date": user.criado_em,
+                "user_id": user.id
             })
         
         # Treinos enviados
-        trainings_response = supabase.table('treinos_enviados').select('id, nome_arquivo, enviado_em, usuario_id').order('enviado_em', desc=True).limit(10).execute()
-        for training in trainings_response.data:
+        trainings = db.query(TreinoEnviado).order_by(TreinoEnviado.enviado_em.desc()).limit(10).all()
+        for training in trainings:
             activities.append({
                 "type": "training_sent",
-                "title": f"Treino enviado: {training['nome_arquivo']}",
+                "title": f"Treino enviado: {training.nome_arquivo}",
                 "description": "Novo treino foi enviado para o usuário",
-                "date": training['enviado_em'],
-                "user_id": training['usuario_id']
+                "date": training.enviado_em,
+                "user_id": training.usuario_id
             })
         
         # Progresso registrado
-        progress_response = supabase.table('progresso').select('id, peso, data_medicao, usuario_id').order('data_medicao', desc=True).limit(10).execute()
-        for progress in progress_response.data:
+        progress_entries = db.query(Progresso).order_by(Progresso.data_medicao.desc()).limit(10).all()
+        for progress_entry in progress_entries:
             activities.append({
                 "type": "progress_logged",
-                "title": f"Progresso registrado: {progress['peso']}kg",
+                "title": f"Progresso registrado: {progress_entry.peso}kg",
                 "description": "Usuário registrou novo progresso",
-                "date": progress['data_medicao'],
-                "user_id": progress['usuario_id']
+                "date": progress_entry.data_medicao,
+                "user_id": progress_entry.usuario_id
             })
         
         # Mensagens enviadas
-        messages_response = supabase.table('mensagens').select('id, assunto, enviado_em, usuario_id').order('enviado_em', desc=True).limit(10).execute()
-        for message in messages_response.data:
+        messages = db.query(Mensagem).order_by(Mensagem.enviado_em.desc()).limit(10).all()
+        for message in messages:
             activities.append({
                 "type": "message_sent",
-                "title": f"Mensagem: {message['assunto']}",
+                "title": f"Mensagem: {message.assunto}",
                 "description": "Nova mensagem foi enviada",
-                "date": message['enviado_em'],
-                "user_id": message['usuario_id']
+                "date": message.enviado_em,
+                "user_id": message.usuario_id
             })
         
         # Ordenar todas as atividades por data
@@ -272,7 +256,7 @@ async def get_recent_activity(
         )
 
 @router.get("/analytics/users")
-async def get_user_analytics(current_user: UserProfile = Depends(get_current_user)):
+async def get_user_analytics(current_user: UserProfile = Depends(get_current_user), db: Session = Depends(get_db)):
     """
     Retorna análises de usuários para gráficos
     """
@@ -282,8 +266,6 @@ async def get_user_analytics(current_user: UserProfile = Depends(get_current_use
             detail="Acesso negado. Apenas administradores podem acessar este endpoint."
         )
     
-    supabase = get_supabase_client()
-    
     try:
         # Usuários por mês (últimos 12 meses)
         monthly_users = []
@@ -291,25 +273,22 @@ async def get_user_analytics(current_user: UserProfile = Depends(get_current_use
             start_date = (datetime.now() - timedelta(days=30 * (i + 1))).replace(day=1)
             end_date = (datetime.now() - timedelta(days=30 * i)).replace(day=1)
             
-            response = supabase.table('profiles').select('id', count='exact').gte('criado_em', start_date.isoformat()).lt('criado_em', end_date.isoformat()).execute()
+            count = db.query(Profile).filter(
+                Profile.criado_em >= start_date,
+                Profile.criado_em < end_date
+            ).count()
             
             monthly_users.append({
                 "month": start_date.strftime("%Y-%m"),
-                "count": response.count or 0
+                "count": count
             })
         
         monthly_users.reverse()
         
         # Distribuição por planos
-        plans_response = supabase.table('assinaturas').select('plano_id', count='exact').eq('status', 'ativa').execute()
+        plan_distribution_query = db.query(Assinatura.plano_id, func.count(Assinatura.plano_id)).filter(Assinatura.status == 'ativa').group_by(Assinatura.plano_id).all()
         
-        plan_distribution = {}
-        for plan in plans_response.data:
-            plan_id = plan['plano_id']
-            if plan_id in plan_distribution:
-                plan_distribution[plan_id] += 1
-            else:
-                plan_distribution[plan_id] = 1
+        plan_distribution = {plan_id: count for plan_id, count in plan_distribution_query}
         
         return {
             "monthly_users": monthly_users,
@@ -329,7 +308,8 @@ async def get_user_analytics(current_user: UserProfile = Depends(get_current_use
 async def update_user_role(
     user_id: str,
     role: str,
-    current_user: UserProfile = Depends(get_current_user)
+    current_user: UserProfile = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
     """
     Atualiza o papel de um usuário
@@ -346,18 +326,18 @@ async def update_user_role(
             detail="Papel inválido. Use: client, admin ou trainer"
         )
     
-    supabase = get_supabase_client()
-    
     try:
-        response = supabase.table('profiles').update({'role': role}).eq('id', user_id).execute()
-        
-        if not response.data:
+        user = db.query(Profile).filter(Profile.id == user_id).first()
+        if not user:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Usuário não encontrado"
             )
+        user.role = role
+        db.commit()
+        db.refresh(user)
         
-        return {"message": "Papel do usuário atualizado com sucesso", "user": response.data[0]}
+        return {"message": "Papel do usuário atualizado com sucesso", "user": user}
         
     except HTTPException:
         raise
@@ -366,4 +346,5 @@ async def update_user_role(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Erro ao atualizar papel do usuário: {str(e)}"
         )
+
 

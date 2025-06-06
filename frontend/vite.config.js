@@ -21,6 +21,7 @@ export default defineConfig({
             if (id.includes('chart.js') || id.includes('react-chartjs-2')) return 'vendor_charts';
             if (id.includes('react-dom')) return 'vendor_react-dom';
             if (id.includes('react')) return 'vendor_react';
+            if (id.includes('recharts')) return 'vendor_recharts';
           }
         },
       },

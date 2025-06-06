@@ -1,218 +1,153 @@
-"""
-Esquemas para modelos de dados
-"""
-from pydantic import BaseModel, Field
-from typing import Optional, List, Dict, Any
-from datetime import datetime
-from enum import Enum
+from sqlalchemy import Column, String, DateTime, Integer, Float, Boolean
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.sql import func
+from pydantic import BaseModel, EmailStr
+from typing import Optional
 
-# Enums
-class Role(str, Enum):
-    ADMIN = "admin"
-    USER = "user"
-    TRAINER = "trainer"
+Base = declarative_base()
 
-class TrainingType(str, Enum):
-    STRENGTH = "strength"
-    CARDIO = "cardio"
-    FLEXIBILITY = "flexibility"
-    HIIT = "hiit"
-    CUSTOM = "custom"
+class Profile(Base):
+    __tablename__ = "profiles"
 
-class AssessmentType(str, Enum):
-    INITIAL = "initial"
-    PROGRESS = "progress"
-    FINAL = "final"
+    id = Column(String, primary_key=True)
+    nome = Column(String)
+    email = Column(String, unique=True, index=True)
+    password_hash = Column(String) # Added password_hash field
+    role = Column(String, default="client")
+    criado_em = Column(DateTime, default=func.now())
+    ultimo_login = Column(DateTime, default=func.now())
 
-# Mensagens
-class MessageBase(BaseModel):
-    """Esquema base para mensagens"""
-    content: str
+class TreinoEnviado(Base):
+    __tablename__ = "treinos_enviados"
 
-class MessageCreate(MessageBase):
-    """Esquema para criação de mensagens"""
-    receiver_id: str
+    id = Column(String, primary_key=True)
+    usuario_id = Column(String)
+    nome_arquivo = Column(String)
+    url_pdf = Column(String)
+    enviado_em = Column(DateTime, default=func.now())
 
-class MessageResponse(MessageBase):
-    """Esquema para resposta de mensagens"""
-    id: str
-    sender_id: str
-    receiver_id: str
-    created_at: datetime
-    is_read: bool
+class Progresso(Base):
+    __tablename__ = "progresso"
 
-    class Config:
-        orm_mode = True
+    id = Column(String, primary_key=True)
+    usuario_id = Column(String)
+    data_medicao = Column(DateTime, default=func.now())
+    peso = Column(Float)
+    altura = Column(Float)
+    percentual_gordura = Column(Float)
+    massa_muscular = Column(Float)
 
-# Treinos
-class ExerciseBase(BaseModel):
-    """Esquema base para exercícios"""
-    name: str
-    sets: int
-    reps: int
-    weight: Optional[float] = None
-    rest: Optional[int] = None  # em segundos
-    notes: Optional[str] = None
+class Avaliacao(Base):
+    __tablename__ = "avaliacoes"
 
-class TrainingBase(BaseModel):
-    """Esquema base para treinos"""
-    title: str
-    description: Optional[str] = None
-    type: TrainingType
-    exercises: List[ExerciseBase]
+    id = Column(String, primary_key=True)
+    usuario_id = Column(String)
+    tipo = Column(String)
+    data = Column(DateTime, default=func.now())
+    peso = Column(Float)
+    altura = Column(Float)
+    percentual_gordura = Column(Float)
+    massa_muscular = Column(Float)
 
-class TrainingCreate(TrainingBase):
-    """Esquema para criação de treinos"""
-    user_id: str
+class Mensagem(Base):
+    __tablename__ = "mensagens"
 
-class TrainingResponse(TrainingBase):
-    """Esquema para resposta de treinos"""
-    id: str
-    user_id: str
-    created_at: datetime
-    updated_at: Optional[datetime] = None
+    id = Column(String, primary_key=True)
+    usuario_id = Column(String)
+    assunto = Column(String)
+    conteudo = Column(String)
+    enviado_em = Column(DateTime, default=func.now())
 
-    class Config:
-        orm_mode = True
+class Assinatura(Base):
+    __tablename__ = "assinaturas"
 
-# Avaliações
-class MeasurementBase(BaseModel):
-    """Esquema base para medidas"""
-    weight: Optional[float] = None  # em kg
-    height: Optional[float] = None  # em cm
-    body_fat: Optional[float] = None  # em %
-    muscle_mass: Optional[float] = None  # em kg
-    bmi: Optional[float] = None  # Índice de Massa Corporal
-    waist: Optional[float] = None  # em cm
-    hip: Optional[float] = None  # em cm
-    chest: Optional[float] = None  # em cm
-    arms: Optional[float] = None  # em cm
-    legs: Optional[float] = None  # em cm
+    id = Column(String, primary_key=True)
+    usuario_id = Column(String)
+    plano_id = Column(String)
+    status = Column(String)
+    data_inicio = Column(DateTime)
+    data_fim = Column(DateTime)
+    valor_pago = Column(Float)
 
-class AssessmentBase(BaseModel):
-    """Esquema base para avaliações"""
-    type: AssessmentType
-    date: datetime
-    measurements: MeasurementBase
-    notes: Optional[str] = None
+class Payment(Base):
+    __tablename__ = "payments"
 
-class AssessmentCreate(AssessmentBase):
-    """Esquema para criação de avaliações"""
-    user_id: str
+    id = Column(String, primary_key=True)
+    user_id = Column(String)
+    payment_method = Column(String)
+    amount = Column(Float)
+    transaction_id = Column(String)
+    status = Column(String)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
 
-class AssessmentResponse(AssessmentBase):
-    """Esquema para resposta de avaliações"""
-    id: str
-    user_id: str
-    created_at: datetime
+class Plan(Base):
+    __tablename__ = "plans"
 
-    class Config:
-        orm_mode = True
+    id = Column(String, primary_key=True)
+    name = Column(String)
+    description = Column(String)
+    price = Column(Float)
+    duration_months = Column(Integer)
+    is_active = Column(Boolean, default=True)
 
-# Progresso
-class ProgressEntryBase(BaseModel):
-    """Esquema base para entradas de progresso"""
-    date: datetime
-    weight: Optional[float] = None
-    notes: Optional[str] = None
-    photos: Optional[List[str]] = None
-
-class ProgressEntryCreate(ProgressEntryBase):
-    """Esquema para criação de entradas de progresso"""
-    user_id: str
-
-class ProgressEntryResponse(ProgressEntryBase):
-    """Esquema para resposta de entradas de progresso"""
-    id: str
-    user_id: str
-    created_at: datetime
-
-    class Config:
-        orm_mode = True
-
-# Pagamentos
-class PaymentStatus(str, Enum):
-    PENDING = "pending"
-    COMPLETED = "completed"
-    FAILED = "failed"
-    REFUNDED = "refunded"
-
-class PaymentBase(BaseModel):
-    """Esquema base para pagamentos"""
-    amount: float
-    description: str
-    status: PaymentStatus
-
-class PaymentCreate(PaymentBase):
-    """Esquema para criação de pagamentos"""
-    user_id: str
-
-class PaymentResponse(PaymentBase):
-    """Esquema para resposta de pagamentos"""
-    id: str
-    user_id: str
-    created_at: datetime
-    updated_at: Optional[datetime] = None
-
-    class Config:
-        orm_mode = True
-
-# Conteúdo
-class ContentType(str, Enum):
-    ARTICLE = "article"
-    VIDEO = "video"
-    RECIPE = "recipe"
-    WORKOUT = "workout"
-
-class ContentBase(BaseModel):
-    """Esquema base para conteúdo"""
-    title: str
-    type: ContentType
-    description: str
-    content: str
-    thumbnail_url: Optional[str] = None
-    tags: Optional[List[str]] = None
-
-class ContentCreate(ContentBase):
-    """Esquema para criação de conteúdo"""
-    author_id: str
-
-class ContentResponse(ContentBase):
-    """Esquema para resposta de conteúdo"""
-    id: str
-    author_id: str
-    created_at: datetime
-    updated_at: Optional[datetime] = None
-
-    class Config:
-        orm_mode = True
-
-# Respostas genéricas
-class SuccessResponse(BaseModel):
-    """Esquema para respostas de sucesso"""
-    success: bool
-    message: str
-    data: Optional[Dict[str, Any]] = None
-
-class ErrorResponse(BaseModel):
-    """Esquema para respostas de erro"""
-    success: bool = False
-    error: str
-    details: Optional[Dict[str, Any]] = None
-
-# Perfil de usuário
+# Pydantic Models
 class PerfilResponse(BaseModel):
-    """Esquema para resposta de perfil"""
     id: str
-    user_id: str
     nome: Optional[str] = None
-    email: str
-    telefone: Optional[str] = None
-    objetivo: Optional[str] = None
-    avatar_url: Optional[str] = None
-    created_at: datetime
-    updated_at: Optional[datetime] = None
+    email: EmailStr
+    role: str
+    criado_em: datetime
+    ultimo_login: Optional[datetime] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
+
+class Cadastro(BaseModel):
+    nome: str
+    email: EmailStr
+    telefone: Optional[str] = None
+    password: str # Added password to Cadastro for registration
+
+class PaymentCreate(BaseModel):
+    user_id: str
+    payment_method: str
+    amount: float
+
+class PaymentResponse(BaseModel):
+    id: str
+    user_id: str
+    payment_method: str
+    amount: float
+    transaction_id: str
+    status: str
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class PlanResponse(BaseModel):
+    id: str
+    name: str
+    description: str
+    price: float
+    duration_months: int
+    is_active: bool
+
+    class Config:
+        from_attributes = True
+
+class SubscriptionResponse(BaseModel):
+    id: str
+    usuario_id: str
+    plano_id: str
+    status: str
+    data_inicio: datetime
+    data_fim: datetime
+    valor_pago: float
+
+    class Config:
+        from_attributes = True
+
 

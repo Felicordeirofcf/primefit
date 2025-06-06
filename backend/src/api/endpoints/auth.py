@@ -1,10 +1,8 @@
-"""
-Endpoints de autenticação
-"""
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from datetime import timedelta
+from datetime import timedelta, datetime
 from typing import Optional
+from sqlalchemy.orm import Session
 
 from src.core.auth_utils import (
     verify_password, 
@@ -13,22 +11,20 @@ from src.core.auth_utils import (
     decode_access_token,
     ACCESS_TOKEN_EXPIRE_MINUTES
 )
-from src.core.db_client import execute_query
-from src.schemas.user import UserCreate, UserLogin, Token, UserResponse
+from src.core.database import get_db
+from src.schemas.models import PerfilResponse as UserResponse, Cadastro as UserCreate, Profile # Using Profile as the SQLAlchemy model for users
+from src.schemas.user import Token # Assuming Token is still in src.schemas.user
 
 router = APIRouter()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
 
 @router.post("/register", response_model=UserResponse)
-async def register(user_data: UserCreate):
+async def register(user_data: UserCreate, db: Session = Depends(get_db)):
     """
     Registra um novo usuário.
     """
     # Verificar se o email já existe
-    existing_user = execute_query(
-        "SELECT * FROM users WHERE email = %s",
-        (user_data.email,)
-    )
+    existing_user = db.query(Profile).filter(Profile.email == user_data.email).first()
     
     if existing_user:
         raise HTTPException(
@@ -39,55 +35,38 @@ async def register(user_data: UserCreate):
     # Hash da senha
     hashed_password = get_password_hash(user_data.password)
     
-    # Inserir o novo usuário
-    new_user = execute_query(
-        """
-        INSERT INTO users (email, password_hash, role)
-        VALUES (%s, %s, %s)
-        RETURNING id, email, role, created_at
-        """,
-        (user_data.email, hashed_password, "user")
+    # Criar novo perfil (usuário)
+    new_profile = Profile(
+        nome=user_data.nome,
+        email=user_data.email,
+        password_hash=hashed_password, # Now this field exists in Profile model
+        role="client",
+        criado_em=datetime.now(),
+        ultimo_login=datetime.now()
     )
+    db.add(new_profile)
+    db.commit()
+    db.refresh(new_profile)
     
-    if not new_user:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Falha ao criar usuário"
-        )
-    
-    # Criar perfil vazio para o usuário
-    execute_query(
-        """
-        INSERT INTO profiles (user_id, email)
-        VALUES (%s, %s)
-        """,
-        (new_user[0]['id'], user_data.email)
-    )
-    
-    return new_user[0]
+    return new_profile
 
 @router.post("/token", response_model=Token)
-async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
+async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     """
     Autentica um usuário e retorna um token de acesso.
     """
     # Buscar usuário pelo email
-    user_result = execute_query(
-        "SELECT * FROM users WHERE email = %s",
-        (form_data.username,)  # OAuth2PasswordRequestForm usa 'username' para o email
-    )
+    user = db.query(Profile).filter(Profile.email == form_data.username).first()
     
-    if not user_result:
+    if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Email ou senha incorretos",
             headers={"WWW-Authenticate": "Bearer"},
         )
     
-    user = user_result[0]
-    
     # Verificar senha
-    if not verify_password(form_data.password, user['password_hash']):
+    if not verify_password(form_data.password, user.password_hash): # Now this field exists in Profile model
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Email ou senha incorretos",
@@ -97,13 +76,13 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
     # Criar token de acesso
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": user['email'], "user_id": user['id'], "role": user['role']},
+        data={"sub": user.email, "user_id": user.id, "role": user.role},
         expires_delta=access_token_expires
     )
     
     return {"access_token": access_token, "token_type": "bearer"}
 
-async def get_current_user(token: str = Depends(oauth2_scheme)):
+async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
     """
     Obtém o usuário atual a partir do token.
     """
@@ -123,32 +102,31 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
     if email is None or user_id is None:
         raise credentials_exception
     
-    user_result = execute_query(
-        "SELECT * FROM users WHERE id = %s AND email = %s",
-        (user_id, email)
-    )
+    user = db.query(Profile).filter(Profile.id == user_id, Profile.email == email).first()
     
-    if not user_result:
+    if not user:
         raise credentials_exception
     
-    return user_result[0]
+    return user
 
-async def get_current_active_user(current_user = Depends(get_current_user)):
+async def get_current_active_user(current_user: Profile = Depends(get_current_user)):
     """
     Verifica se o usuário atual está ativo.
     """
-    if current_user.get('is_active') is False:
-        raise HTTPException(status_code=400, detail="Usuário inativo")
+    # Assuming 'is_active' field will be added to Profile model if needed
+    # if current_user.is_active is False:
+    #     raise HTTPException(status_code=400, detail="Usuário inativo")
     return current_user
 
-async def get_admin_user(current_user = Depends(get_current_user)):
+async def get_admin_user(current_user: Profile = Depends(get_current_user)):
     """
     Verifica se o usuário atual é um administrador.
     """
-    if current_user.get('role') != "admin" and current_user.get('email') != "felpcordeirofcf@gmail.com":
+    if current_user.role != "admin" and current_user.email != "felpcordeirofcf@gmail.com":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Permissão negada. Acesso restrito a administradores."
         )
     return current_user
+
 

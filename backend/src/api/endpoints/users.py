@@ -1,10 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from typing import List, Optional
-
-from src.core.supabase_client import get_supabase_client
-supabase = get_supabase_client()
+from sqlalchemy.orm import Session
+from src.core.database import get_db
 from src.api.endpoints.auth import get_current_user
-from src.schemas.user import UserResponse, UserUpdate
+from src.schemas.models import Profile as UserProfile, PerfilResponse as UserResponse, Cadastro as UserUpdate # Assuming Cadastro is used for UserUpdate
 
 router = APIRouter()
 
@@ -12,7 +11,8 @@ router = APIRouter()
 async def get_users(
     skip: int = 0, 
     limit: int = 100,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
     # Verifica se o usuário tem permissão de administrador
     if current_user["role"] != "admin":
@@ -22,18 +22,7 @@ async def get_users(
         )
     
     try:
-        response = supabase.table("users").select("*").range(skip, skip + limit).execute()
-        
-        if not response.data:
-            return []
-        
-        # Remove senhas do retorno
-        users = []
-        for user in response.data:
-            user_data = dict(user)
-            user_data.pop("password", None)
-            users.append(user_data)
-        
+        users = db.query(UserProfile).offset(skip).limit(limit).all()
         return users
     except Exception as e:
         raise HTTPException(
@@ -44,7 +33,8 @@ async def get_users(
 @router.get("/{user_id}", response_model=UserResponse)
 async def get_user(
     user_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
     # Verifica se o usuário está buscando seu próprio perfil ou é um admin
     if current_user["id"] != user_id and current_user["role"] != "admin":
@@ -54,19 +44,15 @@ async def get_user(
         )
     
     try:
-        response = supabase.table("users").select("*").eq("id", user_id).execute()
+        user = db.query(UserProfile).filter(UserProfile.id == user_id).first()
         
-        if not response.data or len(response.data) == 0:
+        if not user:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Usuário não encontrado"
             )
         
-        # Remove senha do retorno
-        user_data = dict(response.data[0])
-        user_data.pop("password", None)
-        
-        return user_data
+        return user
     except HTTPException:
         raise
     except Exception as e:
@@ -79,7 +65,8 @@ async def get_user(
 async def update_user(
     user_id: str,
     user_update: UserUpdate,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
     # Verifica se o usuário está atualizando seu próprio perfil ou é um admin
     if current_user["id"] != user_id and current_user["role"] != "admin":
@@ -89,32 +76,21 @@ async def update_user(
         )
     
     try:
-        # Verifica se o usuário existe
-        response = supabase.table("users").select("*").eq("id", user_id).execute()
+        user = db.query(UserProfile).filter(UserProfile.id == user_id).first()
         
-        if not response.data or len(response.data) == 0:
+        if not user:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Usuário não encontrado"
             )
         
-        # Prepara dados para atualização
-        update_data = user_update.dict(exclude_unset=True)
+        for key, value in user_update.dict(exclude_unset=True).items():
+            setattr(user, key, value)
         
-        # Atualiza usuário no Supabase
-        response = supabase.table("users").update(update_data).eq("id", user_id).execute()
+        db.commit()
+        db.refresh(user)
         
-        if not response.data or len(response.data) == 0:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Erro ao atualizar usuário"
-            )
-        
-        # Remove senha do retorno
-        user_data = dict(response.data[0])
-        user_data.pop("password", None)
-        
-        return user_data
+        return user
     except HTTPException:
         raise
     except Exception as e:
@@ -126,7 +102,8 @@ async def update_user(
 @router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_user(
     user_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
     # Apenas administradores podem excluir usuários
     if current_user["role"] != "admin":
@@ -136,17 +113,16 @@ async def delete_user(
         )
     
     try:
-        # Verifica se o usuário existe
-        response = supabase.table("users").select("*").eq("id", user_id).execute()
+        user = db.query(UserProfile).filter(UserProfile.id == user_id).first()
         
-        if not response.data or len(response.data) == 0:
+        if not user:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Usuário não encontrado"
             )
         
-        # Exclui usuário do Supabase
-        supabase.table("users").delete().eq("id", user_id).execute()
+        db.delete(user)
+        db.commit()
         
         return None
     except HTTPException:
@@ -156,3 +132,5 @@ async def delete_user(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Erro ao excluir usuário: {str(e)}"
         )
+
+

@@ -24,14 +24,8 @@ class UserUpdate(BaseModel):
     is_active: Optional[bool] = None
     role: Optional[str] = None
 
-class UserResponse(UserBase):
-    """Esquema para resposta de usuários"""
-    id: str
-    role: str
-    created_at: datetime
-
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class Token(BaseModel):
     """Esquema para token de acesso"""
@@ -71,5 +65,5 @@ class ProfileResponse(ProfileBase):
     updated_at: Optional[datetime] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 

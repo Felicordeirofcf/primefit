@@ -1,11 +1,10 @@
-"""
-Aplicação principal do backend PrimeFit
-"""
 import os
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
+
+from src.core.database import engine, Base # Import Base and engine for metadata
 
 # Carregar variáveis de ambiente
 load_dotenv()
@@ -81,4 +80,5 @@ if __name__ == "__main__":
         port=port,
         reload=os.getenv("ENVIRONMENT", "development") == "development"
     )
+
 

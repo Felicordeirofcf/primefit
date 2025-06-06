@@ -1,16 +1,20 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from typing import Dict, Any
+from typing import Dict, Any, Optional
+from sqlalchemy.orm import Session
+from sqlalchemy import func
+from datetime import datetime, timedelta
 
-from src.core.supabase_client import get_supabase_client
-supabase = get_supabase_client()
+from src.core.database import get_db
 from src.api.endpoints.auth import get_current_user
-from src.schemas.models import DashboardStats
+from src.schemas.models import DashboardStats, Profile, TreinoEnviado, Progresso, Mensagem, Assinatura, Avaliacao
 
 router = APIRouter()
 
 @router.get("/stats", response_model=DashboardStats)
-async def get_dashboard_stats(current_user: dict = Depends(get_current_user)):
-    """Obtém estatísticas para o dashboard (apenas para admins)"""
+async def get_dashboard_stats(current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    """
+    Obtém estatísticas para o dashboard (apenas para admins)
+    """
     # Verifica se o usuário tem permissão de administrador
     if current_user.get("role") != "admin":
         raise HTTPException(
@@ -19,42 +23,25 @@ async def get_dashboard_stats(current_user: dict = Depends(get_current_user)):
         )
     
     try:
-        # Chama a função do Supabase para obter estatísticas
-        response = supabase.rpc("get_dashboard_stats").execute()
-        
-        if response.data:
-            return response.data
-        else:
-            # Fallback: calcula estatísticas manualmente
-            return await calculate_stats_manually()
-    except Exception as e:
-        # Fallback em caso de erro
-        return await calculate_stats_manually()
-
-async def calculate_stats_manually():
-    """Calcula estatísticas manualmente como fallback"""
-    try:
         # Total de usuários
-        users_response = supabase.table("profiles").select("id", count="exact").execute()
-        total_usuarios = users_response.count if users_response.count else 0
+        total_usuarios = db.query(Profile).count()
         
         # Usuários com assinatura ativa
-        active_subs_response = supabase.table("assinaturas").select("usuario_id", count="exact").eq("status", "ativa").execute()
-        usuarios_ativos = active_subs_response.count if active_subs_response.count else 0
+        usuarios_ativos = db.query(Assinatura).filter(Assinatura.status == "ativa").count()
         
         # Total de assinaturas ativas
-        assinaturas_ativas = usuarios_ativos
+        assinaturas_ativas = usuarios_ativos # Assuming 1 active subscription per active user for this stat
         
         # Receita mensal (soma dos valores das assinaturas ativas do mês atual)
-        from datetime import datetime
         current_month = datetime.now().month
         current_year = datetime.now().year
         
-        revenue_response = supabase.table("assinaturas").select("valor_pago").eq("status", "ativa").execute()
-        receita_mensal = 0
-        if revenue_response.data:
-            for sub in revenue_response.data:
-                receita_mensal += float(sub.get("valor_pago", 0))
+        revenue_data = db.query(Assinatura.valor_pago).filter(
+            Assinatura.status == "ativa",
+            func.extract("month", Assinatura.data_inicio) == current_month,
+            func.extract("year", Assinatura.data_inicio) == current_year
+        ).all()
+        receita_mensal = sum(float(sub[0] or 0) for sub in revenue_data)
         
         return {
             "total_usuarios": total_usuarios,
@@ -63,46 +50,39 @@ async def calculate_stats_manually():
             "receita_mensal": receita_mensal
         }
     except Exception as e:
-        return {
-            "total_usuarios": 0,
-            "usuarios_ativos": 0,
-            "assinaturas_ativas": 0,
-            "receita_mensal": 0.0
-        }
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro ao buscar estatísticas do dashboard: {str(e)}"
+        )
 
 @router.get("/user-summary")
-async def get_user_summary(current_user: dict = Depends(get_current_user)):
-    """Obtém resumo do usuário para o dashboard pessoal"""
+async def get_user_summary(current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    """
+    Obtém resumo do usuário para o dashboard pessoal
+    """
     try:
         user_id = current_user["id"]
         
         # Busca perfil do usuário
-        profile_response = supabase.table("profiles").select("*").eq("id", user_id).execute()
-        profile = profile_response.data[0] if profile_response.data else {}
+        profile = db.query(Profile).filter(Profile.id == user_id).first()
         
-        # Conta treinos ativos
-        trainings_response = supabase.table("treinos_enviados").select("id", count="exact").eq("cliente_id", user_id).eq("ativo", True).execute()
-        total_treinos = trainings_response.count if trainings_response.count else 0
+        # Conta treinos ativos (assuming 'ativo' column in TreinoEnviado, if not, remove filter)
+        total_treinos = db.query(TreinoEnviado).filter(TreinoEnviado.usuario_id == user_id).count()
         
         # Conta entradas de progresso
-        progress_response = supabase.table("progresso").select("id", count="exact").eq("usuario_id", user_id).execute()
-        total_progresso = progress_response.count if progress_response.count else 0
+        total_progresso = db.query(Progresso).filter(Progresso.usuario_id == user_id).count()
         
-        # Conta mensagens não lidas
-        messages_response = supabase.table("mensagens").select("id", count="exact").eq("destinatario_id", user_id).eq("lida", False).execute()
-        mensagens_nao_lidas = messages_response.count if messages_response.count else 0
+        # Conta mensagens não lidas (assuming 'lida' column in Mensagem, if not, remove filter)
+        mensagens_nao_lidas = db.query(Mensagem).filter(Mensagem.usuario_id == user_id, Mensagem.lida == False).count()
         
         # Busca última entrada de progresso
-        last_progress_response = supabase.table("progresso").select("*").eq("usuario_id", user_id).order("data_medicao", desc=True).limit(1).execute()
-        ultimo_progresso = last_progress_response.data[0] if last_progress_response.data else None
+        ultimo_progresso = db.query(Progresso).filter(Progresso.usuario_id == user_id).order_by(Progresso.data_medicao.desc()).first()
         
         # Busca assinatura ativa
-        subscription_response = supabase.table("assinaturas").select("*").eq("usuario_id", user_id).eq("status", "ativa").execute()
-        assinatura_ativa = subscription_response.data[0] if subscription_response.data else None
+        assinatura_ativa = db.query(Assinatura).filter(Assinatura.usuario_id == user_id, Assinatura.status == "ativa").first()
         
         # Busca avaliações pendentes
-        assessments_response = supabase.table("avaliacoes").select("id", count="exact").eq("usuario_id", user_id).eq("status", "pendente").execute()
-        avaliacoes_pendentes = assessments_response.count if assessments_response.count else 0
+        avaliacoes_pendentes = db.query(Avaliacao).filter(Avaliacao.usuario_id == user_id, Avaliacao.status == "pendente").count()
         
         return {
             "profile": profile,
@@ -122,45 +102,45 @@ async def get_user_summary(current_user: dict = Depends(get_current_user)):
 @router.get("/recent-activity")
 async def get_recent_activity(
     limit: int = 10,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
-    """Obtém atividades recentes do usuário"""
+    """
+    Obtém atividades recentes do usuário
+    """
     try:
         user_id = current_user["id"]
         activities = []
         
         # Treinos recentes
-        trainings_response = supabase.table("treinos_enviados").select("*").eq("cliente_id", user_id).order("enviado_em", desc=True).limit(3).execute()
-        if trainings_response.data:
-            for training in trainings_response.data:
-                activities.append({
-                    "type": "treino",
-                    "title": f"Novo treino: {training['nome_arquivo']}",
-                    "date": training["enviado_em"],
-                    "data": training
-                })
+        trainings = db.query(TreinoEnviado).filter(TreinoEnviado.usuario_id == user_id).order_by(TreinoEnviado.enviado_em.desc()).limit(3).all()
+        for training in trainings:
+            activities.append({
+                "type": "treino",
+                "title": f"Novo treino: {training.nome_arquivo}",
+                "date": training.enviado_em,
+                "data": training
+            })
         
         # Progresso recente
-        progress_response = supabase.table("progresso").select("*").eq("usuario_id", user_id).order("data_medicao", desc=True).limit(3).execute()
-        if progress_response.data:
-            for progress in progress_response.data:
-                activities.append({
-                    "type": "progresso",
-                    "title": f"Progresso registrado em {progress['data_medicao']}",
-                    "date": progress["criado_em"],
-                    "data": progress
-                })
+        progress_entries = db.query(Progresso).filter(Progresso.usuario_id == user_id).order_by(Progresso.data_medicao.desc()).limit(3).all()
+        for progress_entry in progress_entries:
+            activities.append({
+                "type": "progresso",
+                "title": f"Progresso registrado em {progress_entry.data_medicao}",
+                "date": progress_entry.data_medicao,
+                "data": progress_entry
+            })
         
         # Mensagens recentes
-        messages_response = supabase.table("mensagens").select("*").eq("destinatario_id", user_id).order("data_envio", desc=True).limit(3).execute()
-        if messages_response.data:
-            for message in messages_response.data:
-                activities.append({
-                    "type": "mensagem",
-                    "title": f"Nova mensagem: {message['assunto']}",
-                    "date": message["data_envio"],
-                    "data": message
-                })
+        messages = db.query(Mensagem).filter(Mensagem.usuario_id == user_id).order_by(Mensagem.enviado_em.desc()).limit(3).all()
+        for message in messages:
+            activities.append({
+                "type": "mensagem",
+                "title": f"Nova mensagem: {message.assunto}",
+                "date": message.enviado_em,
+                "data": message
+            })
         
         # Ordena por data (mais recente primeiro) e limita
         activities.sort(key=lambda x: x["date"], reverse=True)
@@ -172,45 +152,47 @@ async def get_recent_activity(
         )
 
 @router.get("/quick-stats")
-async def get_quick_stats(current_user: dict = Depends(get_current_user)):
-    """Obtém estatísticas rápidas para cards do dashboard"""
+async def get_quick_stats(current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    """
+    Obtém estatísticas rápidas para cards do dashboard
+    """
     try:
         user_id = current_user["id"]
         
         # Se for admin, retorna estatísticas gerais
         if current_user.get("role") == "admin":
-            return await get_admin_quick_stats()
+            return await get_admin_quick_stats(db) # Pass db session to admin quick stats
         
         # Para usuários comuns, retorna estatísticas pessoais
         # Progresso: diferença entre primeira e última medição de peso
-        progress_response = supabase.table("progresso").select("peso, data_medicao").eq("usuario_id", user_id).order("data_medicao").execute()
+        progress_entries = db.query(Progresso.peso, Progresso.data_medicao).filter(Progresso.usuario_id == user_id).order_by(Progresso.data_medicao).all()
         
         evolucao_peso = 0
-        if progress_response.data and len(progress_response.data) > 1:
-            primeiro = progress_response.data[0]
-            ultimo = progress_response.data[-1]
-            if primeiro.get("peso") and ultimo.get("peso"):
-                evolucao_peso = ultimo["peso"] - primeiro["peso"]
+        if progress_entries and len(progress_entries) > 1:
+            primeiro = progress_entries[0].peso
+            ultimo = progress_entries[-1].peso
+            if primeiro is not None and ultimo is not None:
+                evolucao_peso = ultimo - primeiro
         
         # Dias desde o cadastro
-        profile_response = supabase.table("profiles").select("data_cadastro").eq("id", user_id).execute()
+        profile = db.query(Profile.criado_em).filter(Profile.id == user_id).first()
         dias_cadastrado = 0
-        if profile_response.data:
-            from datetime import datetime
-            cadastro = datetime.fromisoformat(profile_response.data[0]["data_cadastro"].replace("Z", "+00:00"))
-            dias_cadastrado = (datetime.now(cadastro.tzinfo) - cadastro).days
+        if profile and profile.criado_em:
+            cadastro = profile.criado_em
+            dias_cadastrado = (datetime.now() - cadastro).days
         
         # Treinos este mês
-        from datetime import datetime, timedelta
         inicio_mes = datetime.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        trainings_response = supabase.table("treinos_enviados").select("id", count="exact").eq("cliente_id", user_id).gte("enviado_em", inicio_mes.isoformat()).execute()
-        treinos_mes = trainings_response.count if trainings_response.count else 0
+        treinos_mes = db.query(TreinoEnviado).filter(
+            TreinoEnviado.usuario_id == user_id,
+            TreinoEnviado.enviado_em >= inicio_mes
+        ).count()
         
         return {
             "evolucao_peso": round(evolucao_peso, 1),
             "dias_cadastrado": dias_cadastrado,
             "treinos_mes": treinos_mes,
-            "progresso_total": len(progress_response.data) if progress_response.data else 0
+            "progresso_total": len(progress_entries) if progress_entries else 0
         }
     except Exception as e:
         raise HTTPException(
@@ -218,26 +200,23 @@ async def get_quick_stats(current_user: dict = Depends(get_current_user)):
             detail=f"Erro ao buscar estatísticas rápidas: {str(e)}"
         )
 
-async def get_admin_quick_stats():
-    """Obtém estatísticas rápidas para administradores"""
+async def get_admin_quick_stats(db: Session):
+    """
+    Obtém estatísticas rápidas para administradores
+    """
     try:
         # Novos usuários este mês
-        from datetime import datetime
         inicio_mes = datetime.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        new_users_response = supabase.table("profiles").select("id", count="exact").gte("data_cadastro", inicio_mes.isoformat()).execute()
-        novos_usuarios = new_users_response.count if new_users_response.count else 0
+        novos_usuarios = db.query(Profile).filter(Profile.criado_em >= inicio_mes).count()
         
         # Treinos enviados este mês
-        trainings_response = supabase.table("treinos_enviados").select("id", count="exact").gte("enviado_em", inicio_mes.isoformat()).execute()
-        treinos_enviados = trainings_response.count if trainings_response.count else 0
+        treinos_enviados = db.query(TreinoEnviado).filter(TreinoEnviado.enviado_em >= inicio_mes).count()
         
-        # Mensagens não respondidas
-        messages_response = supabase.table("mensagens").select("id", count="exact").eq("respondida", False).execute()
-        mensagens_pendentes = messages_response.count if messages_response.count else 0
+        # Mensagens não respondidas (assuming 'respondida' column in Mensagem, if not, remove filter)
+        mensagens_pendentes = db.query(Mensagem).filter(Mensagem.respondida == False).count()
         
         # Avaliações pendentes
-        assessments_response = supabase.table("avaliacoes").select("id", count="exact").eq("status", "pendente").execute()
-        avaliacoes_pendentes = assessments_response.count if assessments_response.count else 0
+        avaliacoes_pendentes = db.query(Avaliacao).filter(Avaliacao.status == "pendente").count()
         
         return {
             "novos_usuarios": novos_usuarios,
@@ -246,10 +225,9 @@ async def get_admin_quick_stats():
             "avaliacoes_pendentes": avaliacoes_pendentes
         }
     except Exception as e:
-        return {
-            "novos_usuarios": 0,
-            "treinos_enviados": 0,
-            "mensagens_pendentes": 0,
-            "avaliacoes_pendentes": 0
-        }
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro ao buscar estatísticas rápidas do admin: {str(e)}"
+        )
+
 
