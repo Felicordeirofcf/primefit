@@ -170,3 +170,150 @@ class MessageResponse(BaseModel):
         from_attributes = True
 
 
+
+
+class TreinoCreate(BaseModel):
+    usuario_id: str
+    nome_arquivo: str
+    url_pdf: str
+
+class TreinoResponse(BaseModel):
+    id: str
+    usuario_id: str
+    nome_arquivo: str
+    url_pdf: str
+    enviado_em: datetime
+
+    class Config:
+        from_attributes = True
+
+
+
+
+class AvaliacaoCreate(BaseModel):
+    usuario_id: str
+    tipo: str
+    peso: float
+    altura: float
+    percentual_gordura: float
+    massa_muscular: float
+
+class AvaliacaoResponse(BaseModel):
+    id: str
+    usuario_id: str
+    tipo: str
+    data: datetime
+    peso: float
+    altura: float
+    percentual_gordura: float
+    massa_muscular: float
+
+    class Config:
+        from_attributes = True
+
+
+
+
+class DashboardStats(BaseModel):
+    total_usuarios: int
+    usuarios_ativos: int
+    assinaturas_ativas: int
+    receita_mensal: float
+
+    class Config:
+        from_attributes = True
+
+
+
+
+class ProgressoCreate(BaseModel):
+    usuario_id: str
+    peso: float
+    altura: float
+    percentual_gordura: float
+    massa_muscular: float
+
+class ProgressoResponse(BaseModel):
+    id: str
+    usuario_id: str
+    data_medicao: datetime
+    peso: float
+    altura: float
+    percentual_gordura: float
+    massa_muscular: float
+
+    class Config:
+        from_attributes = True
+
+
+
+
+class Content(Base):
+    __tablename__ = "content"
+
+    id = Column(String, primary_key=True)
+    title = Column(String)
+    summary = Column(String)
+    body = Column(String)
+    author_id = Column(String)
+    category = Column(String)
+    tags = Column(String) # Assuming tags are stored as a comma-separated string for simplicity
+    image_url = Column(String)
+    published = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+class Comment(Base):
+    __tablename__ = "comments"
+
+    id = Column(String, primary_key=True)
+    content_id = Column(String)
+    user_id = Column(String)
+    text = Column(String)
+    created_at = Column(DateTime, default=func.now())
+
+
+
+
+class ContentCreate(BaseModel):
+    title: str
+    summary: str
+    body: str
+    category: str
+    tags: List[str]
+    image_url: Optional[str] = None
+    published: bool = True
+
+    class Config:
+        from_attributes = True
+
+class ContentResponse(BaseModel):
+    id: str
+    title: str
+    summary: str
+    body: str
+    author_id: str
+    category: str
+    tags: List[str]
+    image_url: Optional[str] = None
+    published: bool = True
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+class CommentCreate(BaseModel):
+    text: str
+
+class CommentResponse(BaseModel):
+    id: str
+    content_id: str
+    user_id: str
+    text: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+

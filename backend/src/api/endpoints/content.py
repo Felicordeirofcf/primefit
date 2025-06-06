@@ -1,16 +1,16 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from typing import List, Optional
 from sqlalchemy.orm import Session
+from sqlalchemy import func
+
 from src.core.database import get_db
 from src.api.endpoints.auth import get_current_user
-from src.schemas.models import Profile # Assuming Profile is needed for author_id validation
-from src.schemas.content import Content, ContentCreate, Comment, CommentCreate # Assuming CommentCreate is needed
-from sqlalchemy import func
+from src.schemas.models import Profile, Content, ContentCreate, ContentResponse, Comment, CommentCreate, CommentResponse
 
 router = APIRouter()
 
 # Rotas para conteúdo
-@router.post("/", response_model=Content)
+@router.post("/", response_model=ContentResponse)
 async def create_content(
     content: ContentCreate,
     current_user: dict = Depends(get_current_user),
@@ -36,7 +36,7 @@ async def create_content(
             detail=f"Erro ao criar conteúdo: {str(e)}"
         )
 
-@router.get("/", response_model=List[Content])
+@router.get("/", response_model=List[ContentResponse])
 async def get_contents(
     category: Optional[str] = None,
     tag: Optional[str] = None,
@@ -70,7 +70,7 @@ async def get_contents(
             detail=f"Erro ao buscar conteúdos: {str(e)}"
         )
 
-@router.get("/{content_id}", response_model=Content)
+@router.get("/{content_id}", response_model=ContentResponse)
 async def get_content(
     content_id: str,
     current_user: dict = Depends(get_current_user),
@@ -100,7 +100,7 @@ async def get_content(
             detail=f"Erro ao buscar conteúdo: {str(e)}"
         )
 
-@router.put("/{content_id}", response_model=Content)
+@router.put("/{content_id}", response_model=ContentResponse)
 async def update_content(
     content_id: str,
     content_update: ContentCreate,
@@ -172,7 +172,7 @@ async def delete_content(
         )
 
 # Rotas para comentários
-@router.post("/{content_id}/comments", response_model=Comment)
+@router.post("/{content_id}/comments", response_model=CommentResponse)
 async def create_comment(
     content_id: str,
     comment_data: CommentCreate, # Using CommentCreate Pydantic model
@@ -202,7 +202,7 @@ async def create_comment(
             detail=f"Erro ao criar comentário: {str(e)}"
         )
 
-@router.get("/{content_id}/comments", response_model=List[Comment])
+@router.get("/{content_id}/comments", response_model=List[CommentResponse])
 async def get_comments(
     content_id: str,
     current_user: dict = Depends(get_current_user),
@@ -260,5 +260,6 @@ async def delete_comment(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Erro ao excluir comentário: {str(e)}"
         )
+
 
 
