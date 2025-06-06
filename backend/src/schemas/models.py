@@ -2,7 +2,7 @@ from sqlalchemy import Column, String, DateTime, Integer, Float, Boolean
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.sql import func
 from pydantic import BaseModel, EmailStr
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime # Adicionado import para datetime
 
 Base = declarative_base()
