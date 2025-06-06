@@ -5,7 +5,7 @@ import os
 
 # URL de conexão com o banco de dados PostgreSQL
 # Ex: postgresql://user:password@host:port/dbname
-DATABASE_URL = os.environ.get("DATABASE_URL", "postgresql://user:password@host:5432/dbname")
+DATABASE_URL = os.environ.get("DATABASE_URL", "postgresql://postgres:eDapPJzWCXDybPcjKyXRIKGgdZjqrlWO@tramway.proxy.rlwy.net:16404/railway")
 
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
