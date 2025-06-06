@@ -139,18 +139,6 @@ class PlanResponse(BaseModel):
     class Config:
         from_attributes = True
 
-class SubscriptionResponse(BaseModel):
-    id: str
-    usuario_id: str
-    plano_id: str
-    status: str
-    data_inicio: datetime
-    data_fim: datetime
-    valor_pago: float
-
-    class Config:
-        from_attributes = True
-
 
 
 
@@ -315,5 +303,15 @@ class CommentResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+
+
+class PlanCreate(BaseModel):
+    name: str
+    description: str
+    price: float
+    duration_months: int
+    is_active: Optional[bool] = True
 
 

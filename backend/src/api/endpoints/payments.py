@@ -7,9 +7,9 @@ from src.core.database import get_db
 from src.api.endpoints.auth import get_current_user
 from src.schemas.models import (
     Payment, PaymentCreate, PaymentResponse,
-    Assinatura, SubscriptionResponse,
     PlanCreate, PlanResponse
 )
+from src.schemas.subscription import SubscriptionCreate, SubscriptionResponse
 from src.schemas.models import Plan as SQLAlchemyPlan
 
 # Instancia o roteador
@@ -169,7 +169,7 @@ async def get_plans(
 # Rotas para assinaturas
 @router.post("/subscriptions", response_model=SubscriptionResponse)
 async def create_subscription(
-    subscription_data: Assinatura,
+    subscription_data: SubscriptionCreate,
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -181,7 +181,7 @@ async def create_subscription(
         )
     
     try:
-        db_subscription = Assinatura(**subscription_data.dict())
+        db_subscription = Assinatura(**subscription_data.model_dump())
         db.add(db_subscription)
         db.commit()
         db.refresh(db_subscription)
