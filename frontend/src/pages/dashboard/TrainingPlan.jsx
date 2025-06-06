@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../hooks/useAuth'; // Assuming useAuth provides user, loading, and session
 
 // API URL from environment variables
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_URL = import.meta.env.VITE_API_URL || 'https://primefit-production.up.railway.app';
 
 const TrainingPlan = () => {
   // Use auth hook to get user, loading status, and session

@@ -4,7 +4,7 @@
 import axios from 'axios';
 
 // Obter a URL da API do ambiente
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_URL = import.meta.env.VITE_API_URL || 'https://primefit-production.up.railway.app';
 const WEBSOCKET_URL = import.meta.env.VITE_WEBSOCKET_URL || 'ws://localhost:8000';
 
 // Criar instância do axios com configurações padrão
