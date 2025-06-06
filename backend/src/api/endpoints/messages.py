@@ -1,273 +1,254 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from typing import List, Optional
+"""
+Endpoints para gerenciamento de mensagens
+"""
+from fastapi import APIRouter, Depends, HTTPException, status, WebSocket, WebSocketDisconnect
+from typing import List, Dict, Any
+import json
+import asyncio
+from datetime import datetime
 
-from src.core.supabase_client import supabase
-from src.api.endpoints.auth import get_current_user
-from src.schemas.models import MensagemCreate, MensagemResponse
+from src.api.endpoints.auth import get_current_user, get_admin_user
+from src.core.db_client import execute_query
+from src.schemas.models import MessageCreate, MessageResponse
 
 router = APIRouter()
 
-@router.get("/", response_model=List[MensagemResponse])
-async def get_my_messages(
-    skip: int = 0,
-    limit: int = 100,
-    apenas_nao_lidas: bool = False,
-    current_user: dict = Depends(get_current_user)
-):
-    """Obtém as mensagens do usuário autenticado (enviadas e recebidas)"""
-    try:
-        query = supabase.table("mensagens").select("*")
-        
-        # Filtra mensagens onde o usuário é remetente ou destinatário
-        query = query.or_(f"remetente_id.eq.{current_user['id']},destinatario_id.eq.{current_user['id']}")
-        
-        # Filtro opcional para apenas mensagens não lidas
-        if apenas_nao_lidas:
-            query = query.eq("lida", False).eq("destinatario_id", current_user["id"])
-        
-        # Ordena por data de envio (mais recente primeiro)
-        query = query.order("data_envio", desc=True)
-        
-        # Aplica paginação
-        response = query.range(skip, skip + limit).execute()
-        
-        if not response.data:
-            return []
-        
-        return response.data
-    except Exception as e:
+# Gerenciador de conexões WebSocket
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: Dict[str, WebSocket] = {}
+    
+    async def connect(self, websocket: WebSocket, user_id: str):
+        await websocket.accept()
+        self.active_connections[user_id] = websocket
+    
+    def disconnect(self, user_id: str):
+        if user_id in self.active_connections:
+            del self.active_connections[user_id]
+    
+    async def send_personal_message(self, message: Dict[str, Any], user_id: str):
+        if user_id in self.active_connections:
+            await self.active_connections[user_id].send_text(json.dumps(message))
+    
+    async def broadcast(self, message: Dict[str, Any]):
+        for connection in self.active_connections.values():
+            await connection.send_text(json.dumps(message))
+
+manager = ConnectionManager()
+
+@router.post("/", response_model=MessageResponse)
+async def create_message(message: MessageCreate, current_user = Depends(get_current_user)):
+    """
+    Cria uma nova mensagem.
+    """
+    # Verificar se o destinatário existe
+    receiver = execute_query(
+        "SELECT * FROM users WHERE id = %s",
+        (message.receiver_id,)
+    )
+    
+    if not receiver:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Destinatário não encontrado"
+        )
+    
+    # Inserir a mensagem
+    new_message = execute_query(
+        """
+        INSERT INTO mensagens (sender_id, receiver_id, content, is_read)
+        VALUES (%s, %s, %s, %s)
+        RETURNING *
+        """,
+        (current_user['id'], message.receiver_id, message.content, False)
+    )
+    
+    if not new_message:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Erro ao buscar mensagens: {str(e)}"
+            detail="Falha ao enviar mensagem"
         )
-
-@router.post("/", response_model=MensagemResponse)
-async def send_message(
-    message_data: MensagemCreate,
-    current_user: dict = Depends(get_current_user)
-):
-    """Envia uma nova mensagem"""
+    
+    # Tentar enviar a mensagem via WebSocket se o destinatário estiver conectado
     try:
-        # Verifica se o destinatário existe
-        response = supabase.table("profiles").select("id").eq("id", message_data.destinatario_id).execute()
-        
-        if not response.data or len(response.data) == 0:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Destinatário não encontrado"
-            )
-        
-        # Prepara dados para inserção
-        message_dict = message_data.dict()
-        message_dict["remetente_id"] = current_user["id"]
-        
-        # Insere mensagem no Supabase
-        response = supabase.table("mensagens").insert(message_dict).execute()
-        
-        if not response.data or len(response.data) == 0:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Erro ao enviar mensagem"
-            )
-        
-        return response.data[0]
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Erro ao enviar mensagem: {str(e)}"
-        )
-
-@router.get("/{message_id}", response_model=MensagemResponse)
-async def get_message(
-    message_id: str,
-    current_user: dict = Depends(get_current_user)
-):
-    """Obtém uma mensagem específica"""
-    try:
-        response = supabase.table("mensagens").select("*").eq("id", message_id).execute()
-        
-        if not response.data or len(response.data) == 0:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Mensagem não encontrada"
-            )
-        
-        message = response.data[0]
-        
-        # Verifica se o usuário tem permissão para ver esta mensagem
-        if (message["remetente_id"] != current_user["id"] and 
-            message["destinatario_id"] != current_user["id"] and 
-            current_user.get("role") != "admin"):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Sem permissão para acessar esta mensagem"
-            )
-        
-        return message
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Erro ao buscar mensagem: {str(e)}"
-        )
-
-@router.put("/{message_id}/marcar-lida", response_model=MensagemResponse)
-async def mark_message_as_read(
-    message_id: str,
-    current_user: dict = Depends(get_current_user)
-):
-    """Marca uma mensagem como lida"""
-    try:
-        # Verifica se a mensagem existe e o usuário é o destinatário
-        response = supabase.table("mensagens").select("*").eq("id", message_id).execute()
-        
-        if not response.data or len(response.data) == 0:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Mensagem não encontrada"
-            )
-        
-        message = response.data[0]
-        
-        if message["destinatario_id"] != current_user["id"]:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Apenas o destinatário pode marcar a mensagem como lida"
-            )
-        
-        # Atualiza mensagem como lida
-        from datetime import datetime
-        update_data = {
-            "lida": True,
-            "data_leitura": datetime.utcnow().isoformat()
-        }
-        
-        response = supabase.table("mensagens").update(update_data).eq("id", message_id).execute()
-        
-        if not response.data or len(response.data) == 0:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Erro ao marcar mensagem como lida"
-            )
-        
-        return response.data[0]
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Erro ao marcar mensagem como lida: {str(e)}"
-        )
-
-@router.get("/conversas/lista")
-async def get_conversations(current_user: dict = Depends(get_current_user)):
-    """Obtém lista de conversas do usuário com contagem de mensagens não lidas"""
-    try:
-        # Busca todas as mensagens do usuário
-        response = supabase.table("mensagens").select("*").or_(
-            f"remetente_id.eq.{current_user['id']},destinatario_id.eq.{current_user['id']}"
-        ).order("data_envio", desc=True).execute()
-        
-        if not response.data:
-            return []
-        
-        # Agrupa mensagens por conversa
-        conversas = {}
-        
-        for msg in response.data:
-            # Determina o ID do outro participante da conversa
-            outro_id = msg["destinatario_id"] if msg["remetente_id"] == current_user["id"] else msg["remetente_id"]
-            
-            if outro_id not in conversas:
-                conversas[outro_id] = {
-                    "participante_id": outro_id,
-                    "ultima_mensagem": msg,
-                    "total_mensagens": 0,
-                    "nao_lidas": 0
+        await manager.send_personal_message(
+            {
+                "type": "new_message",
+                "data": {
+                    "id": new_message[0]['id'],
+                    "sender_id": current_user['id'],
+                    "receiver_id": message.receiver_id,
+                    "content": message.content,
+                    "created_at": new_message[0]['created_at'].isoformat(),
+                    "is_read": False
                 }
-            
-            conversas[outro_id]["total_mensagens"] += 1
-            
-            # Conta mensagens não lidas (apenas as recebidas pelo usuário atual)
-            if (msg["destinatario_id"] == current_user["id"] and not msg["lida"]):
-                conversas[outro_id]["nao_lidas"] += 1
-        
-        # Busca informações dos participantes
-        for conversa in conversas.values():
-            profile_response = supabase.table("profiles").select("nome, email").eq("id", conversa["participante_id"]).execute()
-            if profile_response.data:
-                conversa["participante_nome"] = profile_response.data[0]["nome"]
-                conversa["participante_email"] = profile_response.data[0]["email"]
-        
-        return list(conversas.values())
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Erro ao buscar conversas: {str(e)}"
+            },
+            message.receiver_id
         )
+    except Exception as e:
+        # Ignorar erros de WebSocket, a mensagem já foi salva no banco
+        print(f"Erro ao enviar mensagem via WebSocket: {e}")
+    
+    return new_message[0]
 
-@router.get("/conversa/{outro_usuario_id}", response_model=List[MensagemResponse])
-async def get_conversation_with_user(
-    outro_usuario_id: str,
-    skip: int = 0,
-    limit: int = 50,
-    current_user: dict = Depends(get_current_user)
-):
-    """Obtém todas as mensagens de uma conversa específica"""
-    try:
-        # Busca mensagens entre os dois usuários
-        response = supabase.table("mensagens").select("*").or_(
-            f"and(remetente_id.eq.{current_user['id']},destinatario_id.eq.{outro_usuario_id}),"
-            f"and(remetente_id.eq.{outro_usuario_id},destinatario_id.eq.{current_user['id']})"
-        ).order("data_envio", desc=False).range(skip, skip + limit).execute()
-        
-        if not response.data:
-            return []
-        
-        return response.data
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Erro ao buscar conversa: {str(e)}"
-        )
+@router.get("/", response_model=List[MessageResponse])
+async def get_my_messages(current_user = Depends(get_current_user)):
+    """
+    Obtém todas as mensagens do usuário atual.
+    """
+    messages = execute_query(
+        """
+        SELECT * FROM mensagens
+        WHERE sender_id = %s OR receiver_id = %s
+        ORDER BY created_at DESC
+        """,
+        (current_user['id'], current_user['id'])
+    )
+    
+    return messages or []
 
-@router.delete("/{message_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_message(
-    message_id: str,
-    current_user: dict = Depends(get_current_user)
-):
-    """Exclui uma mensagem (apenas o remetente ou admin)"""
-    try:
-        # Verifica se a mensagem existe
-        response = supabase.table("mensagens").select("*").eq("id", message_id).execute()
-        
-        if not response.data or len(response.data) == 0:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Mensagem não encontrada"
-            )
-        
-        message = response.data[0]
-        
-        # Verifica permissão (apenas remetente ou admin)
-        if message["remetente_id"] != current_user["id"] and current_user.get("role") != "admin":
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Sem permissão para excluir esta mensagem"
-            )
-        
-        # Exclui mensagem do Supabase
-        supabase.table("mensagens").delete().eq("id", message_id).execute()
-        
-        return None
-    except HTTPException:
-        raise
-    except Exception as e:
+@router.get("/conversation/{other_user_id}", response_model=List[MessageResponse])
+async def get_conversation(other_user_id: str, current_user = Depends(get_current_user)):
+    """
+    Obtém a conversa entre o usuário atual e outro usuário.
+    """
+    # Verificar se o outro usuário existe
+    other_user = execute_query(
+        "SELECT * FROM users WHERE id = %s",
+        (other_user_id,)
+    )
+    
+    if not other_user:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Erro ao excluir mensagem: {str(e)}"
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Usuário não encontrado"
         )
+    
+    # Obter as mensagens da conversa
+    messages = execute_query(
+        """
+        SELECT * FROM mensagens
+        WHERE (sender_id = %s AND receiver_id = %s)
+        OR (sender_id = %s AND receiver_id = %s)
+        ORDER BY created_at ASC
+        """,
+        (current_user['id'], other_user_id, other_user_id, current_user['id'])
+    )
+    
+    # Marcar mensagens recebidas como lidas
+    execute_query(
+        """
+        UPDATE mensagens
+        SET is_read = TRUE
+        WHERE sender_id = %s AND receiver_id = %s AND is_read = FALSE
+        """,
+        (other_user_id, current_user['id'])
+    )
+    
+    return messages or []
+
+@router.put("/read/{message_id}")
+async def mark_message_as_read(message_id: str, current_user = Depends(get_current_user)):
+    """
+    Marca uma mensagem como lida.
+    """
+    # Verificar se a mensagem existe e pertence ao usuário
+    message = execute_query(
+        "SELECT * FROM mensagens WHERE id = %s AND receiver_id = %s",
+        (message_id, current_user['id'])
+    )
+    
+    if not message:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Mensagem não encontrada ou você não tem permissão para acessá-la"
+        )
+    
+    # Marcar como lida
+    updated_message = execute_query(
+        """
+        UPDATE mensagens
+        SET is_read = TRUE
+        WHERE id = %s
+        RETURNING *
+        """,
+        (message_id,)
+    )
+    
+    return {"success": True, "message": "Mensagem marcada como lida"}
+
+@router.websocket("/ws/{user_id}")
+async def websocket_endpoint(websocket: WebSocket, user_id: str):
+    """
+    Endpoint WebSocket para comunicação em tempo real.
+    """
+    await manager.connect(websocket, user_id)
+    try:
+        while True:
+            data = await websocket.receive_text()
+            try:
+                message_data = json.loads(data)
+                
+                # Validar a mensagem
+                if "type" not in message_data or "data" not in message_data:
+                    await websocket.send_text(json.dumps({"error": "Formato de mensagem inválido"}))
+                    continue
+                
+                # Processar diferentes tipos de mensagens
+                if message_data["type"] == "ping":
+                    await websocket.send_text(json.dumps({"type": "pong"}))
+                
+                elif message_data["type"] == "message":
+                    # Aqui você pode implementar a lógica para salvar a mensagem no banco
+                    # e encaminhá-la para o destinatário
+                    msg_data = message_data["data"]
+                    if "receiver_id" in msg_data and "content" in msg_data:
+                        # Inserir a mensagem no banco
+                        new_message = execute_query(
+                            """
+                            INSERT INTO mensagens (sender_id, receiver_id, content, is_read)
+                            VALUES (%s, %s, %s, %s)
+                            RETURNING *
+                            """,
+                            (user_id, msg_data["receiver_id"], msg_data["content"], False)
+                        )
+                        
+                        if new_message:
+                            # Enviar para o destinatário se estiver conectado
+                            await manager.send_personal_message(
+                                {
+                                    "type": "new_message",
+                                    "data": {
+                                        "id": new_message[0]['id'],
+                                        "sender_id": user_id,
+                                        "receiver_id": msg_data["receiver_id"],
+                                        "content": msg_data["content"],
+                                        "created_at": new_message[0]['created_at'].isoformat(),
+                                        "is_read": False
+                                    }
+                                },
+                                msg_data["receiver_id"]
+                            )
+                            
+                            # Confirmar para o remetente
+                            await websocket.send_text(json.dumps({
+                                "type": "message_sent",
+                                "data": {
+                                    "id": new_message[0]['id'],
+                                    "timestamp": new_message[0]['created_at'].isoformat()
+                                }
+                            }))
+                    else:
+                        await websocket.send_text(json.dumps({"error": "Dados de mensagem incompletos"}))
+                
+            except json.JSONDecodeError:
+                await websocket.send_text(json.dumps({"error": "JSON inválido"}))
+            except Exception as e:
+                await websocket.send_text(json.dumps({"error": str(e)}))
+    
+    except WebSocketDisconnect:
+        manager.disconnect(user_id)
+    except Exception as e:
+        print(f"Erro no WebSocket: {e}")
+        manager.disconnect(user_id)
 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { supabase } from '../supabaseClient'; // Import Supabase client
+import { blogAPI } from '../api/blogAPI'; // Import blog API client
 import { FiFilter, FiSearch, FiMail, FiArrowLeft, FiArrowRight } from 'react-icons/fi'; // Using react-icons
 
 const BlogPage = () => {
@@ -10,17 +10,26 @@ const BlogPage = () => {
   const [selectedCategory, setSelectedCategory] = useState('Todas');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [categories, setCategories] = useState(['Todas']);
   const postsPerPage = 6; // Number of posts per page
 
-  // TODO: Fetch categories dynamically from Supabase if needed
-  const categories = [
-    'Todas',
-    'Emagrecimento',
-    'Nutrição',
-    'Treino',
-    'Saúde',
-    'Casos de Sucesso'
-  ];
+  useEffect(() => {
+    // Carregar categorias disponíveis
+    const fetchCategories = async () => {
+      try {
+        const { data, error } = await blogAPI.getCategories();
+        if (error) {
+          console.error('Erro ao carregar categorias:', error);
+        } else if (data) {
+          setCategories(data);
+        }
+      } catch (err) {
+        console.error('Erro ao carregar categorias:', err);
+      }
+    };
+
+    fetchCategories();
+  }, []);
 
   useEffect(() => {
     const fetchPosts = async () => {
@@ -28,35 +37,19 @@ const BlogPage = () => {
       setError(null);
 
       try {
-        // Calculate pagination range
-        const rangeStart = (currentPage - 1) * postsPerPage;
-        const rangeEnd = rangeStart + postsPerPage - 1;
+        const { data, error } = await blogAPI.getPosts(currentPage, selectedCategory, postsPerPage);
 
-        let query = supabase
-          .from('posts') // Assuming a 'posts' table in Supabase
-          .select('*', { count: 'exact' }) // Select all columns and get total count
-          .order('created_at', { ascending: false })
-          .range(rangeStart, rangeEnd);
-
-        // Apply category filter if not 'Todas'
-        if (selectedCategory !== 'Todas') {
-          query = query.eq('category', selectedCategory); // Assuming a 'category' column
-        }
-
-        const { data, error: fetchError, count } = await query;
-
-        if (fetchError) {
-          throw fetchError;
+        if (error) {
+          throw new Error(error);
         }
 
         if (data) {
-          setPosts(data);
-          setTotalPages(Math.ceil(count / postsPerPage));
+          setPosts(data.posts);
+          setTotalPages(data.totalPages);
         } else {
           setPosts([]);
           setTotalPages(1);
         }
-
       } catch (err) {
         console.error('Erro ao buscar posts:', err);
         setError('Não foi possível carregar os posts. Tente novamente mais tarde.');
@@ -81,13 +74,24 @@ const BlogPage = () => {
     }
   };
 
-  // TODO: Implement newsletter subscription logic (e.g., call Supabase function)
-  const handleNewsletterSubmit = (e) => {
+  // Função para inscrição na newsletter
+  const handleNewsletterSubmit = async (e) => {
     e.preventDefault();
     const email = e.target.elements.email.value;
-    console.log('Newsletter subscription attempt:', email);
-    alert('Funcionalidade de inscrição na newsletter ainda não implementada.');
-    // Example: await supabase.functions.invoke('subscribe-newsletter', { email });
+    
+    try {
+      const { data, error } = await blogAPI.subscribeNewsletter(email);
+      
+      if (error) {
+        alert(`Erro: ${error}`);
+      } else {
+        alert(data.message || 'Inscrição realizada com sucesso!');
+        e.target.reset();
+      }
+    } catch (err) {
+      console.error('Erro ao processar inscrição:', err);
+      alert('Ocorreu um erro ao processar sua inscrição. Tente novamente mais tarde.');
+    }
   };
 
   const formatDate = (dateString) => {
@@ -149,7 +153,7 @@ const BlogPage = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-12">
           {posts.map(post => (
             <div key={post.id} className="bg-white rounded-lg shadow-md overflow-hidden flex flex-col transition-shadow hover:shadow-lg">
-              {post.image_url && ( // Assuming an 'image_url' column
+              {post.image_url && (
                 <img
                   src={post.image_url}
                   alt={post.title}

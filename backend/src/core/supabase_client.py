@@ -15,4 +15,7 @@ if not SUPABASE_URL or not SUPABASE_KEY:
     raise ValueError("Credenciais do Supabase não encontradas nas variáveis de ambiente")
 
 # Cria e exporta o cliente Supabase
-supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+def get_supabase_client():
+    return create_client(SUPABASE_URL, SUPABASE_KEY)
+
+

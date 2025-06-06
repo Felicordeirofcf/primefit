@@ -11,10 +11,13 @@ httpx>=0.23.0,<0.24.0
 pytest==7.4.0
 pytest-asyncio==0.21.1
 pytest-cov==4.1.0
-supabase==1.0.3
+psycopg2-binary==2.9.9
 celery==5.3.4
 redis==4.6.0
 loguru==0.7.0
 email-validator==2.0.0
 python-dotenv==1.0.0
 sentry-sdk==1.30.0
+websockets==11.0.3
+pyjwt==2.8.0
+

@@ -1,50 +1,84 @@
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
+"""
+Aplicação principal do backend PrimeFit
+"""
 import os
+from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
 
-# Carrega variáveis de ambiente
+# Carregar variáveis de ambiente
 load_dotenv()
 
-# Inicializa a aplicação FastAPI
+# Importar rotas
+from src.api.endpoints import auth, profiles, messages, trainings, assessments, progress, payments, content, admin, users
+
+# Criar aplicação FastAPI
 app = FastAPI(
     title="PrimeFit API",
-    description="Sistema de autenticação e gerenciamento com Supabase",
-    version="1.0.0",
-    docs_url="/docs",
-    redoc_url="/redoc"
+    description="API para o sistema PrimeFit",
+    version="1.0.0"
 )
 
-# Habilita CORS para o frontend React (ajuste para produção!)
+# Configurar CORS
+origins = [
+    "http://localhost",
+    "http://localhost:5173",  # Vite dev server
+    "http://localhost:3000",
+    "https://primefit.railway.app",  # Produção no Railway
+    os.getenv("FRONTEND_URL", ""),  # URL do frontend definida nas variáveis de ambiente
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000"],  # Ajuste para produção
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Importação das rotas
-from src.api.endpoints import auth, users, trainings, assessments, payments, content
-from src.api.endpoints import profiles, progress, messages, dashboard, admin
+# Rota de verificação de saúde
+@app.get("/health")
+async def health_check():
+    """
+    Verifica se a API está funcionando.
+    """
+    return {"status": "ok", "message": "API is running"}
 
-# Registro de todas as rotas da aplicação
+# Incluir rotas
 app.include_router(auth.router, prefix="/auth", tags=["Autenticação"])
-app.include_router(users.router, prefix="/users", tags=["Usuários"])
 app.include_router(profiles.router, prefix="/profiles", tags=["Perfis"])
-app.include_router(trainings.router, prefix="/trainings", tags=["Treinos"])
-app.include_router(progress.router, prefix="/progress", tags=["Progresso"])
-app.include_router(assessments.router, prefix="/assessments", tags=["Avaliações"])
 app.include_router(messages.router, prefix="/messages", tags=["Mensagens"])
-app.include_router(dashboard.router, prefix="/dashboard", tags=["Dashboard"])
-app.include_router(admin.router, prefix="/admin", tags=["Administração"])
+app.include_router(trainings.router, prefix="/trainings", tags=["Treinos"])
+app.include_router(assessments.router, prefix="/assessments", tags=["Avaliações"])
+app.include_router(progress.router, prefix="/progress", tags=["Progresso"])
 app.include_router(payments.router, prefix="/payments", tags=["Pagamentos"])
 app.include_router(content.router, prefix="/content", tags=["Conteúdo"])
+app.include_router(admin.router, prefix="/admin", tags=["Admin"])
+app.include_router(users.router, prefix="/users", tags=["Usuários"])
 
-@app.get("/")
-async def root():
-    return {"message": "Bem-vindo à API do PrimeFit! Acesse /docs para a documentação."}
+# Tratamento de exceções
+@app.exception_handler(Exception)
+async def global_exception_handler(request, exc):
+    """
+    Manipulador global de exceções.
+    """
+    return JSONResponse(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content={"detail": f"Erro interno: {str(exc)}"}
+    )
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    
+    # Obter porta do ambiente (Railway define PORT automaticamente)
+    port = int(os.getenv("PORT", "8000"))
+    
+    # Iniciar servidor
+    uvicorn.run(
+        "main:app",
+        host="0.0.0.0",  # Bind em todas as interfaces
+        port=port,
+        reload=os.getenv("ENVIRONMENT", "development") == "development"
+    )
+

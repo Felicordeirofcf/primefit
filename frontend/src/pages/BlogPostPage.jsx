@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { supabase } from '../supabaseClient'; // Import Supabase client
+import { blogAPI } from '../api/blogAPI'; // Import blog API client
 import { FiUser, FiCalendar, FiTag, FiArrowLeft, FiLoader, FiAlertCircle } from 'react-icons/fi'; // Using react-icons
+import ReactMarkdown from 'react-markdown';
 
 const BlogPostPage = () => {
   const { id } = useParams();
@@ -27,20 +28,11 @@ const BlogPostPage = () => {
       try {
         // Fetch the main post by ID
         console.log(`Buscando post com ID: ${id}`);
-        const { data: postData, error: postError } = await supabase
-          .from('posts')
-          .select('*') // Select all columns
-          .eq('id', id)
-          .single(); // Expecting a single result
+        const { data: postData, error: postError } = await blogAPI.getPostById(id);
 
         if (postError) {
-          if (postError.code === 'PGRST116') { // Post not found code
-            console.warn(`Post com ID ${id} não encontrado.`);
-            setError('Post não encontrado.');
-          } else {
-            console.error('Erro ao buscar post:', postError);
-            throw new Error('Falha ao carregar o post.');
-          }
+          console.error('Erro ao buscar post:', postError);
+          setError('Post não encontrado.');
           setLoading(false);
           return;
         }
@@ -52,23 +44,19 @@ const BlogPostPage = () => {
           // Fetch related posts (same category, different ID)
           if (postData.category) {
             console.log(`Buscando posts relacionados na categoria: ${postData.category}`);
-            const { data: relatedData, error: relatedError } = await supabase
-              .from('posts')
-              .select('id, title, image_url, category') // Select only needed fields
-              .eq('category', postData.category)
-              .neq('id', id) // Exclude the current post
-              .limit(3); // Limit to 3 related posts
-
-            if (relatedError) {
-              console.warn('Erro ao buscar posts relacionados:', relatedError);
-              // Don't block rendering if related posts fail
-            } else {
-              console.log('Posts relacionados encontrados:', relatedData);
-              setRelatedPosts(relatedData || []);
+            const { data: allPostsData } = await blogAPI.getPosts(1, postData.category, 100);
+            
+            if (allPostsData && allPostsData.posts) {
+              // Filtrar posts relacionados (mesma categoria, ID diferente)
+              const related = allPostsData.posts
+                .filter(p => p.id !== id)
+                .slice(0, 3); // Limitar a 3 posts relacionados
+              
+              setRelatedPosts(related);
             }
           }
         } else {
-           setError('Post não encontrado.'); // Should be caught by PGRST116, but as a fallback
+           setError('Post não encontrado.');
         }
 
       } catch (err) {
@@ -189,13 +177,10 @@ const BlogPostPage = () => {
               )}
             </div>
 
-            {/* Post Content (Rendered from HTML string) */}
-            {/* WARNING: Ensure the HTML content from Supabase is sanitized to prevent XSS attacks */}
-            {/* Consider using a library like DOMPurify if content comes from untrusted sources */}
-            <div
-              className="prose prose-lg max-w-none prose-blue prose-img:rounded-lg prose-a:text-blue-600 hover:prose-a:text-blue-800"
-              dangerouslySetInnerHTML={{ __html: post.content || '' }}
-            />
+            {/* Post Content (Rendered from Markdown) */}
+            <div className="prose prose-lg max-w-none prose-blue prose-img:rounded-lg prose-a:text-blue-600 hover:prose-a:text-blue-800">
+              <ReactMarkdown>{post.content || ''}</ReactMarkdown>
+            </div>
 
             {/* Tags */}
             {post.tags && Array.isArray(post.tags) && post.tags.length > 0 && (

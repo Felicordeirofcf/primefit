@@ -39,7 +39,7 @@ const ProtectedRoute = ({ children }) => {
         console.log('Não autenticado, redirecionando para login...');
         // Inclui search params na URL de redirecionamento
         navigate('/login?redirect=' + encodeURIComponent(location.pathname + location.search));
-      } else if (isAdmin === false) { // Verifica perfil apenas se NÃO for admin
+      } else if (isAdmin === false && userProfile) { // Verifica perfil apenas se NÃO for admin e se userProfile estiver disponível
         const isProfileComplete = !!(userProfile?.nome && userProfile?.objetivo);
         if (!isProfileComplete && location.pathname !== '/completar-perfil') {
           console.log('Perfil incompleto (não admin), redirecionando para completar perfil...');
@@ -51,10 +51,9 @@ const ProtectedRoute = ({ children }) => {
   }, [loading, isAuthenticated, isAdmin, userProfile, navigate, location.pathname, location.search]);
 
   // 1. Exibe loading enquanto o estado de autenticação está sendo determinado ou status de admin está pendente
-  if (loading || (isAuthenticated && isAdmin === null)) {
+  if (loading || (isAuthenticated && isAdmin === null && !userProfile)) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        {/* Usando a cor primária definida no Tailwind config (se houver) ou azul padrão */}
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-600"></div>
       </div>
     );
@@ -68,9 +67,9 @@ const ProtectedRoute = ({ children }) => {
   // 3. Se autenticado:
   //    - Admins sempre têm acesso
   //    - Não-admins precisam de perfil completo (exceto para /completar-perfil)
-  if (isAdmin === true) {
+  if (isAdmin === true || userProfile?.role === 'admin' || userProfile?.email === 'felpcordeirofcf@gmail.com') {
     return children; // Acesso de admin garantido
-  } else { // Não é admin (isAdmin === false)
+  } else if (userProfile) { // Não é admin (isAdmin === false)
     const isProfileComplete = !!(userProfile?.nome && userProfile?.objetivo);
     if (isProfileComplete || location.pathname === '/completar-perfil') {
       return children; // Perfil completo ou na página de completar perfil
@@ -78,6 +77,10 @@ const ProtectedRoute = ({ children }) => {
       // Perfil incompleto e não está na página de completar, não renderiza nada (redirecionamento tratado no useEffect)
       return null;
     }
+  } else {
+    // Se userProfile ainda não estiver disponível, mas o usuário está autenticado, mostra o conteúdo
+    // Isso evita problemas de redirecionamento prematuro
+    return children;
   }
 };
 

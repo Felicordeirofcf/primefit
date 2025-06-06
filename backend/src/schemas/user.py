@@ -1,28 +1,75 @@
-from pydantic import BaseModel, EmailStr
+"""
+Esquemas para usuários e autenticação
+"""
+from pydantic import BaseModel, EmailStr, Field
 from typing import Optional
 from datetime import datetime
 
-# Modelo para criação de usuário
-class UserCreate(BaseModel):
+class UserBase(BaseModel):
+    """Esquema base para usuários"""
     email: EmailStr
-    password: str
-    full_name: str # Corrigido de name para full_name
 
-# Modelo para resposta de usuário (sem senha)
-class UserResponse(BaseModel):
+class UserCreate(UserBase):
+    """Esquema para criação de usuários"""
+    password: str = Field(..., min_length=6)
+
+class UserLogin(UserBase):
+    """Esquema para login de usuários"""
+    password: str
+
+class UserUpdate(BaseModel):
+    """Esquema para atualização de usuários"""
+    email: Optional[EmailStr] = None
+    password: Optional[str] = Field(None, min_length=6)
+    is_active: Optional[bool] = None
+    role: Optional[str] = None
+
+class UserResponse(UserBase):
+    """Esquema para resposta de usuários"""
     id: str
-    email: EmailStr
-    full_name: str # Corrigido de name para full_name
     role: str
     created_at: datetime
-    
-    class Config:
-        from_attributes = True
 
-# Modelo para atualização de usuário
-class UserUpdate(BaseModel):
-    name: Optional[str] = None
-    email: Optional[EmailStr] = None
-    
     class Config:
-        from_attributes = True
+        orm_mode = True
+
+class Token(BaseModel):
+    """Esquema para token de acesso"""
+    access_token: str
+    token_type: str
+
+class TokenData(BaseModel):
+    """Esquema para dados do token"""
+    email: Optional[str] = None
+    user_id: Optional[str] = None
+    role: Optional[str] = None
+
+class ProfileBase(BaseModel):
+    """Esquema base para perfis"""
+    nome: Optional[str] = None
+    email: EmailStr
+    telefone: Optional[str] = None
+    objetivo: Optional[str] = None
+    avatar_url: Optional[str] = None
+
+class ProfileCreate(ProfileBase):
+    """Esquema para criação de perfis"""
+    user_id: str
+
+class ProfileUpdate(BaseModel):
+    """Esquema para atualização de perfis"""
+    nome: Optional[str] = None
+    telefone: Optional[str] = None
+    objetivo: Optional[str] = None
+    avatar_url: Optional[str] = None
+
+class ProfileResponse(ProfileBase):
+    """Esquema para resposta de perfis"""
+    id: str
+    user_id: str
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        orm_mode = True
+

@@ -2,8 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from typing import List, Optional
 from datetime import datetime, timedelta
 from src.core.supabase_client import get_supabase_client
-from src.core.auth import get_current_user
-from src.schemas.models import UserProfile
+from src.api.endpoints.auth import get_current_user
+from src.schemas.models import PerfilResponse as UserProfile
 
 router = APIRouter()
 

@@ -1,8 +1,8 @@
 import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { useAuth } from '../context/AuthContext'
+import { useAuth } from '../hooks/useAuth'
 import { toast } from 'react-toastify'
-import { supabase } from '../supabaseClient'
+import { authAPI } from '../api/apiClient'
 
 const RegisterPage = () => {
   const [fullName, setFullName] = useState('')
@@ -43,24 +43,6 @@ const RegisterPage = () => {
     setIsLoading(true)
 
     try {
-      // Verificar se o email já está em uso
-      const { data: existingUsers, error: checkError } = await supabase
-        .from('users')
-        .select('email')
-        .eq('email', email)
-        .maybeSingle()
-
-      if (checkError) {
-        console.error('Erro ao verificar email:', checkError)
-      }
-
-      if (existingUsers) {
-        setError('Este email já está em uso')
-        toast.error('Este email já está em uso')
-        setIsLoading(false)
-        return
-      }
-
       // Registra o usuário
       const registerResult = await signUp(email, password, { full_name: fullName })
 

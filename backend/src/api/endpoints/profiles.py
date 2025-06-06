@@ -1,164 +1,119 @@
+"""
+Endpoints para gerenciamento de perfis de usuários
+"""
 from fastapi import APIRouter, Depends, HTTPException, status
-from typing import List, Optional
+from typing import List
 
-from src.core.supabase_client import supabase
-from src.api.endpoints.auth import get_current_user
-from src.schemas.models import PerfilCreate, PerfilUpdate, PerfilResponse
+from src.api.endpoints.auth import get_current_user, get_admin_user
+from src.core.db_client import execute_query
+from src.schemas.user import ProfileResponse, ProfileUpdate
 
 router = APIRouter()
 
-@router.get("/me", response_model=PerfilResponse)
-async def get_my_profile(current_user: dict = Depends(get_current_user)):
-    """Obtém o perfil do usuário autenticado"""
-    try:
-        response = supabase.table("profiles").select("*").eq("id", current_user["id"]).execute()
-        
-        if not response.data or len(response.data) == 0:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Perfil não encontrado"
-            )
-        
-        return response.data[0]
-    except HTTPException:
-        raise
-    except Exception as e:
+@router.get("/me", response_model=ProfileResponse)
+async def get_my_profile(current_user = Depends(get_current_user)):
+    """
+    Obtém o perfil do usuário atual.
+    """
+    profile_result = execute_query(
+        "SELECT * FROM profiles WHERE user_id = %s",
+        (current_user['id'],)
+    )
+    
+    if not profile_result:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Erro ao buscar perfil: {str(e)}"
-        )
-
-@router.put("/me", response_model=PerfilResponse)
-async def update_my_profile(
-    profile_update: PerfilUpdate,
-    current_user: dict = Depends(get_current_user)
-):
-    """Atualiza o perfil do usuário autenticado"""
-    try:
-        # Verifica se o perfil existe
-        response = supabase.table("profiles").select("*").eq("id", current_user["id"]).execute()
-        
-        if not response.data or len(response.data) == 0:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Perfil não encontrado"
-            )
-        
-        # Prepara dados para atualização
-        update_data = profile_update.dict(exclude_unset=True)
-        
-        # Atualiza perfil no Supabase
-        response = supabase.table("profiles").update(update_data).eq("id", current_user["id"]).execute()
-        
-        if not response.data or len(response.data) == 0:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Erro ao atualizar perfil"
-            )
-        
-        return response.data[0]
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Erro ao atualizar perfil: {str(e)}"
-        )
-
-@router.get("/{user_id}", response_model=PerfilResponse)
-async def get_profile(
-    user_id: str,
-    current_user: dict = Depends(get_current_user)
-):
-    """Obtém o perfil de um usuário específico (apenas admins ou próprio usuário)"""
-    # Verifica se o usuário está buscando seu próprio perfil ou é um admin
-    if current_user["id"] != user_id and current_user.get("role") != "admin":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Sem permissão para acessar este perfil"
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Perfil não encontrado"
         )
     
-    try:
-        response = supabase.table("profiles").select("*").eq("id", user_id).execute()
-        
-        if not response.data or len(response.data) == 0:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Perfil não encontrado"
-            )
-        
-        return response.data[0]
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Erro ao buscar perfil: {str(e)}"
-        )
+    return profile_result[0]
 
-@router.get("/", response_model=List[PerfilResponse])
-async def get_all_profiles(
-    skip: int = 0,
-    limit: int = 100,
-    current_user: dict = Depends(get_current_user)
-):
-    """Lista todos os perfis (apenas para admins)"""
-    # Verifica se o usuário tem permissão de administrador
-    if current_user.get("role") != "admin":
+@router.put("/me", response_model=ProfileResponse)
+async def update_my_profile(profile_data: ProfileUpdate, current_user = Depends(get_current_user)):
+    """
+    Atualiza o perfil do usuário atual.
+    """
+    # Verificar se o perfil existe
+    profile_result = execute_query(
+        "SELECT * FROM profiles WHERE user_id = %s",
+        (current_user['id'],)
+    )
+    
+    if not profile_result:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Sem permissão para acessar esta funcionalidade"
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Perfil não encontrado"
         )
     
-    try:
-        response = supabase.table("profiles").select("*").range(skip, skip + limit).execute()
-        
-        if not response.data:
-            return []
-        
-        return response.data
-    except Exception as e:
+    # Construir a consulta de atualização dinamicamente
+    update_fields = []
+    update_values = []
+    
+    for field, value in profile_data.dict(exclude_unset=True).items():
+        if value is not None:  # Ignorar campos None
+            update_fields.append(f"{field} = %s")
+            update_values.append(value)
+    
+    if not update_fields:
+        # Nenhum campo para atualizar
+        return profile_result[0]
+    
+    # Adicionar o ID do usuário aos valores
+    update_values.append(current_user['id'])
+    
+    # Executar a atualização
+    updated_profile = execute_query(
+        f"""
+        UPDATE profiles
+        SET {", ".join(update_fields)}, updated_at = NOW()
+        WHERE user_id = %s
+        RETURNING *
+        """,
+        tuple(update_values)
+    )
+    
+    if not updated_profile:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Erro ao buscar perfis: {str(e)}"
+            detail="Falha ao atualizar perfil"
         )
+    
+    return updated_profile[0]
 
-@router.post("/", response_model=PerfilResponse)
-async def create_profile(
-    profile_data: PerfilCreate,
-    current_user: dict = Depends(get_current_user)
-):
-    """Cria um perfil para o usuário autenticado"""
-    try:
-        # Verifica se já existe um perfil para este usuário
-        response = supabase.table("profiles").select("*").eq("id", current_user["id"]).execute()
-        
-        if response.data and len(response.data) > 0:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Perfil já existe para este usuário"
-            )
-        
-        # Prepara dados para inserção
-        profile_dict = profile_data.dict()
-        profile_dict["id"] = current_user["id"]
-        profile_dict["email"] = current_user["email"]
-        
-        # Insere perfil no Supabase
-        response = supabase.table("profiles").insert(profile_dict).execute()
-        
-        if not response.data or len(response.data) == 0:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Erro ao criar perfil"
-            )
-        
-        return response.data[0]
-    except HTTPException:
-        raise
-    except Exception as e:
+@router.get("/{user_id}", response_model=ProfileResponse)
+async def get_profile_by_id(user_id: str, current_user = Depends(get_current_user)):
+    """
+    Obtém o perfil de um usuário específico.
+    """
+    # Verificar se o usuário atual é o proprietário do perfil ou um admin
+    if current_user['id'] != user_id and current_user.get('role') != "admin":
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Erro ao criar perfil: {str(e)}"
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Acesso negado"
         )
+    
+    profile_result = execute_query(
+        "SELECT * FROM profiles WHERE user_id = %s",
+        (user_id,)
+    )
+    
+    if not profile_result:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Perfil não encontrado"
+        )
+    
+    return profile_result[0]
+
+@router.get("/", response_model=List[ProfileResponse])
+async def get_all_profiles(skip: int = 0, limit: int = 100, current_user = Depends(get_admin_user)):
+    """
+    Obtém todos os perfis (apenas para administradores).
+    """
+    profiles = execute_query(
+        "SELECT * FROM profiles ORDER BY created_at DESC LIMIT %s OFFSET %s",
+        (limit, skip)
+    )
+    
+    return profiles or []
 

@@ -7,7 +7,10 @@ import logo from '../../assets/primelogo.png'; // Adjust path if needed
 const DashboardSidebar = ({ className = '', isMobile = false, onClose }) => {
   const { pathname } = useLocation();
   // Use userProfile for display data, as it's fetched separately and might be more complete
-  const { userProfile, isAdmin, signOut } = useAuth();
+  const { userProfile, isAdmin, signOut, user } = useAuth();
+
+  // Verificar se o usuário é admin por múltiplos critérios
+  const isUserAdmin = isAdmin === true || userProfile?.role === 'admin' || (user?.email === 'felpcordeirofcf@gmail.com');
 
   // Define navigation links, potentially adding admin links conditionally
   const baseNavLinks = [
@@ -23,7 +26,7 @@ const DashboardSidebar = ({ className = '', isMobile = false, onClose }) => {
     { name: 'Painel Admin', path: '/dashboard/admin', icon: FiSettings }, // Example admin link
   ];
 
-  const navLinks = isAdmin ? [...baseNavLinks, ...adminLinks] : baseNavLinks;
+  const navLinks = isUserAdmin ? [...baseNavLinks, ...adminLinks] : baseNavLinks;
 
   const handleLinkClick = () => {
     if (isMobile && onClose) {

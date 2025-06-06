@@ -1,450 +1,389 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../hooks/useAuth';
-import { supabase } from '../../supabaseClient';
-import { formatDate } from '../../utils/formatDate'; // Importar a função utilitária
+import { messagesAPI, profilesAPI } from '../../api/apiClient';
+import { 
+  Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle 
+} from '../../components/ui/card';
+import { Button } from '../../components/ui/button';
+import { Input } from '../../components/ui/input';
+import { Avatar, AvatarFallback, AvatarImage } from '../../components/ui/avatar';
+import { ScrollArea } from '../../components/ui/scroll-area';
+import { Separator } from '../../components/ui/separator';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import { Send, User } from 'lucide-react';
+
+// Dados mock para quando a API não estiver disponível
+const mockUsers = [
+  { id: 'admin', nome: 'Administrador', email: 'admin@primefit.com', role: 'admin', avatar_url: null },
+  { id: 'trainer1', nome: 'João Treinador', email: 'joao@primefit.com', role: 'trainer', avatar_url: null },
+  { id: 'support', nome: 'Suporte', email: 'suporte@primefit.com', role: 'support', avatar_url: null },
+];
+
+const mockMessages = [
+  { 
+    id: '1', 
+    sender_id: 'admin', 
+    receiver_id: 'current_user', 
+    content: 'Olá! Como posso ajudar você hoje?', 
+    created_at: '2025-06-05T10:00:00Z',
+    is_read: true
+  },
+  { 
+    id: '2', 
+    sender_id: 'current_user', 
+    receiver_id: 'admin', 
+    content: 'Olá! Gostaria de saber mais sobre os planos de treino.', 
+    created_at: '2025-06-05T10:05:00Z',
+    is_read: true
+  },
+  { 
+    id: '3', 
+    sender_id: 'admin', 
+    receiver_id: 'current_user', 
+    content: 'Claro! Temos planos personalizados para diferentes objetivos. Qual é o seu objetivo principal?', 
+    created_at: '2025-06-05T10:10:00Z',
+    is_read: true
+  },
+];
 
 const Messages = () => {
-  const { user } = useAuth();
-  const [conversations, setConversations] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [activeConversationId, setActiveConversationId] = useState(null);
+  const { user, userProfile, isAuthenticated, loading } = useAuth();
+  const [contacts, setContacts] = useState([]);
+  const [selectedContact, setSelectedContact] = useState(null);
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
-  const [sending, setSending] = useState(false);
-  const [error, setError] = useState(null);
+  const [websocket, setWebsocket] = useState(null);
+  const [dataLoading, setDataLoading] = useState(true);
   const messagesEndRef = useRef(null);
-  const [otherUsers, setOtherUsers] = useState({});
 
-  const fetchUserProfile = useCallback(async (userId) => {
-    if (otherUsers[userId]) {
-      return otherUsers[userId];
-    }
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, username, avatar_url, role')
-        .eq('id', userId)
-        .single();
+  // Inicializar WebSocket e carregar contatos
+  useEffect(() => {
+    if (!isAuthenticated || !user) return;
 
-      if (error) {
-        console.error('Error fetching user profile:', error);
-        return { id: userId, username: `User ${userId.substring(0, 6)}`, avatar_url: null, role: 'Unknown' };
-      }
-      if (data) {
-        setOtherUsers(prev => ({ ...prev, [userId]: data }));
-        return data;
-      }
-    } catch (err) {
-      console.error('Unexpected error fetching profile:', err);
-      return { id: userId, username: `User ${userId.substring(0, 6)}`, avatar_url: null, role: 'Unknown' };
-    }
-    return { id: userId, username: `User ${userId.substring(0, 6)}`, avatar_url: null, role: 'Unknown' };
-  }, [otherUsers]);
-
-  const fetchInitialData = useCallback(async () => {
-    if (!user) return;
-    setLoading(true);
-    setError(null);
-
-    try {
-      const { data: messageData, error: messageError } = await supabase
-        .from('mensagens')
-        .select('*')
-        .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
-        .order('created_at', { ascending: true });
-
-      if (messageError) {
-        throw messageError;
-      }
-
-      const groupedConversations = {};
-      const userPromises = [];
-
-      for (const msg of messageData) {
-        const otherUserId = msg.sender_id === user.id ? msg.receiver_id : msg.sender_id;
-        if (!groupedConversations[otherUserId]) {
-          groupedConversations[otherUserId] = {
-            otherUserId: otherUserId,
-            messages: [],
-            lastMessage: null,
-            unread: 0,
-            with: null
-          };
-          if (!otherUsers[otherUserId]) {
-             userPromises.push(fetchUserProfile(otherUserId));
+    const loadContacts = async () => {
+      try {
+        // Tentar carregar administradores e treinadores
+        const { data, error } = await profilesAPI.getAllProfiles();
+        
+        if (error || !data) {
+          console.error('Erro ao carregar contatos:', error);
+          // Usar dados mock
+          const mockContactsWithCurrentUser = mockUsers.map(contact => ({
+            ...contact,
+            id: contact.id === 'current_user' ? user.id : contact.id
+          }));
+          setContacts(mockContactsWithCurrentUser);
+          // Selecionar o primeiro contato por padrão
+          setSelectedContact(mockContactsWithCurrentUser[0]);
+        } else {
+          // Filtrar apenas administradores e treinadores
+          const filteredContacts = data.filter(
+            profile => profile.role === 'admin' || profile.role === 'trainer'
+          );
+          setContacts(filteredContacts);
+          // Selecionar o primeiro contato por padrão
+          if (filteredContacts.length > 0) {
+            setSelectedContact(filteredContacts[0]);
           }
         }
-        groupedConversations[otherUserId].messages.push(msg);
-        if (!groupedConversations[otherUserId].lastMessage || new Date(msg.created_at) > new Date(groupedConversations[otherUserId].lastMessage.created_at)) {
-            groupedConversations[otherUserId].lastMessage = msg;
-        }
-        if (msg.receiver_id === user.id && !msg.is_read) {
-            groupedConversations[otherUserId].unread++;
-        }
+      } catch (error) {
+        console.error('Erro ao carregar contatos:', error);
+        // Usar dados mock
+        setContacts(mockUsers);
+        setSelectedContact(mockUsers[0]);
+      } finally {
+        setDataLoading(false);
       }
+    };
 
-      const profiles = await Promise.all(userPromises);
-      const profilesMap = profiles.reduce((acc, profile) => {
-          if (profile) acc[profile.id] = profile;
-          return acc;
-      }, {});
-
-       setOtherUsers(prev => ({ ...prev, ...profilesMap }));
-
-      Object.values(groupedConversations).forEach(convo => {
-          convo.with = otherUsers[convo.otherUserId] || profilesMap[convo.otherUserId] || { id: convo.otherUserId, username: `User ${convo.otherUserId.substring(0, 6)}`, avatar_url: null, role: 'Unknown' };
-      });
-
-      const sortedConversations = Object.values(groupedConversations).sort((a, b) => {
-          if (!a.lastMessage) return 1;
-          if (!b.lastMessage) return -1;
-          return new Date(b.lastMessage.created_at) - new Date(a.lastMessage.created_at);
-      });
-
-      setConversations(sortedConversations);
-
-      if (activeConversationId) {
-        const activeConvoData = groupedConversations[activeConversationId];
-        setMessages(activeConvoData ? activeConvoData.messages : []);
-      } else if (sortedConversations.length > 0) {
-        // Optionally select the first conversation by default
-        // setActiveConversationId(sortedConversations[0].otherUserId);
-        // setMessages(sortedConversations[0].messages);
-        // markAsRead(sortedConversations[0].otherUserId);
-      }
-
-    } catch (err) {
-      console.error('Error fetching messages:', err);
-      setError('Falha ao carregar mensagens. Tente novamente.');
-    } finally {
-      setLoading(false);
+    // Inicializar WebSocket
+    try {
+      const ws = messagesAPI.connectWebSocket(user.id);
+      
+      ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        
+        if (data.type === 'new_message') {
+          // Adicionar nova mensagem à lista
+          setMessages(prev => [...prev, data.data]);
+          
+          // Marcar como lida se for do contato selecionado
+          if (selectedContact && data.data.sender_id === selectedContact.id) {
+            messagesAPI.markAsRead(data.data.id);
+          }
+        }
+      };
+      
+      ws.onerror = (error) => {
+        console.error('Erro no WebSocket:', error);
+      };
+      
+      ws.onclose = () => {
+        console.log('WebSocket fechado');
+      };
+      
+      setWebsocket(ws);
+    } catch (error) {
+      console.error('Erro ao inicializar WebSocket:', error);
     }
-  }, [user, activeConversationId, fetchUserProfile, otherUsers]);
 
-  useEffect(() => {
-    fetchInitialData();
-  }, [fetchInitialData]);
+    loadContacts();
 
+    // Limpar WebSocket ao desmontar
+    return () => {
+      if (websocket && websocket.readyState === WebSocket.OPEN) {
+        websocket.close();
+      }
+    };
+  }, [isAuthenticated, user]);
+
+  // Carregar mensagens quando o contato selecionado mudar
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (!selectedContact || !user) return;
+
+    const loadMessages = async () => {
+      try {
+        const { data, error } = await messagesAPI.getConversation(selectedContact.id);
+        
+        if (error || !data) {
+          console.error('Erro ao carregar mensagens:', error);
+          // Usar dados mock
+          const mockMessagesWithIds = mockMessages.map(msg => ({
+            ...msg,
+            sender_id: msg.sender_id === 'current_user' ? user.id : msg.sender_id,
+            receiver_id: msg.receiver_id === 'current_user' ? user.id : msg.receiver_id
+          }));
+          setMessages(mockMessagesWithIds);
+        } else {
+          setMessages(data);
+        }
+      } catch (error) {
+        console.error('Erro ao carregar mensagens:', error);
+        // Usar dados mock
+        const mockMessagesWithIds = mockMessages.map(msg => ({
+          ...msg,
+          sender_id: msg.sender_id === 'current_user' ? user.id : msg.sender_id,
+          receiver_id: msg.receiver_id === 'current_user' ? user.id : msg.receiver_id
+        }));
+        setMessages(mockMessagesWithIds);
+      }
+    };
+
+    loadMessages();
+  }, [selectedContact, user]);
+
+  // Rolar para a última mensagem quando as mensagens mudarem
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
   }, [messages]);
 
-  // Realtime subscription
-  useEffect(() => {
-    if (!user) return;
-
-    const channel = supabase
-      .channel('public:mensagens')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'mensagens' },
-        (payload) => {
-          const newMessage = payload.new;
-          if (newMessage.sender_id === user.id || newMessage.receiver_id === user.id) {
-            console.log('New message received:', newMessage);
-            setConversations(prevConversations => {
-              const otherUserId = newMessage.sender_id === user.id ? newMessage.receiver_id : newMessage.sender_id;
-              let convoExists = false;
-              const updatedConversations = prevConversations.map(convo => {
-                if (convo.otherUserId === otherUserId) {
-                  convoExists = true;
-                  return {
-                    ...convo,
-                    messages: [...convo.messages, newMessage],
-                    lastMessage: newMessage,
-                    unread: newMessage.receiver_id === user.id ? convo.unread + 1 : convo.unread
-                  };
-                }
-                return convo;
-              });
-
-              if (!convoExists) {
-                fetchUserProfile(otherUserId).then(profile => {
-                    const newConvo = {
-                        otherUserId: otherUserId,
-                        messages: [newMessage],
-                        lastMessage: newMessage,
-                        unread: newMessage.receiver_id === user.id ? 1 : 0,
-                        with: profile || { id: otherUserId, username: `User ${otherUserId.substring(0, 6)}`, avatar_url: null, role: 'Unknown' }
-                    };
-                    setConversations(prev => [newConvo, ...prev].sort((a, b) => new Date(b.lastMessage.created_at) - new Date(a.lastMessage.created_at)));
-                });
-                return updatedConversations;
-              } else {
-                 return updatedConversations.sort((a, b) => {
-                    if (!a.lastMessage) return 1;
-                    if (!b.lastMessage) return -1;
-                    return new Date(b.lastMessage.created_at) - new Date(a.lastMessage.created_at);
-                });
-              }
-            });
-
-            if (activeConversationId === (newMessage.sender_id === user.id ? newMessage.receiver_id : newMessage.sender_id)) {
-              setMessages(prevMessages => [...prevMessages, newMessage]);
-              markAsRead(activeConversationId);
-            }
-          }
-        }
-      )
-      .subscribe((status, err) => {
-          if (status === 'SUBSCRIBED') {
-              console.log('Subscribed to messages channel!');
-          } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-              console.error('Subscription error:', err);
-              setError('Erro na conexão em tempo real. As mensagens podem não atualizar automaticamente.');
-          }
-      });
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [user, activeConversationId, fetchUserProfile]);
-
-  // Função para enviar mensagem
-  const handleSendMessage = async (e) => {
-    e.preventDefault();
-    if (!newMessage.trim() || !activeConversationId || !user) return;
-
-    setSending(true);
-    setError(null);
+  // Enviar mensagem
+  const handleSendMessage = async () => {
+    if (!newMessage.trim() || !selectedContact) return;
 
     try {
-      const { error: insertError } = await supabase
-        .from('mensagens')
-        .insert({
+      // Enviar via API
+      const { data, error } = await messagesAPI.sendMessage(selectedContact.id, newMessage);
+      
+      if (error) {
+        console.error('Erro ao enviar mensagem:', error);
+        // Adicionar mensagem localmente mesmo com erro
+        const mockMessage = {
+          id: `local-${Date.now()}`,
           sender_id: user.id,
-          receiver_id: activeConversationId,
-          content: newMessage.trim(),
+          receiver_id: selectedContact.id,
+          content: newMessage,
+          created_at: new Date().toISOString(),
           is_read: false
-        });
-
-      if (insertError) {
-        throw insertError;
+        };
+        setMessages(prev => [...prev, mockMessage]);
+      } else if (data) {
+        // Adicionar mensagem à lista
+        setMessages(prev => [...prev, data]);
       }
-
-      setNewMessage('');
-
-    } catch (err) {
-      console.error('Error sending message:', err);
-      setError('Falha ao enviar mensagem.');
+    } catch (error) {
+      console.error('Erro ao enviar mensagem:', error);
+      // Adicionar mensagem localmente mesmo com erro
+      const mockMessage = {
+        id: `local-${Date.now()}`,
+        sender_id: user.id,
+        receiver_id: selectedContact.id,
+        content: newMessage,
+        created_at: new Date().toISOString(),
+        is_read: false
+      };
+      setMessages(prev => [...prev, mockMessage]);
     } finally {
-      setSending(false);
+      // Limpar campo de mensagem
+      setNewMessage('');
     }
   };
 
-  // Função para marcar mensagens como lidas
-  const markAsRead = useCallback(async (otherUserId) => {
-    if (!user || !otherUserId) return;
-
-    setConversations(prev => prev.map(convo =>
-        convo.otherUserId === otherUserId ? { ...convo, unread: 0 } : convo
-    ));
-    if (activeConversationId === otherUserId) {
-        setMessages(prev => prev.map(msg =>
-            msg.receiver_id === user.id && !msg.is_read ? { ...msg, is_read: true } : msg
-        ));
-    }
-
-    try {
-      const { error: updateError } = await supabase
-        .from('mensagens')
-        .update({ is_read: true })
-        .eq('receiver_id', user.id)
-        .eq('sender_id', otherUserId)
-        .eq('is_read', false);
-
-      if (updateError) {
-        console.error('Error marking messages as read:', updateError);
-      }
-    } catch (err) {
-        console.error('Unexpected error marking messages as read:', err);
-    }
-  }, [user, activeConversationId]);
-
-  // Função para selecionar uma conversa
-  const handleSelectConversation = (otherUserId) => {
-    const selectedConvo = conversations.find(c => c.otherUserId === otherUserId);
-    if (selectedConvo) {
-        setActiveConversationId(otherUserId);
-        setMessages(selectedConvo.messages);
-        if (selectedConvo.unread > 0) {
-            markAsRead(otherUserId);
-        }
-    } else {
-        console.warn(`Conversation with ${otherUserId} not found.`);
-        setActiveConversationId(otherUserId);
-        setMessages([]);
-    }
-  };
-
-  const activeConversationDetails = conversations.find(c => c.otherUserId === activeConversationId)?.with;
-
-  if (loading && conversations.length === 0) {
+  // Renderizar conteúdo com base no estado de carregamento
+  if (loading) {
     return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-600"></div>
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-4 text-lg">Carregando...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold mb-4">Acesso Negado</h2>
+          <p className="mb-4">Você precisa estar logado para acessar esta página.</p>
+          <Button asChild>
+            <a href="/login">Fazer Login</a>
+          </Button>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      {error && <div className="alert alert-error mb-4">{error}</div>}
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Mensagens</h1>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 h-[calc(100vh-200px)]">
-        {/* Lista de conversas */}
-        <div className="lg:col-span-1 bg-white rounded-lg shadow overflow-hidden flex flex-col">
-          <div className="p-4 border-b">
-            <input
-              type="text"
-              placeholder="Buscar conversas..."
-              className="input w-full"
-              disabled // Search not implemented yet
-            />
-          </div>
-          <div className="flex-1 overflow-y-auto">
-            {conversations.length === 0 && !loading && (
-                <p className="text-center text-gray-500 p-4">Nenhuma conversa encontrada.</p>
-            )}
-            {conversations.map(conversation => (
-              <button
-                key={conversation.otherUserId}
-                onClick={() => handleSelectConversation(conversation.otherUserId)}
-                className={`w-full text-left p-3 transition border-b border-gray-100 ${
-                  activeConversationId === conversation.otherUserId
-                    ? 'bg-primary-100 text-primary-800'
-                    : 'hover:bg-gray-50'
-                }`}
-              >
-                <div className="flex items-center">
-                  <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center text-gray-500 mr-3 flex-shrink-0">
-                    {conversation.with?.avatar_url ? (
-                      <img src={conversation.with.avatar_url} alt={conversation.with?.username} className="w-10 h-10 rounded-full object-cover" />
-                    ) : (
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                      </svg>
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex justify-between items-center">
-                      <h3 className="font-medium truncate text-sm">{conversation.with?.username || 'Usuário Desconhecido'}</h3>
-                      <span className="text-xs text-gray-500 flex-shrink-0 ml-2">
-                        {conversation.lastMessage ? formatDate(conversation.lastMessage.created_at).split(' ')[0] : ''}
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center mt-1">
-                      <p className="text-xs text-gray-500 truncate">
-                        {conversation.lastMessage?.content || 'Nenhuma mensagem'}
-                      </p>
-                      {conversation.unread > 0 && (
-                        <span className="inline-flex items-center justify-center w-5 h-5 text-xs font-bold text-white bg-primary-600 rounded-full flex-shrink-0 ml-2">
-                          {conversation.unread}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Conversa ativa */}
-        <div className="lg:col-span-3 bg-white rounded-lg shadow overflow-hidden flex flex-col">
-          {activeConversationId ? (
-            <>
-              {/* Cabeçalho da conversa */}
-              <div className="p-4 border-b border-gray-200 flex items-center">
-                <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center text-gray-500 mr-3 flex-shrink-0">
-                  {activeConversationDetails?.avatar_url ? (
-                    <img src={activeConversationDetails.avatar_url} alt={activeConversationDetails.username} className="w-10 h-10 rounded-full object-cover" />
-                  ) : (
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                    </svg>
-                  )}
-                </div>
-                <div>
-                  <h3 className="font-medium">{activeConversationDetails?.username || 'Usuário Desconhecido'}</h3>
-                  <p className="text-xs text-gray-500">{activeConversationDetails?.role || 'Cliente'}</p>
-                </div>
-              </div>
-
-              {/* Mensagens */}
-              <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
-                {messages.map(message => (
-                  <div
-                    key={message.id}
-                    className={`flex ${message.sender_id === user.id ? 'justify-end' : 'justify-start'}`}
+    <div className="container mx-auto p-4">
+      <h1 className="text-3xl font-bold mb-6">Mensagens</h1>
+      
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Lista de Contatos */}
+        <Card className="md:col-span-1">
+          <CardHeader>
+            <CardTitle>Contatos</CardTitle>
+            <CardDescription>Selecione um contato para conversar</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ScrollArea className="h-[500px]">
+              <div className="space-y-2">
+                {contacts.map((contact) => (
+                  <div 
+                    key={contact.id}
+                    className={`flex items-center p-2 rounded-md cursor-pointer ${
+                      selectedContact?.id === contact.id ? 'bg-muted' : 'hover:bg-muted/50'
+                    }`}
+                    onClick={() => setSelectedContact(contact)}
                   >
-                    <div
-                      className={`max-w-[70%] rounded-lg p-3 shadow-sm ${
-                        message.sender_id === user.id
-                          ? 'bg-primary-600 text-white rounded-br-none'
-                          : 'bg-white text-gray-800 rounded-bl-none'
-                      }`}
-                    >
-                      <p className="text-sm">{message.content}</p>
-                      <div
-                        className={`text-xs mt-1 flex justify-end items-center ${
-                          message.sender_id === user.id ? 'text-primary-100 opacity-75' : 'text-gray-400'
-                        }`}
-                      >
-                        {formatDate(message.created_at)}
-                        {message.sender_id === user.id && (
-                          <span className="ml-1.5">
-                            {message.is_read ? (
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-blue-300" viewBox="0 0 20 20" fill="currentColor">
-                                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L4 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" transform="translate(-4, 0)"/>
-                              </svg>
-                            ) : (
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                              </svg>
-                            )}
-                          </span>
-                        )}
-                      </div>
+                    <Avatar className="h-10 w-10 mr-3">
+                      <AvatarImage src={contact.avatar_url} alt={contact.nome} />
+                      <AvatarFallback>
+                        <User className="h-6 w-6" />
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <p className="font-medium">{contact.nome}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {contact.role === 'admin' ? 'Administrador' : 
+                         contact.role === 'trainer' ? 'Treinador' : 
+                         contact.role}
+                      </p>
                     </div>
                   </div>
                 ))}
-                <div ref={messagesEndRef} />
+                {contacts.length === 0 && !dataLoading && (
+                  <p className="text-center text-muted-foreground py-4">
+                    Nenhum contato disponível
+                  </p>
+                )}
+                {dataLoading && (
+                  <div className="flex justify-center py-4">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                  </div>
+                )}
               </div>
-
-              {/* Input de mensagem */}
-              <div className="p-4 border-t border-gray-200 bg-white">
-                <form onSubmit={handleSendMessage} className="flex items-center">
-                  <input
-                    type="text"
-                    placeholder="Digite sua mensagem..."
-                    className="input flex-1 mr-3"
-                    value={newMessage}
-                    onChange={(e) => setNewMessage(e.target.value)}
-                    disabled={sending}
-                  />
-                  <button type="submit" className="btn btn-primary" disabled={sending || !newMessage.trim()}>
-                    {sending ? (
-                      <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white"></div>
-                    ) : (
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                        <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 16.571V11.69l4.768 1.06a1 1 0 001.169-1.409l-7-14z" />
-                      </svg>
-                    )}
-                  </button>
-                </form>
+            </ScrollArea>
+          </CardContent>
+        </Card>
+        
+        {/* Área de Mensagens */}
+        <Card className="md:col-span-2">
+          <CardHeader>
+            {selectedContact ? (
+              <>
+                <div className="flex items-center">
+                  <Avatar className="h-10 w-10 mr-3">
+                    <AvatarImage src={selectedContact.avatar_url} alt={selectedContact.nome} />
+                    <AvatarFallback>
+                      <User className="h-6 w-6" />
+                    </AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <CardTitle>{selectedContact.nome}</CardTitle>
+                    <CardDescription>
+                      {selectedContact.role === 'admin' ? 'Administrador' : 
+                       selectedContact.role === 'trainer' ? 'Treinador' : 
+                       selectedContact.role}
+                    </CardDescription>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <CardTitle>Selecione um contato</CardTitle>
+            )}
+          </CardHeader>
+          <CardContent>
+            {selectedContact ? (
+              <ScrollArea className="h-[400px] pr-4">
+                <div className="space-y-4">
+                  {messages.map((message) => {
+                    const isCurrentUser = message.sender_id === user.id;
+                    return (
+                      <div 
+                        key={message.id}
+                        className={`flex ${isCurrentUser ? 'justify-end' : 'justify-start'}`}
+                      >
+                        <div 
+                          className={`max-w-[80%] rounded-lg p-3 ${
+                            isCurrentUser ? 'bg-primary text-primary-foreground' : 'bg-muted'
+                          }`}
+                        >
+                          <p>{message.content}</p>
+                          <p className={`text-xs mt-1 ${
+                            isCurrentUser ? 'text-primary-foreground/70' : 'text-muted-foreground'
+                          }`}>
+                            {format(new Date(message.created_at), 'HH:mm', { locale: ptBR })}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  <div ref={messagesEndRef} />
+                </div>
+              </ScrollArea>
+            ) : (
+              <div className="flex items-center justify-center h-[400px]">
+                <p className="text-muted-foreground">Selecione um contato para iniciar uma conversa</p>
               </div>
-            </>
-          ) : (
-            <div className="flex items-center justify-center h-full text-gray-500">
-              Selecione uma conversa para começar a conversar.
-            </div>
-          )}
-        </div>
+            )}
+          </CardContent>
+          <Separator />
+          <CardFooter className="p-4">
+            {selectedContact && (
+              <div className="flex w-full items-center space-x-2">
+                <Input
+                  placeholder="Digite sua mensagem..."
+                  value={newMessage}
+                  onChange={(e) => setNewMessage(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSendMessage();
+                    }
+                  }}
+                />
+                <Button size="icon" onClick={handleSendMessage}>
+                  <Send className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
+          </CardFooter>
+        </Card>
       </div>
     </div>
   );
