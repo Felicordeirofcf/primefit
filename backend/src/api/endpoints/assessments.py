@@ -164,7 +164,7 @@ async def update_assessment_status(
         if new_status not in valid_statuses:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Status inválido. Valores aceitos: {", ".join(valid_statuses)}"
+                detail=f"Status inválido. Valores aceitos: {', '.join(valid_statuses)}"
             )
         
         # Atualiza status
