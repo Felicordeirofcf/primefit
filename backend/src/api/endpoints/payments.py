@@ -5,12 +5,8 @@ from sqlalchemy import func
 
 from src.core.database import get_db
 from src.api.endpoints.auth import get_current_user
-from src.schemas.models import Payment, PaymentCreate, PaymentResponse, Plan, PlanResponse, Assinatura, SubscriptionResponse
-
-router = APIRouter()
-
-# Rotas para pagamentos
-@router.post("/", response_model=PaymentResponse)
+from src.schemas.models import Payment, PaymentCreate, PaymentResponse, Assinatura, SubscriptionResponse, PlanCreate, PlanResponse
+from src.schemas.models import Plan as SQLAlchemyPlan.post("/", response_model=PaymentResponse)
 async def create_payment(
     payment_data: PaymentCreate,
     current_user: dict = Depends(get_current_user),
@@ -109,7 +105,7 @@ async def complete_payment(
 # Rotas para planos
 @router.post("/plans", response_model=PlanResponse)
 async def create_plan(
-    plan_data: Plan,
+    plan_data: PlanCreate,
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -121,7 +117,7 @@ async def create_plan(
         )
     
     try:
-        db_plan = Plan(**plan_data.dict())
+        db_plan = SQLAlchemyPlan(**plan_data.dict())
         db.add(db_plan)
         db.commit()
         db.refresh(db_plan)
@@ -140,10 +136,10 @@ async def get_plans(
     db: Session = Depends(get_db)
 ):
     try:
-        query = db.query(Plan)
+        query = db.query(SQLAlchemyPlan)
         
         if is_active is not None:
-            query = query.filter(Plan.is_active == is_active)
+            query = query.filter(SQLAlchemyPlan.is_active == is_active)
         
         plans = query.all()
         
@@ -248,5 +244,6 @@ async def cancel_subscription(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Erro ao cancelar assinatura: {str(e)}"
         )
+
 
 
