@@ -5,8 +5,17 @@ from sqlalchemy import func
 
 from src.core.database import get_db
 from src.api.endpoints.auth import get_current_user
-from src.schemas.models import Payment, PaymentCreate, PaymentResponse, Assinatura, SubscriptionResponse, PlanCreate, PlanResponse
-from src.schemas.models import Plan as SQLAlchemyPlan.post("/", response_model=PaymentResponse)
+from src.schemas.models import (
+    Payment, PaymentCreate, PaymentResponse,
+    Assinatura, SubscriptionResponse,
+    PlanCreate, PlanResponse
+)
+from src.schemas.models import Plan as SQLAlchemyPlan
+
+# Instancia o roteador
+router = APIRouter()
+
+@router.post("/", response_model=PaymentResponse)
 async def create_payment(
     payment_data: PaymentCreate,
     current_user: dict = Depends(get_current_user),
@@ -18,13 +27,19 @@ async def create_payment(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Sem permissão para criar pagamentos para outros usuários"
         )
-    
+
     try:
-        db_payment = Payment(**payment_data.dict(), status="pending", transaction_id=f"sim_{payment_data.payment_method}_{payment_data.amount}", created_at=func.now(), updated_at=func.now())
+        db_payment = Payment(
+            **payment_data.dict(),
+            status="pending",
+            transaction_id=f"sim_{payment_data.payment_method}_{payment_data.amount}",
+            created_at=func.now(),
+            updated_at=func.now()
+        )
         db.add(db_payment)
         db.commit()
         db.refresh(db_payment)
-        
+
         return db_payment
     except Exception as e:
         raise HTTPException(
@@ -42,21 +57,21 @@ async def get_payments(
     try:
         # Define o user_id para filtro
         filter_user_id = user_id if user_id else current_user["id"]
-        
+
         # Usuários comuns só podem ver seus próprios pagamentos
         if current_user["role"] == "client" and current_user["id"] != filter_user_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Sem permissão para acessar pagamentos de outros usuários"
             )
-        
+
         query = db.query(Payment).filter(Payment.user_id == filter_user_id)
-        
+
         if status_filter:
             query = query.filter(Payment.status == status_filter)
-        
+
         payments = query.order_by(Payment.created_at.desc()).all()
-        
+
         return payments
     except HTTPException:
         raise
@@ -65,6 +80,7 @@ async def get_payments(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Erro ao buscar pagamentos: {str(e)}"
         )
+
 
 @router.put("/{payment_id}/complete", response_model=PaymentResponse)
 async def complete_payment(
