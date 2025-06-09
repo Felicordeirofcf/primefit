@@ -1,11 +1,13 @@
 {
   "$schema": "https://railway.app/railway.schema.json",
+  "workspacePath": "frontend",
   "build": {
     "builder": "NIXPACKS",
-    "buildCommand": "npm install && npm run build"
+    "buildCommand": "npm run build"
   },
   "deploy": {
-    "startCommand": "npm run start"
-  },
-  "workspacePath": "frontend"
+    "startCommand": "serve -s dist --listen $PORT",
+    "restartPolicyType": "ON_FAILURE",
+    "restartPolicyMaxRetries": 10
+  }
 }
