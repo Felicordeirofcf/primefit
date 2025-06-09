@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "start": "serve -s dist -l $PORT",
+    "start": "serve -s dist --listen ${PORT}",
     "build": "vite build"
   },
   "dependencies": {
