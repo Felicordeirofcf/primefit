@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
 
-from src.core.database import engine, Base # Import Base and engine for metadata
+from src.core.database import engine, Base  # Import Base and engine for metadata
 
 # Carregar variáveis de ambiente
 load_dotenv()
@@ -19,15 +19,9 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Configurar CORS
-origins = [
-    "http://localhost",
-    "http://localhost:5173",  # Vite dev server
-    "http://localhost:3000",
-    "https://worthy-reflection-production-992d.up.railway.app",  # Frontend no Railway
-    "https://primefit-production.up.railway.app",  # Backend no Railway
-    os.getenv("FRONTEND_URL", ""),  # URL do frontend definida nas variáveis de ambiente
-]
+# Configurar CORS dinamicamente a partir da variável de ambiente CORS_ORIGINS
+origins = os.getenv("CORS_ORIGINS", "").split(",")
+origins = [origin.strip() for origin in origins if origin.strip()]
 
 app.add_middleware(
     CORSMiddleware,
@@ -70,10 +64,10 @@ async def global_exception_handler(request, exc):
 
 if __name__ == "__main__":
     import uvicorn
-    
+
     # Obter porta do ambiente (Railway define PORT automaticamente)
     port = int(os.getenv("PORT", "8000"))
-    
+
     # Iniciar servidor
     uvicorn.run(
         "main:app",
@@ -81,5 +75,3 @@ if __name__ == "__main__":
         port=port,
         reload=os.getenv("ENVIRONMENT", "development") == "development"
     )
-
-
