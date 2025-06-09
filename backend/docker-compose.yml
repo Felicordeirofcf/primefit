@@ -1,0 +1,49 @@
+version: "3.9"
+
+services:
+  backend:
+    build: .
+    container_name: primefit-backend
+    command: python main.py
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    depends_on:
+      - db
+      - redis
+    restart: always
+
+  db:
+    image: postgres:15
+    container_name: primefit-db
+    environment:
+      POSTGRES_DB: primefit
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    restart: always
+
+  redis:
+    image: redis:7
+    container_name: primefit-redis
+    ports:
+      - "6379:6379"
+    restart: always
+
+  worker:
+    build: .
+    container_name: primefit-worker
+    command: celery -A src.core.celery_app worker --loglevel=info
+    depends_on:
+      - backend
+      - redis
+    env_file:
+      - .env
+    restart: always
+
+volumes:
+  pgdata:
