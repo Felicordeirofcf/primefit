@@ -78,7 +78,7 @@ if __name__ == "__main__":
     import uvicorn
 
     # Obter porta do ambiente (Railway define PORT automaticamente)
-    port = int(os.getenv("PORT", "8000"))
+    port = int(os.getenv("PORT", "8080"))
 
     # Iniciar servidor
     uvicorn.run(
