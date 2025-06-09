@@ -1,15 +1,20 @@
-# Imagem base
+# Base Python
 FROM python:3.11
 
-# Diretório de trabalho
+# Define o diretório de trabalho
 WORKDIR /app
 
-# Instala dependências
+# Copia os arquivos de dependências
 COPY requirements.txt .
+
+# Instala as dependências
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copia o projeto
+# Copia o restante do projeto
 COPY . .
 
-# Comando de execução
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Expõe a porta usada (não obrigatória, mas boa prática)
+EXPOSE 8000
+
+# Comando de execução (usando lógica do main.py)
+CMD ["python", "main.py"]
