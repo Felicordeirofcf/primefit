@@ -16,11 +16,11 @@ COPY . .
 # Gera a versão de produção do app (build Vite)
 RUN npm run build
 
-# Instala o `serve` para rodar o frontend estático (pré-requisito do preview)
+# Instala o `serve` globalmente para servir o app
 RUN npm install -g serve
 
-# Exponha a porta usada pelo Vite Preview
-EXPOSE 4173
+# Expõe a porta correta que será usada externamente
+EXPOSE 8080
 
-# Executa o app com `serve` apontando para o build (dist/)
-CMD ["serve", "-s", "dist"]
+# Executa o app servindo a pasta dist e escutando em todas as interfaces
+CMD ["serve", "-s", "dist", "-l", "0.0.0.0:8080"]
