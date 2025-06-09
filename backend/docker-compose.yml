@@ -1,10 +1,8 @@
-version: "3.9"
-
 services:
   backend:
     build: .
     container_name: primefit-backend
-    command: python main.py
+    command: python main.py  # usa main.py que trata PORT via os.getenv()
     ports:
       - "8000:8000"
     env_file:
@@ -38,11 +36,11 @@ services:
     build: .
     container_name: primefit-worker
     command: celery -A src.core.celery_app worker --loglevel=info
+    env_file:
+      - .env
     depends_on:
       - backend
       - redis
-    env_file:
-      - .env
     restart: always
 
 volumes:
