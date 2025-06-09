@@ -1,19 +1,15 @@
-# Configuração do ambiente de desenvolvimento
-FROM python:3.11-slim
+# Imagem base
+FROM python:3.11
 
+# Diretório de trabalho
 WORKDIR /app
 
-# Copia os arquivos de requisitos
+# Instala dependências
 COPY requirements.txt .
-
-# Instala as dependências
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copia o código da aplicação
+# Copia o projeto
 COPY . .
 
-# Expõe a porta que a aplicação usará
-EXPOSE 8000
-
-# Comando para iniciar a aplicação
+# Comando de execução
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
