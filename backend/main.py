@@ -24,8 +24,8 @@ origins = [
     "http://localhost",
     "http://localhost:5173",  # Vite dev server
     "http://localhost:3000",
-    "https://primefit-production.up.railway.app", 
-    "https://worthy-reflection-production-992d.up.railway.app",  # Frontend no Railway # Produção no Railway
+    "https://worthy-reflection-production-992d.up.railway.app",  # Frontend no Railway
+    "https://primefit-production.up.railway.app",  # Backend no Railway
     os.getenv("FRONTEND_URL", ""),  # URL do frontend definida nas variáveis de ambiente
 ]
 
