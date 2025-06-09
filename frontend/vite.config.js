@@ -1,9 +1,12 @@
-import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   base: './',
   plugins: [react()],
+  resolve: {
+    dedupe: ['react', 'react-dom'],
+  },
   server: {
     port: 5173,
     host: true,
@@ -17,18 +20,18 @@ export default defineConfig({
         manualChunks(id) {
           if (id.includes('node_modules')) {
             if (id.includes('react-router-dom') || id.includes('@remix-run') || id.includes('react-router')) {
-              return 'vendor_routing';
+              return 'vendor_routing'
             }
             if (id.includes('chart.js') || id.includes('react-chartjs-2')) {
-              return 'vendor_charts';
+              return 'vendor_charts'
             }
-            if (id.includes('react-dom')) return 'vendor_react-dom';
-            if (id.includes('react')) return 'vendor_react';
-            if (id.includes('recharts')) return 'vendor_recharts';
-            return 'vendor';
+            if (id.includes('react-dom')) return 'vendor_react-dom'
+            if (id.includes('react')) return 'vendor_react'
+            if (id.includes('recharts')) return 'vendor_recharts'
+            return 'vendor'
           }
         },
       },
     },
   },
-});
+})
