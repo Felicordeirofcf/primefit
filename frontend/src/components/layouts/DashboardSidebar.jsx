@@ -1,29 +1,37 @@
 import React from 'react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
-import { FiHome, FiBarChart2, FiClipboard, FiMessageSquare, FiUser, FiSettings, FiLogOut, FiX, FiArrowLeft, FiGrid, FiZap, FiActivity } from 'react-icons/fi'; // Using react-icons
-import logo from '../../assets/primelogo.png'; // Adjust path if needed
+import {
+  FiBarChart2,
+  FiClipboard,
+  FiMessageSquare,
+  FiUser,
+  FiSettings,
+  FiLogOut,
+  FiX,
+  FiArrowLeft,
+  FiGrid,
+  FiZap
+} from 'react-icons/fi';
+import logo from '../../assets/primelogo.png';
 
 const DashboardSidebar = ({ className = '', isMobile = false, onClose }) => {
   const { pathname } = useLocation();
-  // Use userProfile for display data, as it's fetched separately and might be more complete
   const { userProfile, isAdmin, signOut, user } = useAuth();
 
-  // Verificar se o usuário é admin por múltiplos critérios
   const isUserAdmin = isAdmin === true || userProfile?.role === 'admin' || (user?.email === 'felpcordeirofcf@gmail.com');
 
-  // Define navigation links, potentially adding admin links conditionally
   const baseNavLinks = [
     { name: 'Visão Geral', path: '/dashboard', icon: FiGrid, exact: true },
     { name: 'Meus Treinos', path: '/dashboard/treinos', icon: FiZap },
     { name: 'Meu Progresso', path: '/dashboard/progresso', icon: FiBarChart2 },
     { name: 'Avaliações', path: '/dashboard/avaliacoes', icon: FiClipboard },
     { name: 'Mensagens', path: '/dashboard/mensagens', icon: FiMessageSquare },
-    { name: 'Meu Perfil', path: '/dashboard/perfil', icon: FiUser },
+    { name: 'Meu Perfil', path: '/dashboard/perfil', icon: FiUser }
   ];
 
   const adminLinks = [
-    { name: 'Painel Admin', path: '/dashboard/admin', icon: FiSettings }, // Example admin link
+    { name: 'Painel Admin', path: '/dashboard/admin', icon: FiSettings }
   ];
 
   const navLinks = isUserAdmin ? [...baseNavLinks, ...adminLinks] : baseNavLinks;
@@ -37,24 +45,20 @@ const DashboardSidebar = ({ className = '', isMobile = false, onClose }) => {
   const handleLogout = async () => {
     try {
       await signOut();
-      // Navigation should be handled by ProtectedRoute or AuthProvider state change
       if (isMobile && onClose) {
-        onClose(); // Close mobile menu on logout
+        onClose();
       }
     } catch (error) {
       console.error("Logout failed:", error);
-      // Handle logout error (e.g., show notification)
     }
   };
 
-  // Get user's first initial or default 'U'
   const userInitial = userProfile?.nome?.charAt(0).toUpperCase() || userProfile?.email?.charAt(0).toUpperCase() || 'U';
   const userName = userProfile?.nome || userProfile?.email?.split('@')[0] || 'Usuário';
   const userEmail = userProfile?.email || 'Carregando...';
 
   return (
     <div className={`bg-white w-64 shadow-lg flex flex-col ${isMobile ? 'h-full fixed inset-y-0 left-0 z-50' : 'h-screen sticky top-0'} ${className}`}>
-      {/* Header with Logo and Close Button (Mobile) */}
       <div className="flex items-center justify-between h-16 border-b px-4 flex-shrink-0">
         <Link to="/" className="flex items-center space-x-2 text-xl font-bold text-blue-600">
           <img src={logo} alt="Prime Fit Logo" className="h-8 w-auto" />
@@ -71,7 +75,6 @@ const DashboardSidebar = ({ className = '', isMobile = false, onClose }) => {
         )}
       </div>
 
-      {/* User Profile Section */}
       <div className="p-4 border-b flex-shrink-0">
         <div className="flex items-center">
           <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-semibold text-lg ring-1 ring-blue-200">
@@ -84,28 +87,34 @@ const DashboardSidebar = ({ className = '', isMobile = false, onClose }) => {
         </div>
       </div>
 
-      {/* Navigation Links */}
       <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
         {navLinks.map((link) => (
           <NavLink
             key={link.path}
             to={link.path}
             onClick={handleLinkClick}
-            end={link.exact} // Use end prop for exact matching on index routes
+            end={link.exact}
             className={({ isActive }) =>
-              `flex items-center px-3 py-2.5 rounded-md text-sm font-medium transition-colors duration-150 ease-in-out group ${isActive
-                ? 'bg-blue-50 text-blue-700 font-semibold'
-                : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+              `flex items-center px-3 py-2.5 rounded-md text-sm font-medium transition-colors duration-150 ease-in-out group ${
+                isActive
+                  ? 'bg-blue-50 text-blue-700 font-semibold'
+                  : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
               }`
             }
           >
-            <link.icon className={`mr-3 h-5 w-5 flex-shrink-0 ${pathname === link.path ? 'text-blue-600' : 'text-gray-400 group-hover:text-gray-500'}`} aria-hidden="true" />
+            {link.icon && (
+              <link.icon
+                className={`mr-3 h-5 w-5 flex-shrink-0 ${
+                  pathname === link.path ? 'text-blue-600' : 'text-gray-400 group-hover:text-gray-500'
+                }`}
+                aria-hidden="true"
+              />
+            )}
             <span className="truncate">{link.name}</span>
           </NavLink>
         ))}
       </nav>
 
-      {/* Sidebar Footer Actions */}
       <div className="p-4 border-t flex-shrink-0 space-y-2">
         <button
           onClick={handleLogout}
@@ -128,4 +137,3 @@ const DashboardSidebar = ({ className = '', isMobile = false, onClose }) => {
 };
 
 export default DashboardSidebar;
-
