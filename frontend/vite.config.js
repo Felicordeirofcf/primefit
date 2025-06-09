@@ -2,7 +2,7 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
 export default defineConfig({
-  base: '/', // ← ADICIONE ESTA LINHA!
+  base: './', // ✅ Caminho relativo para funcionar no Vercel
   plugins: [
     react(),
   ],
@@ -29,4 +29,3 @@ export default defineConfig({
     chunkSizeWarningLimit: 550,
   },
 });
-

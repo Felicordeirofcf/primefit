@@ -30,8 +30,7 @@ RUN npm install -g serve
 # Copia apenas os arquivos de build da etapa anterior
 COPY --from=builder /app/dist ./dist
 
-# Expõe a porta usada pelo app
+# Expõe a porta usada pelo app (Railway define a variável PORT)
 EXPOSE 8080
 
-# Executa o app servindo a pasta dist, escutando todas interfaces
-CMD ["serve", "-s", "dist", "-l", "0.0.0.0:8080"]
+# Executa o app u
