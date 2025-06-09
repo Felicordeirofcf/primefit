@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { useAuth } from '../../hooks/useAuth'
 
 // URL base da API
-const API_URL = import.meta.env.VITE_API_URL || 'https://primefit-production.up.railway.app'
+const API_URL = import.meta.env.VITE_API_URL
 
 const Assessments = () => {
   const { user } = useAuth()

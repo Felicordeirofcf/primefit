@@ -33,7 +33,7 @@ export default function LoginCadastroCliente() {
       : form;
 
     try {
-      const res = await fetch(`https://primefit-production.up.railway.app${endpoint}`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}${endpoint}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
