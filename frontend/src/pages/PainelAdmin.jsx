@@ -18,7 +18,7 @@ export default function PainelAdmin() {
       // Simulação - Em um cenário real, buscaria da API
       // Adapte esta parte se a API real estiver disponível e configurada
       try {
-        // Exemplo: const res = await fetch("http://localhost:8000/admin/clientes", { headers: { Authorization: `Bearer ${token}` } });
+        // Exemplo: const res = await fetch("https://primefit-production.up.railway.app/admin/clientes", { headers: { Authorization: `Bearer ${token}` } });
         // const data = await res.json();
         // setClientes(data);
         // Dados simulados por enquanto:
