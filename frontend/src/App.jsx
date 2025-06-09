@@ -119,7 +119,7 @@ function App() {
         <Route path="avaliacoes" element={<Assessments />} />
         <Route path="perfil" element={<Profile />} />
         <Route path="mensagens" element={<Messages />} />
-        {/* Rota Admin - O próprio componente AdminDashboard já faz a verificação interna */}
+        {/* Rota Admin - O próprio componente AdminDashboard sjá faz a verificação interna */}
         <Route path="admin" element={<AdminDashboard />} />
       </Route>
 
