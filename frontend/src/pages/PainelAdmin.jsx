@@ -61,7 +61,7 @@ export default function PainelAdmin() {
     setLinkTreino("");
   };
 
-  // 📂 Upload do PDF para Supabase (simulado)
+  // 📂 Upload do PDF (simulado)
   const handleUploadPDF = async () => {
     if (!clienteSelecionado || !arquivoPDF) {
       alert("⚠️ Selecione um cliente e um arquivo PDF.");

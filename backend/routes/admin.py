@@ -2,20 +2,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, EmailStr
 from passlib.context import CryptContext
 from auth import require_admin
-from supabase import create_client
+from src.core.db_client import get_database_client
 from datetime import datetime
 import os
 
 router = APIRouter()
-
-# 🔗 Conexão com Supabase
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")
-
-if not SUPABASE_URL or not SUPABASE_KEY:
-    raise RuntimeError("SUPABASE_URL e SUPABASE_KEY devem estar configuradas.")
-
-supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # 🔐 Hasher de senha
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -31,8 +22,11 @@ class NovoAdmin(BaseModel):
 @router.post("/criar", dependencies=[Depends(require_admin)])
 async def criar_admin(data: NovoAdmin):
     try:
-        existe = supabase.table("usuarios").select("id").eq("email", data.email).execute()
-        if existe.data:
+        db_client = get_database_client()
+        
+        # Verificar se email já existe
+        existing_user = db_client.get_user_by_email(data.email)
+        if existing_user:
             raise HTTPException(status_code=400, detail="Esse e-mail já está cadastrado")
 
         hashed = pwd_context.hash(data.senha)
@@ -40,22 +34,25 @@ async def criar_admin(data: NovoAdmin):
         novo_admin = {
             "nome": "Administrador",
             "email": data.email,
-            "senha": hashed,
+            "senha_hash": hashed,
             "endereco": "Admin Street",
             "cidade": "Adminville",
             "cep": "00000-000",
             "telefone": "000000000",
             "whatsapp": "000000000",
-            "plano": "admin",
-            "status_plano": "ativo",
-            "treino_pdf": None,
-            "link_app": None
+            "is_admin": True,
+            "treino_pdf": None
         }
 
-        supabase.table("usuarios").insert(novo_admin).execute()
+        db_client.create_user(novo_admin)
+        db_client.close()
+        
         return {"message": "Novo administrador criado com sucesso!"}
 
+    except HTTPException:
+        raise
     except Exception as e:
+        print("❌ Erro ao criar admin:", e)
         raise HTTPException(status_code=500, detail=f"Erro ao criar admin: {str(e)}")
 
 # =============================
@@ -64,9 +61,18 @@ async def criar_admin(data: NovoAdmin):
 @router.get("/clientes", dependencies=[Depends(require_admin)])
 async def listar_clientes():
     try:
-        response = supabase.table("usuarios").select("*").execute()
-        return response.data or []
+        db_client = get_database_client()
+        users = db_client.get_all_users()
+        
+        # Remover senhas do retorno
+        for user in users:
+            user.pop("senha_hash", None)
+        
+        db_client.close()
+        return users
+        
     except Exception as e:
+        print("❌ Erro ao listar clientes:", e)
         raise HTTPException(status_code=500, detail=f"Erro ao listar clientes: {str(e)}")
 
 # =============================
@@ -75,22 +81,23 @@ async def listar_clientes():
 @router.post("/enviar-treino/{cliente_email}", dependencies=[Depends(require_admin)])
 async def enviar_treino(cliente_email: str, treino: dict):
     try:
-        supabase.table("usuarios").update({
-            "link_app": treino.get("link_app"),
-            "plano": treino.get("plano"),
-            "status_plano": "ativo"
-        }).eq("email", cliente_email).execute()
+        db_client = get_database_client()
+        
+        # Atualizar dados do cliente
+        updates = {
+            "treino_pdf": treino.get("treino_pdf")
+        }
+        
+        db_client.update_user(cliente_email, updates)
+        db_client.close()
 
-        supabase.table("historico_alteracoes").insert({
-            "tipo": "envio_treino",
-            "detalhe": f"Plano: {treino.get('plano')}",
-            "autor": "admin@prime.com",
-            "data": datetime.utcnow().isoformat(),
-            "email_cliente": cliente_email
-        }).execute()
+        # Log do histórico (pode ser implementado em tabela específica se necessário)
+        print(f"📝 Treino enviado para {cliente_email} - Admin")
 
-        return {"message": "Treino enviado e histórico registrado com sucesso!"}
+        return {"message": "Treino enviado com sucesso!"}
+        
     except Exception as e:
+        print("❌ Erro ao enviar treino:", e)
         raise HTTPException(status_code=500, detail=f"Erro ao enviar treino: {str(e)}")
 
 # =============================
@@ -99,15 +106,11 @@ async def enviar_treino(cliente_email: str, treino: dict):
 @router.get("/historico/{email_cliente}", dependencies=[Depends(require_admin)])
 async def obter_historico(email_cliente: str):
     try:
-        response = (
-            supabase.table("historico_alteracoes")
-            .select("*")
-            .eq("email_cliente", email_cliente)
-            .order("data", desc=True)
-            .execute()
-        )
-        return response.data or []
+        # TODO: Implementar tabela de histórico se necessário
+        return {"message": "Histórico não implementado ainda", "cliente": email_cliente}
+        
     except Exception as e:
+        print("❌ Erro ao obter histórico:", e)
         raise HTTPException(status_code=500, detail=f"Erro ao obter histórico: {str(e)}")
 
 # =============================
@@ -116,15 +119,12 @@ async def obter_historico(email_cliente: str):
 @router.get("/eventos/{email_cliente}", dependencies=[Depends(require_admin)])
 async def listar_eventos_cliente(email_cliente: str):
     try:
-        response = (
-            supabase.table("eventos")
-            .select("*")
-            .eq("email_cliente", email_cliente)
-            .order("data", desc=True)
-            .execute()
-        )
-        return response.data or []
+        db_client = get_database_client()
+        # TODO: Implementar busca de eventos se necessário
+        db_client.close()
+        return {"message": "Eventos não implementados ainda", "cliente": email_cliente}
     except Exception as e:
+        print("❌ Erro ao buscar eventos:", e)
         raise HTTPException(status_code=500, detail=f"Erro ao buscar eventos: {str(e)}")
 
 # =============================
@@ -133,33 +133,24 @@ async def listar_eventos_cliente(email_cliente: str):
 @router.post("/historico/teste", dependencies=[Depends(require_admin)])
 async def inserir_historico_teste():
     try:
-        registro = {
-            "tipo": "envio_treino",
-            "detalhe": "Plano: Consultoria Teste",
-            "autor": "admin@prime.com",
-            "data": datetime.utcnow().isoformat(),
-            "email_cliente": "admin@teste.com"
-        }
-
-        response = supabase.table("historico_alteracoes").insert(registro).execute()
-        return {"message": "Registro de teste inserido com sucesso!", "data": response.data}
+        # TODO: Implementar tabela de histórico se necessário
+        print("📝 Histórico de teste - funcionalidade não implementada")
+        return {"message": "Registro de teste simulado com sucesso!"}
     except Exception as e:
+        print("❌ Erro no teste:", e)
         raise HTTPException(status_code=500, detail=f"Erro ao inserir histórico de teste: {str(e)}")
 
 # =============================
-# 📁 LISTAR TREINOS ENVIADOS (SUPABASE)
+# 📁 LISTAR TREINOS ENVIADOS
 # =============================
 @router.get("/treinos-enviados", dependencies=[Depends(require_admin)])
 async def listar_treinos_enviados(cliente_email: str = Query(...)):
     try:
-        response = (
-            supabase
-            .table("treinos_enviados")
-            .select("*")
-            .eq("cliente_email", cliente_email)
-            .order("enviado_em", desc=True)
-            .execute()
-        )
-        return response.data or []
+        db_client = get_database_client()
+        trainings = db_client.get_trainings_by_client_email(cliente_email)
+        db_client.close()
+        return trainings
+        
     except Exception as e:
+        print("❌ Erro ao listar treinos:", e)
         raise HTTPException(status_code=500, detail=f"Erro ao listar treinos enviados: {str(e)}")

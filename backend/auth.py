@@ -4,7 +4,7 @@ from passlib.context import CryptContext
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
-from supabase import create_client
+from src.core.db_client import get_database_client
 import os
 import uuid
 
@@ -12,20 +12,12 @@ import uuid
 load_dotenv()
 
 # 🔐 Configurações de segurança
-SECRET_KEY: str = os.getenv("SECRET_KEY")
-ALGORITHM: str = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
-
-# 🔗 Supabase
-SUPABASE_URL: str = os.getenv("SUPABASE_URL")
-SUPABASE_KEY: str = os.getenv("SUPABASE_KEY")
+SECRET_KEY: str = os.getenv("JWT_SECRET")
+ALGORITHM: str = os.getenv("JWT_ALGORITHM", "HS256")
+ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("JWT_EXPIRES_IN", "3600")) // 60
 
 if not SECRET_KEY:
-    raise RuntimeError("❌ SECRET_KEY não definida nas variáveis de ambiente.")
-if not SUPABASE_URL or not SUPABASE_KEY:
-    raise RuntimeError("❌ SUPABASE_URL e SUPABASE_KEY devem estar definidas no .env")
-
-supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+    raise RuntimeError("❌ JWT_SECRET não definida nas variáveis de ambiente.")
 
 # 🛡️ Autenticação Bearer OAuth2
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
@@ -79,12 +71,25 @@ def get_current_user(token: str = Depends(oauth2_scheme)) -> str:
 
 def require_admin(user_email: str = Depends(get_current_user)) -> str:
     """Valida se o usuário autenticado é o administrador."""
-    if user_email.lower() != "admin@prime.com":
+    try:
+        db_client = get_database_client()
+        user = db_client.get_user_by_email(user_email)
+        db_client.close()
+        
+        if not user or not user.get("is_admin", False):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Somente administradores têm acesso"
+            )
+        return user_email
+    except HTTPException:
+        raise
+    except Exception as e:
+        print("❌ Erro ao verificar admin:", e)
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Somente administradores têm acesso"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Erro interno na verificação de permissões"
         )
-    return user_email
 
 # ---------------------------
 # 📝 Registro de histórico
@@ -97,12 +102,7 @@ def registrar_alteracao(email_cliente: str, tipo: str, detalhe: str, autor: str)
         return
 
     try:
-        supabase.table("historico_alteracoes").insert({
-            "id": str(uuid.uuid4()),
-            "email_cliente": email_cliente,
-            "tipo": tipo,
-            "detalhe": detalhe,
-            "autor": autor,
-        }).execute()
+        # TODO: Implementar tabela de histórico se necessário
+        print(f"📝 Histórico: {tipo} - {detalhe} por {autor} para {email_cliente}")
     except Exception as e:
         print("❌ Erro ao registrar histórico:", str(e))

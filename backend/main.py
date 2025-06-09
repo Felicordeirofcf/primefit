@@ -2,21 +2,23 @@ import os
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
 
-from src.core.database import engine, Base  # Import Base and engine for metadata
+from src.core.database import engine, create_tables
+from src.core.models import Base
 
 # Carregar variáveis de ambiente
 load_dotenv()
 
 # Importar rotas
-from src.api.endpoints import auth, profiles, messages, trainings, assessments, progress, payments, content, admin, users
+from routes import auth, cadastro, cliente, upload_pdf
 
 # Criar aplicação FastAPI
 app = FastAPI(
     title="PrimeFit API",
-    description="API para o sistema PrimeFit",
-    version="1.0.0"
+    description="API para o sistema PrimeFit - PostgreSQL + FastAPI",
+    version="2.0.0"
 )
 
 # Configurar CORS dinamicamente a partir da variável de ambiente CORS_ORIGINS
@@ -31,25 +33,22 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Montar arquivos estáticos para servir uploads
+app.mount("/storage", StaticFiles(directory="/app/storage"), name="storage")
+
 # Rota de verificação de saúde
 @app.get("/health")
 async def health_check():
     """
     Verifica se a API está funcionando.
     """
-    return {"status": "ok", "message": "API is running"}
+    return {"status": "ok", "message": "PrimeFit API is running", "version": "2.0.0"}
 
 # Incluir rotas
 app.include_router(auth.router, prefix="/auth", tags=["Autenticação"])
-app.include_router(profiles.router, prefix="/profiles", tags=["Perfis"])
-app.include_router(messages.router, prefix="/messages", tags=["Mensagens"])
-app.include_router(trainings.router, prefix="/trainings", tags=["Treinos"])
-app.include_router(assessments.router, prefix="/assessments", tags=["Avaliações"])
-app.include_router(progress.router, prefix="/progress", tags=["Progresso"])
-app.include_router(payments.router, prefix="/payments", tags=["Pagamentos"])
-app.include_router(content.router, prefix="/content", tags=["Conteúdo"])
-app.include_router(admin.router, prefix="/admin", tags=["Admin"])
-app.include_router(users.router, prefix="/users", tags=["Usuários"])
+app.include_router(cadastro.router, prefix="/api", tags=["Cadastro"])
+app.include_router(cliente.router, prefix="/api", tags=["Cliente"])
+app.include_router(upload_pdf.router, prefix="/api", tags=["Upload"])
 
 # Tratamento de exceções
 @app.exception_handler(Exception)
@@ -61,6 +60,19 @@ async def global_exception_handler(request, exc):
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content={"detail": f"Erro interno: {str(exc)}"}
     )
+
+# Inicializar banco de dados na inicialização
+@app.on_event("startup")
+async def startup_event():
+    """
+    Eventos executados na inicialização da aplicação
+    """
+    try:
+        # Criar tabelas se não existirem
+        create_tables()
+        print("✅ Banco de dados inicializado")
+    except Exception as e:
+        print(f"⚠️  Erro na inicialização do banco: {e}")
 
 if __name__ == "__main__":
     import uvicorn

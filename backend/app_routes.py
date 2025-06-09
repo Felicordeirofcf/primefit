@@ -1,20 +1,11 @@
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, EmailStr
-from supabase import create_client, Client
+from src.core.db_client import get_database_client
 from dotenv import load_dotenv
-from supabase_client import supabase
 import os
 
 # 🔐 Carrega variáveis do .env
 load_dotenv()
-
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")
-
-if not SUPABASE_URL or not SUPABASE_KEY:
-    raise EnvironmentError("As variáveis SUPABASE_URL e SUPABASE_KEY devem estar configuradas.")
-
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 router = APIRouter()
 
@@ -28,23 +19,29 @@ class Cadastro(BaseModel):
 @router.post("/cadastro", status_code=status.HTTP_201_CREATED)
 async def cadastrar_usuario(data: Cadastro):
     try:
+        db_client = get_database_client()
+        
         # Verifica se o e-mail já existe na tabela "usuarios"
-        check = supabase.table("usuarios").select("id").eq("email", data.email).execute()
-        if check.data:
+        existing_user = db_client.get_user_by_email(data.email)
+        if existing_user:
             raise HTTPException(status_code=400, detail="E-mail já cadastrado.")
 
         # Insere os dados na tabela "usuarios"
-        result = supabase.table("usuarios").insert({
+        user_data = {
             "nome": data.nome,
             "email": data.email,
             "telefone": data.telefone,
-        }).execute()
-
-        if result.data is None:
-            raise HTTPException(status_code=400, detail="Erro ao inserir dados.")
+            "senha_hash": "",  # Será definida posteriormente
+            "is_admin": False
+        }
+        
+        result = db_client.create_user(user_data)
+        db_client.close()
 
         return {"message": "Cadastro realizado com sucesso!", "email": data.email}
 
+    except HTTPException:
+        raise
     except Exception as e:
         print("❌ ERRO:", e)
         raise HTTPException(status_code=500, detail="Erro interno ao cadastrar usuário.")
