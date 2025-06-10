@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException, status, Depends, UploadFile, File, Form
+from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel, EmailStr
 from sqlalchemy.orm import Session
 from src.core.database import get_db
@@ -45,7 +46,7 @@ class Agendamento(BaseModel):
     data: str  # formato ISO yyyy-mm-dd
 
 # ---------------------------
-# ✅ CLIENTE - Cadastro e login
+# ✅ CLIENTE - Cadastro
 # ---------------------------
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)
@@ -53,15 +54,12 @@ def register(user: UsuarioCreate):
     print("📥 Dados recebidos na rota /auth/register:", user.dict())
     db_client = get_database_client()
     try:
-        # Verificar se email já existe
         existing_user = db_client.get_user_by_email(user.email)
         if existing_user:
             raise HTTPException(status_code=400, detail="Email já cadastrado")
 
-        # Hash da senha
         hashed_password = hash_password(user.senha)
 
-        # Dados do usuário
         user_data = {
             "nome": user.nome,
             "email": user.email,
@@ -76,7 +74,6 @@ def register(user: UsuarioCreate):
             "tipo_usuario": user.tipo_usuario
         }
 
-        # Criar usuário
         created_user = db_client.create_user(user_data)
         return {"message": "Usuário cadastrado com sucesso!", "email": user.email}
 
@@ -89,22 +86,19 @@ def register(user: UsuarioCreate):
     finally:
         db_client.close()
 
+# ---------------------------
+# 🔐 LOGIN padrão personalizado
+# ---------------------------
 
 @router.post("/login", response_model=Token)
 def login(login_data: UsuarioLogin):
     print("🔐 Tentativa de login:", login_data.email)
     db_client = get_database_client()
     try:
-        # Buscar usuário
         user = db_client.get_user_by_email(login_data.email)
-        if not user:
+        if not user or not verify_password(login_data.senha, user["senha_hash"]):
             raise HTTPException(status_code=400, detail="Credenciais inválidas")
 
-        # Verificar senha
-        if not verify_password(login_data.senha, user["senha_hash"]):
-            raise HTTPException(status_code=400, detail="Credenciais inválidas")
-
-        # Criar token
         token = create_access_token({"sub": login_data.email})
         return {"access_token": token}
 
@@ -112,6 +106,31 @@ def login(login_data: UsuarioLogin):
         raise
     except Exception as e:
         print("❌ Erro no login:")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail="Erro interno no login.")
+    finally:
+        db_client.close()
+
+# ---------------------------
+# 🔐 LOGIN compatível com OAuth2 (para frontend usar /auth/token)
+# ---------------------------
+
+@router.post("/token", response_model=Token)
+def oauth2_login(form_data: OAuth2PasswordRequestForm = Depends()):
+    print("🔐 Login OAuth2:", form_data.username)
+    db_client = get_database_client()
+    try:
+        user = db_client.get_user_by_email(form_data.username)
+        if not user or not verify_password(form_data.password, user["senha_hash"]):
+            raise HTTPException(status_code=400, detail="Credenciais inválidas")
+
+        token = create_access_token({"sub": form_data.username})
+        return {"access_token": token}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print("❌ Erro no login OAuth2:")
         traceback.print_exc()
         raise HTTPException(status_code=500, detail="Erro interno no login.")
     finally:
