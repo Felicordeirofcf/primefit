@@ -4,7 +4,7 @@ from sqlalchemy.orm import sessionmaker
 from src.core.models import Base  # Certifique-se de que o caminho está correto
 
 # 🔐 Obter URL do banco de dados a partir do ambiente
-DATABASE_URL = os.environ.get("postgresql://postgres:wbvzYQGLDimXoqgdbEHAhpbWxnXUmfOi@postgres.railway.internal:5432/railway")
+DATABASE_URL = os.environ.get("DATABASE_URL")
 
 if not DATABASE_URL:
     raise ValueError("❌ DATABASE_URL não encontrada nas variáveis de ambiente")
