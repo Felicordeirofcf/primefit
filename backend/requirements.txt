@@ -536,4 +536,5 @@ zstandard==0.23.0
     # via nuitka
    
 psycopg2-binary>=2.9.9
+passlib[bcrypt]>=1.7.4
 
