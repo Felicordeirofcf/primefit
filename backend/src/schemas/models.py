@@ -13,10 +13,12 @@ class Profile(Base):
     id = Column(String, primary_key=True)
     nome = Column(String)
     email = Column(String, unique=True, index=True)
-    password_hash = Column(String) # Added password_hash field
+    password_hash = Column(String)  # hash da senha
     role = Column(String, default="client")
+    tipo_usuario = Column(String, default="client")  # ✅ CAMPO ADICIONADO
     criado_em = Column(DateTime, default=func.now())
     ultimo_login = Column(DateTime, default=func.now())
+
 
 class TreinoEnviado(Base):
     __tablename__ = "treinos_enviados"
