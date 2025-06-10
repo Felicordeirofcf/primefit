@@ -1,5 +1,5 @@
 import { useState } from "react";
-import "./CadastroCliente.css";
+import "./CadastroCliente.css"; // ➕ Garanta que esse CSS existe
 
 export default function CadastroCliente() {
   const [form, setForm] = useState({
@@ -19,16 +19,12 @@ export default function CadastroCliente() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log("Dados do formulário enviados:", form);
     try {
       const res = await fetch("https://primefit-production-e300.up.railway.app/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form )
+        body: JSON.stringify(form)
       });
-
-      console.log("Resposta da API (res.ok):". res.ok);
-      console.log("Status da resposta:", res.status);
 
       if (res.ok) {
         alert("Cadastro realizado com sucesso!");
@@ -43,12 +39,12 @@ export default function CadastroCliente() {
           whatsapp: ""
         });
       } else {
-        const errorData = await res.json();
-        console.error("Erro ao cadastrar (dados do backend):". errorData);
-        alert("Erro ao cadastrar: " + (errorData.detail || JSON.stringify(errorData)));
+        const erro = await res.json();
+        console.error("Erro ao cadastrar:", erro);
+        alert("Erro ao cadastrar: " + (erro.detail || JSON.stringify(erro)));
       }
     } catch (error) {
-      console.error("Erro na requisição (catch block):". error);
+      console.error("Erro na requisição:", error);
       alert("Erro na requisição: " + error.message);
     }
   };
@@ -70,3 +66,5 @@ export default function CadastroCliente() {
     </div>
   );
 }
+
+
