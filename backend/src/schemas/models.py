@@ -107,8 +107,13 @@ class PerfilResponse(BaseModel):
 class Cadastro(BaseModel):
     nome: str
     email: EmailStr
-    telefone: Optional[str] = None
-    password: str # Added password to Cadastro for registration
+    senha: str # Renomeado de 'password' para 'senha' para corresponder ao frontend
+    endereco: str
+    cidade: str
+    cep: str
+    telefone: str
+    whatsapp: str
+    tipo_usuario: str # Adicionado para corresponder ao frontend
 
 class PaymentCreate(BaseModel):
     user_id: str
