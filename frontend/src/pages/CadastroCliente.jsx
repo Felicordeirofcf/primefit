@@ -25,7 +25,12 @@ export default function CadastroCliente() {
       const res = await fetch("https://primefit-production-e300.up.railway.app/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form )
+        body: JSON.stringify({
+        nome: form.nome,
+        email: form.email,
+        senha: form.senha,
+        whatsapp: form.whatsapp
+      })
       });
 
       console.log("Resposta da API (res.ok):". res.ok);
@@ -61,7 +66,7 @@ export default function CadastroCliente() {
       <form onSubmit={handleSubmit} className="cadastro-form">
         <input type="text" name="nome" value={form.nome} onChange={handleChange} placeholder="Nome completo" required />
         <input type="email" name="email" value={form.email} onChange={handleChange} placeholder="E-mail" required />
-        <input type="password" name="senha" value={form.senha} onChange={handleChange} placeholder="Senha" required />
+        <input type="password" autoComplete="new-password" name="senha" value={form.senha} onChange={handleChange} placeholder="Senha" required />
         <input type="text" name="endereco" value={form.endereco} onChange={handleChange} placeholder="Endereço" required />
         <input type="text" name="cidade" value={form.cidade} onChange={handleChange} placeholder="Cidade" required />
         <input type="text" name="cep" value={form.cep} onChange={handleChange} placeholder="CEP" required />
