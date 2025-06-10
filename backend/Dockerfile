@@ -23,4 +23,4 @@ COPY . .
 EXPOSE 8080
 
 # Comando para iniciar o servidor com Uvicorn na porta 8080
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
