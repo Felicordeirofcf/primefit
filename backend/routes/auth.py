@@ -102,4 +102,17 @@ def login(login_data: UsuarioLogin):
 
         # Verificar senha
         if not verify_password(login_data.senha, user["senha_hash"]):
-            raise HTTPException(status_code=400, detail="Credenciais in_
+            raise HTTPException(status_code=400, detail="Credenciais inválidas")
+
+        # Criar token
+        token = create_access_token({"sub": login_data.email})
+        return {"access_token": token}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        print("❌ Erro no login:")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail="Erro interno no login.")
+    finally:
+        db_client.close()
