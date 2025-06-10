@@ -2,11 +2,12 @@ from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
 
-class Training(BaseModel):
+class Progress(BaseModel):
     id: Optional[str] = None
-    name: str
-    description: Optional[str] = None
-    date: Optional[datetime] = None
+    date: datetime
+    weight: float
+    height: float
+    bmi: float
 
     class Config:
         from_attributes = True

@@ -4,7 +4,7 @@ from typing import List
 
 from src.core.database import get_db
 from src.core.models import Training as DBTraining
-from schemas import Training
+from src.schemas.training import Training
 
 router = APIRouter()
 

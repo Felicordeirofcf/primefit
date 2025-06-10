@@ -4,7 +4,7 @@ from typing import List
 
 from src.core.database import get_db
 from src.core.models import Progress as DBProgress
-from schemas import Progress
+from src.schemas.progress import Progress
 
 router = APIRouter()
 

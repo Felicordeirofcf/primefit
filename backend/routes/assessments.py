@@ -4,7 +4,7 @@ from typing import List
 
 from src.core.database import get_db
 from src.core.models import Assessment as DBAssessment
-from schemas import Assessment
+from src.schemas.assessment import Assessment
 
 router = APIRouter()
 

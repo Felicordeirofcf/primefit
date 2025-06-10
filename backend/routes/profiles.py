@@ -4,7 +4,7 @@ from typing import List
 
 from src.core.database import get_db
 from src.core.models import Profile as DBProfile
-from schemas import Profile
+from src.schemas.profile import Profile
 
 router = APIRouter()
 

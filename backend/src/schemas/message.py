@@ -2,11 +2,12 @@ from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
 
-class Training(BaseModel):
+class Message(BaseModel):
     id: Optional[str] = None
-    name: str
-    description: Optional[str] = None
-    date: Optional[datetime] = None
+    sender: str
+    receiver: str
+    timestamp: datetime
+    content: str
 
     class Config:
         from_attributes = True

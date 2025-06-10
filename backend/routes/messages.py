@@ -4,7 +4,7 @@ from typing import List
 
 from src.core.database import get_db
 from src.core.models import Message as DBMessage
-from schemas import Message
+from src.schemas.message import Message
 
 router = APIRouter()
 
