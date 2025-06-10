@@ -17,8 +17,6 @@ const RegisterPage = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-
-    // Limpar erro anterior
     setError('')
 
     if (!fullName || !email || !password || !confirmPassword || !whatsapp) {
@@ -33,7 +31,6 @@ const RegisterPage = () => {
       return
     }
 
-    // Validar força da senha
     if (password.length < 6) {
       setError('A senha deve ter pelo menos 6 caracteres')
       toast.error('A senha deve ter pelo menos 6 caracteres')
@@ -43,20 +40,16 @@ const RegisterPage = () => {
     setIsLoading(true)
 
     try {
-      // Registra o usuário
       const registerResult = await signUp(email, password, {
         nome: fullName,
         email: email,
-        senha: password,
+        password: password,
         whatsapp: whatsapp,
       })
 
       if (registerResult.data && !registerResult.error) {
         toast.success('Cadastro realizado com sucesso!')
-
-        // Faz login automaticamente
         const loginResult = await signIn(email, password)
-
         if (loginResult.data && !loginResult.error) {
           navigate('/dashboard')
         } else {
@@ -127,6 +120,7 @@ const RegisterPage = () => {
             <input
               type="password"
               id="password"
+              autoComplete="new-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -142,6 +136,7 @@ const RegisterPage = () => {
             <input
               type="password"
               id="confirmPassword"
+              autoComplete="new-password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -188,5 +183,3 @@ const RegisterPage = () => {
 }
 
 export default RegisterPage
-
-
