@@ -11,7 +11,7 @@ export default function CadastroCliente() {
     cep: "",
     telefone: "",
     whatsapp: "",
-    tipo_usuario: "Cliente" // <-- CAMPO ADICIONADO/CORRIGIDO
+    tipo_usuario: "client" // Corrigido para minúsculo para alinhar com backend
   });
 
   const handleChange = (e) => {
@@ -22,18 +22,13 @@ export default function CadastroCliente() {
     e.preventDefault();
     console.log("Dados do formulário enviados:", form);
     try {
-      const res = await fetch("https://primefit-production-e300.up.railway.app/register", {
+      const res = await fetch("https://primefit-production-e300.up.railway.app/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-        nome: form.nome,
-        email: form.email,
-        senha: form.senha,
-        whatsapp: form.whatsapp
-      })
+        body: JSON.stringify(form)
       });
 
-      console.log("Resposta da API (res.ok):". res.ok);
+      console.log("Resposta da API (res.ok):", res.ok);
       console.log("Status da resposta:", res.status);
 
       if (res.ok) {
@@ -47,15 +42,15 @@ export default function CadastroCliente() {
           cep: "",
           telefone: "",
           whatsapp: "",
-          tipo_usuario: "Cliente"
+          tipo_usuario: "client"
         });
       } else {
         const errorData = await res.json();
-        console.error("Erro ao cadastrar (dados do backend):". errorData);
+        console.error("Erro ao cadastrar (dados do backend):", errorData);
         alert("Erro ao cadastrar: " + (errorData.detail ? JSON.stringify(errorData.detail) : JSON.stringify(errorData)));
       }
     } catch (error) {
-      console.error("Erro na requisição (catch block):". error);
+      console.error("Erro na requisição (catch block):", error);
       alert("Erro na requisição: " + error.message);
     }
   };
