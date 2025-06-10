@@ -8,7 +8,7 @@ import shutil
 class LocalStorageClient:
     """Cliente de storage local para gerenciamento de arquivos"""
     
-    def __init__(self, base_path: str = "/app/storage"):
+    def __init__(self, base_path: str = "./storage"):
         self.base_path = Path(base_path)
         self.base_path.mkdir(parents=True, exist_ok=True)
         

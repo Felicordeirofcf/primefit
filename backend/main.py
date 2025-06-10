@@ -34,7 +34,7 @@ app.add_middleware(
 )
 
 # Montar arquivos estáticos para servir uploads
-app.mount("/storage", StaticFiles(directory="/app/storage"), name="storage")
+app.mount("/storage", StaticFiles(directory="./storage"), name="storage")
 
 # Rota de verificação de saúde
 @app.get("/health")

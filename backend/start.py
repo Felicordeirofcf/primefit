@@ -9,6 +9,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from dotenv import load_dotenv
+
 def run_command(command, description):
     """Executa um comando e trata erros"""
     print(f"🔄 {description}...")
@@ -26,13 +28,14 @@ def run_command(command, description):
 def main():
     """Função principal de inicialização do Railway"""
     print("🚀 Inicializando PrimeFit no Railway...")
+    load_dotenv()
     
     # Instalar dependências
     if not run_command("pip install -r requirements.txt", "Instalação de dependências"):
         sys.exit(1)
     
     # Inicializar banco de dados
-    if not run_command("python init_db.py", "Inicialização do banco de dados"):
+    if not run_command("python3 init_db.py", "Inicialização do banco de dados"):
         print("⚠️  Continuando mesmo com erro na inicialização do banco...")
     
     # Iniciar servidor
