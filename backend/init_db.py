@@ -68,7 +68,7 @@ def main():
         print("\n🎉 Banco de dados inicializado com sucesso!")
         print("\n📝 Próximos passos:")
         print("1. Execute: python main.py")
-        print("2. Acesse: http://localhost:8000")
+        print("2. Acesse: http://primefit-production-e300.up.railway.app:8000")
         print("3. Login admin: admin@primefit.com / admin123")
         
     except Exception as e:

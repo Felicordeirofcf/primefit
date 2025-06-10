@@ -46,7 +46,7 @@ class LocalStorageClient:
         """Gera URL pública para o arquivo"""
         # Em produção, isso seria uma URL real do servidor
         # Por enquanto, retornamos um caminho relativo
-        base_url = os.getenv("BASE_URL", "http://localhost:8000")
+        base_url = os.getenv("BASE_URL", "http://primefit-production-e300.up.railway.app:8000")
         return f"{base_url}/storage/{bucket}/{file_path}"
     
     def delete(self, bucket: str, file_path: str) -> bool:
