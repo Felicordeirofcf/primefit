@@ -22,5 +22,5 @@ COPY . .
 # Expõe a porta usada pelo Railway (obrigatoriamente 8080)
 EXPOSE 8080
 
-# Comando para iniciar o servidor com Uvicorn na porta 8080
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Comando para iniciar o servidor com Uvicorn na porta definida pela variável de ambiente PORT
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "${PORT:-8000}"]
