@@ -42,7 +42,7 @@ const WeightLossPage = () => {
             <h1 className="text-4xl md:text-5xl font-bold mb-6">
               Transforme seu corpo e sua vida com o programa de emagrecimento PrimeFit
             </h1>
-            <p className="text-xl mb-8">
+            <p className="text-xl mb-8 drop-shadow-md">
               Resultados reais e duradouros com acompanhamento personalizado, baseado em ciência e adaptado ao seu estilo de vida.
             </p>
             <div className="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
