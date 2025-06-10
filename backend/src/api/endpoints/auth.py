@@ -12,8 +12,8 @@ from src.core.auth_utils import (
     ACCESS_TOKEN_EXPIRE_MINUTES
 )
 from src.core.database import get_db
-from src.schemas.models import PerfilResponse as UserResponse, Cadastro as UserCreate, Profile # Using Profile as the SQLAlchemy model for users
-from src.schemas.user import Token # Assuming Token is still in src.schemas.user
+from src.schemas.models import PerfilResponse as UserResponse, CadastroSimples as UserCreate, Profile
+from src.schemas.user import Token
 
 router = APIRouter()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
@@ -21,9 +21,8 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
 @router.post("/register", response_model=UserResponse)
 async def register(user_data: UserCreate, db: Session = Depends(get_db)):
     """
-    Registra um novo usuário.
+    Registra um novo usuário com dados simplificados.
     """
-    # Verificar se o email já existe
     existing_user = db.query(Profile).filter(Profile.email == user_data.email).first()
     
     if existing_user:
@@ -32,14 +31,13 @@ async def register(user_data: UserCreate, db: Session = Depends(get_db)):
             detail="Email já está em uso"
         )
     
-    # Hash da senha
-    hashed_password = get_password_hash(user_data.password)
-    
-    # Criar novo perfil (usuário)
+    # Corrigido: usar senha (como está no Pydantic)
+    hashed_password = get_password_hash(user_data.senha)
+
     new_profile = Profile(
         nome=user_data.nome,
         email=user_data.email,
-        password_hash=hashed_password, # Now this field exists in Profile model
+        password_hash=hashed_password,
         role="client",
         criado_em=datetime.now(),
         ultimo_login=datetime.now()
@@ -55,7 +53,6 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
     """
     Autentica um usuário e retorna um token de acesso.
     """
-    # Buscar usuário pelo email
     user = db.query(Profile).filter(Profile.email == form_data.username).first()
     
     if not user:
@@ -65,15 +62,13 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
             headers={"WWW-Authenticate": "Bearer"},
         )
     
-    # Verificar senha
-    if not verify_password(form_data.password, user.password_hash): # Now this field exists in Profile model
+    if not verify_password(form_data.password, user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Email ou senha incorretos",
             headers={"WWW-Authenticate": "Bearer"},
         )
     
-    # Criar token de acesso
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         data={"sub": user.email, "user_id": user.id, "role": user.role},
@@ -83,9 +78,6 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
     return {"access_token": access_token, "token_type": "bearer"}
 
 async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
-    """
-    Obtém o usuário atual a partir do token.
-    """
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Credenciais inválidas",
@@ -110,23 +102,12 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = De
     return user
 
 async def get_current_active_user(current_user: Profile = Depends(get_current_user)):
-    """
-    Verifica se o usuário atual está ativo.
-    """
-    # Assuming 'is_active' field will be added to Profile model if needed
-    # if current_user.is_active is False:
-    #     raise HTTPException(status_code=400, detail="Usuário inativo")
     return current_user
 
 async def get_admin_user(current_user: Profile = Depends(get_current_user)):
-    """
-    Verifica se o usuário atual é um administrador.
-    """
     if current_user.role != "admin" and current_user.email != "felpcordeirofcf@gmail.com":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Permissão negada. Acesso restrito a administradores."
         )
     return current_user
-
-

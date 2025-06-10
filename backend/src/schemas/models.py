@@ -319,4 +319,8 @@ class PlanCreate(BaseModel):
     duration_months: int
     is_active: Optional[bool] = True
 
-
+class CadastroSimples(BaseModel):
+    nome: str
+    email: EmailStr
+    senha: str
+    whatsapp: str
