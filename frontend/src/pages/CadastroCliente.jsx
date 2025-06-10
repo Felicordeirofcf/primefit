@@ -22,7 +22,7 @@ export default function CadastroCliente() {
     e.preventDefault();
     console.log("Dados do formulário enviados:", form);
     try {
-      const res = await fetch("https://primefit-production-e300.up.railway.app/auth/register", {
+      const res = await fetch("https://primefit-production-e300.up.railway.app/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form)
