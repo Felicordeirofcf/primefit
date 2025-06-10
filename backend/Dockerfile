@@ -6,6 +6,9 @@ ENV PYTHONDONTWRITEBYTECODE=1
 # Exibe logs imediatamente
 ENV PYTHONUNBUFFERED=1
 
+# Define a porta padrão
+ENV PORT=8080
+
 # Diretório de trabalho no container
 WORKDIR /app
 
@@ -23,4 +26,4 @@ COPY . .
 EXPOSE 8080
 
 # Comando para iniciar o servidor com Uvicorn na porta definida pela variável de ambiente PORT
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "${PORT:-8000}"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "$PORT"]
