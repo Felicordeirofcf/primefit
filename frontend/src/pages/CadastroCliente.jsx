@@ -1,5 +1,5 @@
 import { useState } from "react";
-import "./CadastroCliente.css"; // ➕ Garanta que esse CSS existe
+import "./CadastroCliente.css";
 
 export default function CadastroCliente() {
   const [form, setForm] = useState({
@@ -10,7 +10,8 @@ export default function CadastroCliente() {
     cidade: "",
     cep: "",
     telefone: "",
-    whatsapp: ""
+    whatsapp: "",
+    tipo_usuario: "Cliente" // <-- CAMPO ADICIONADO/CORRIGIDO
   });
 
   const handleChange = (e) => {
@@ -19,22 +20,19 @@ export default function CadastroCliente() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
+    console.log("Dados do formulário enviados:", form);
     try {
-      // Envia apenas os dados que o backend espera
-      const { nome, email, senha } = form;
-      const payload = { nome, email, senha };
-
       const res = await fetch("https://primefit-production-e300.up.railway.app/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(form )
       });
+
+      console.log("Resposta da API (res.ok):". res.ok);
+      console.log("Status da resposta:", res.status);
 
       if (res.ok) {
         alert("Cadastro realizado com sucesso!");
-
-        // Limpa todos os campos do formulário, inclusive os dados adicionais
         setForm({
           nome: "",
           email: "",
@@ -43,15 +41,16 @@ export default function CadastroCliente() {
           cidade: "",
           cep: "",
           telefone: "",
-          whatsapp: ""
+          whatsapp: "",
+          tipo_usuario: "Cliente"
         });
       } else {
-        const erro = await res.json();
-        console.error("Erro ao cadastrar:", erro);
-        alert("Erro ao cadastrar: " + (erro.detail || JSON.stringify(erro)));
+        const errorData = await res.json();
+        console.error("Erro ao cadastrar (dados do backend):". errorData);
+        alert("Erro ao cadastrar: " + (errorData.detail ? JSON.stringify(errorData.detail) : JSON.stringify(errorData)));
       }
     } catch (error) {
-      console.error("Erro na requisição:", error);
+      console.error("Erro na requisição (catch block):". error);
       alert("Erro na requisição: " + error.message);
     }
   };
@@ -60,71 +59,14 @@ export default function CadastroCliente() {
     <div className="cadastro-container">
       <h2>Cadastro de Cliente</h2>
       <form onSubmit={handleSubmit} className="cadastro-form">
-        <input
-          type="text"
-          name="nome"
-          value={form.nome}
-          onChange={handleChange}
-          placeholder="Nome completo"
-          required
-        />
-        <input
-          type="email"
-          name="email"
-          value={form.email}
-          onChange={handleChange}
-          placeholder="E-mail"
-          required
-        />
-        <input
-          type="password"
-          name="senha"
-          value={form.senha}
-          onChange={handleChange}
-          placeholder="Senha"
-          autoComplete="new-password"
-          required
-        />
-        <input
-          type="text"
-          name="endereco"
-          value={form.endereco}
-          onChange={handleChange}
-          placeholder="Endereço"
-          required
-        />
-        <input
-          type="text"
-          name="cidade"
-          value={form.cidade}
-          onChange={handleChange}
-          placeholder="Cidade"
-          required
-        />
-        <input
-          type="text"
-          name="cep"
-          value={form.cep}
-          onChange={handleChange}
-          placeholder="CEP"
-          required
-        />
-        <input
-          type="text"
-          name="telefone"
-          value={form.telefone}
-          onChange={handleChange}
-          placeholder="Telefone"
-          required
-        />
-        <input
-          type="text"
-          name="whatsapp"
-          value={form.whatsapp}
-          onChange={handleChange}
-          placeholder="WhatsApp"
-          required
-        />
+        <input type="text" name="nome" value={form.nome} onChange={handleChange} placeholder="Nome completo" required />
+        <input type="email" name="email" value={form.email} onChange={handleChange} placeholder="E-mail" required />
+        <input type="password" name="senha" value={form.senha} onChange={handleChange} placeholder="Senha" required />
+        <input type="text" name="endereco" value={form.endereco} onChange={handleChange} placeholder="Endereço" required />
+        <input type="text" name="cidade" value={form.cidade} onChange={handleChange} placeholder="Cidade" required />
+        <input type="text" name="cep" value={form.cep} onChange={handleChange} placeholder="CEP" required />
+        <input type="text" name="telefone" value={form.telefone} onChange={handleChange} placeholder="Telefone" required />
+        <input type="text" name="whatsapp" value={form.whatsapp} onChange={handleChange} placeholder="WhatsApp" required />
         <button type="submit">Cadastrar</button>
       </form>
     </div>
