@@ -26,4 +26,5 @@ COPY . .
 EXPOSE 8080
 
 # Comando para iniciar o servidor com Uvicorn usando shell para expandir a variável de ambiente PORT
+# 'main:app' refere-se ao arquivo main.py e à instância 'app' dentro dele
 CMD uvicorn main:app --host 0.0.0.0 --port $PORT

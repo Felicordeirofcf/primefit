@@ -22,10 +22,12 @@ app = FastAPI(
 )
 
 # Configurar CORS
-origins = [origin.strip() for origin in os.getenv("CORS_ORIGINS", "").split(",") if origin.strip()]
+# ATENÇÃO: Permitir todas as origens (["*"]) é apenas para depuração.
+# Em produção, você deve listar explicitamente os domínios permitidos.
+origins = ["*"] # Temporariamente permite todas as origens para depuração
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins or ["*"],  # fallback
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -55,7 +57,7 @@ app.include_router(profiles.router, prefix="/api", tags=["Perfis"])
 async def global_exception_handler(request: Request, exc: Exception):
     print(f"Erro não tratado: {exc}")
     return JSONResponse(
-        status_code=status.HTTP_500_INTERNAL_ERROR,
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content={"detail": "Erro interno no servidor."}
     )
 
@@ -63,5 +65,3 @@ async def global_exception_handler(request: Request, exc: Exception):
 @app.on_event("startup")
 async def startup_event():
     create_tables()
-
-
