@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from src.core.database import get_db
 from src.core.db_client import get_database_client
 from src.core.storage import get_storage_client
+from fastapi import Body
 from auth import (
     hash_password,
     verify_password,
@@ -116,21 +117,25 @@ def login(login_data: UsuarioLogin):
 # ---------------------------
 
 @router.post("/token", response_model=Token)
-def oauth2_login(form_data: OAuth2PasswordRequestForm = Depends()):
-    print("🔐 Login OAuth2:", form_data.username)
+def token_login(credentials: dict = Body(...)):
+    email = credentials.get("email")
+    senha = credentials.get("senha")
+
+    print("🔐 Login JSON:", email)
+
     db_client = get_database_client()
     try:
-        user = db_client.get_user_by_email(form_data.username)
-        if not user or not verify_password(form_data.password, user["senha_hash"]):
+        user = db_client.get_user_by_email(email)
+        if not user or not verify_password(senha, user["senha_hash"]):
             raise HTTPException(status_code=400, detail="Credenciais inválidas")
 
-        token = create_access_token({"sub": form_data.username})
+        token = create_access_token({"sub": email})
         return {"access_token": token}
 
     except HTTPException:
         raise
     except Exception as e:
-        print("❌ Erro no login OAuth2:")
+        print("❌ Erro no login JSON:")
         traceback.print_exc()
         raise HTTPException(status_code=500, detail="Erro interno no login.")
     finally:
