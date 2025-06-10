@@ -11,9 +11,8 @@ from src.core.models import Base
 # Carregar variáveis de ambiente
 load_dotenv()
 
-# ✅ Importar rotas corretas
-from src.api.endpoint import auth
-from routes import cadastro, cliente, upload_pdf
+# ✅ Importar rotas corretas da pasta routes
+from routes import auth, cadastro, cliente, upload_pdf
 
 # Criar aplicação FastAPI
 app = FastAPI(
