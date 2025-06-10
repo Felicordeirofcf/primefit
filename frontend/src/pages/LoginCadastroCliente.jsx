@@ -43,7 +43,7 @@ export default function LoginCadastroCliente() {
 
       if (res.ok) {
         if (isLogin) {
-          localStorage.setItem("token", data.access_token);
+          localStorage.setItem("auth_token", data.access_token);
           alert("Login realizado com sucesso!");
           navigate("/dashboard");
         } else {
