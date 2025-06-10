@@ -11,7 +11,7 @@ export default function Navbar() {
     const token = localStorage.getItem("token");
     if (!token) return;
 
-    fetch("https://primefit-production.up.railway.app/auth/clientes/me", {
+    fetch("https://primefit-production-e300.up.railway.app/auth/clientes/me", {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => res.json())

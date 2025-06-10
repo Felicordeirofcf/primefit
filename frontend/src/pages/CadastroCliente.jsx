@@ -19,7 +19,7 @@ export default function CadastroCliente() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const res = await fetch("https://primefit-production.up.railway.app/auth/register", {
+    const res = await fetch("https://primefit-production-e300.up.railway.app/auth/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(form)

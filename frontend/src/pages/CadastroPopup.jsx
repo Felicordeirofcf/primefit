@@ -26,7 +26,7 @@ export default function CadastroPopup() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    const res = await fetch('https://primefit-production.up.railway.app/cliente/clientes', {
+    const res = await fetch('https://primefit-production-e300.up.railway.app/cliente/clientes', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(form)

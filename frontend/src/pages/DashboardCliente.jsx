@@ -25,7 +25,7 @@ export default function DashboardCliente() {
     }
 
     setIsLoadingCliente(true); // Start loading client data
-    fetch("https://primefit-production.up.railway.app/auth/clientes/me", {
+    fetch("https://primefit-production-e300.up.railway.app/auth/clientes/me", {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then(res => {
@@ -54,7 +54,7 @@ export default function DashboardCliente() {
 
     // --- Histórico ---
     setIsLoadingHistorico(true);
-    fetch(`https://primefit-production.up.railway.app/admin/historico/${encodeURIComponent(cliente.email)}`, {
+    fetch(`https://primefit-production-e300.up.railway.app/admin/historico/${encodeURIComponent(cliente.email)}`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then(res => res.ok ? res.json() : [])
@@ -67,7 +67,7 @@ export default function DashboardCliente() {
 
     // --- Eventos ---
     setIsLoadingEventos(true);
-    fetch(`https://primefit-production.up.railway.app/admin/eventos/${encodeURIComponent(cliente.email)}`, {
+    fetch(`https://primefit-production-e300.up.railway.app/admin/eventos/${encodeURIComponent(cliente.email)}`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then(res => res.ok ? res.json() : [])
@@ -80,7 +80,7 @@ export default function DashboardCliente() {
 
     // --- Treinos enviados em PDF ---
     setIsLoadingTreinosPdf(true);
-    fetch(`https://primefit-production.up.railway.app/cliente/treinos-enviados?cliente_email=${encodeURIComponent(cliente.email)}`, {
+    fetch(`https://primefit-production-e300.up.railway.app/cliente/treinos-enviados?cliente_email=${encodeURIComponent(cliente.email)}`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then(res => res.ok ? res.json() : [])
@@ -110,7 +110,7 @@ export default function DashboardCliente() {
 
     try {
       // Consider adding a loading state for the upload itself
-      const res = await fetch("https://primefit-production.up.railway.app/auth/upload_docs", {
+      const res = await fetch("https://primefit-production-e300.up.railway.app/auth/upload_docs", {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
         body: formData,
