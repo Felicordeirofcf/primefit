@@ -1,35 +1,39 @@
-// vite.config.js
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
 export default defineConfig({
-  base: '/', // Corrigido para funcionar com React Router no Railway
+  base: '/',
   plugins: [react()],
   server: {
     port: 5173,
-    host: true,
+    host: '0.0.0.0',
+    strictPort: false,
   },
   build: {
     outDir: 'dist',
-    sourcemap: true,
-    chunkSizeWarningLimit: 550,
+    sourcemap: false,
+    chunkSizeWarningLimit: 1000,
     rollupOptions: {
       output: {
-        manualChunks(id) {
-          if (id.includes('node_modules')) {
-            if (id.includes('react-router-dom') || id.includes('@remix-run') || id.includes('react-router')) {
-              return 'vendor_routing';
-            }
-            if (id.includes('chart.js') || id.includes('react-chartjs-2')) {
-              return 'vendor_charts';
-            }
-            if (id.includes('react-dom')) return 'vendor_react-dom';
-            if (id.includes('react')) return 'vendor_react';
-            if (id.includes('recharts')) return 'vendor_recharts';
-            return 'vendor';
-          }
-        },
-      },
+        manualChunks: {
+          vendor: ['react', 'react-dom'],
+          router: ['react-router-dom'],
+          ui: ['@headlessui/react', '@heroicons/react', '@radix-ui/react-avatar', '@radix-ui/react-scroll-area', '@radix-ui/react-separator', '@radix-ui/react-slot', '@radix-ui/react-tabs'],
+          charts: ['react-chartjs-2', 'recharts'],
+          utils: ['axios', 'class-variance-authority', 'framer-motion', 'lucide-react', 'react-hook-form', 'react-icons', 'react-markdown', 'react-toastify', 'tailwind-merge', 'zustand']
+        }
+      }
     },
+    minify: 'terser',
+    terserOptions: {
+      compress: {
+        drop_console: true,
+        drop_debugger: true
+      }
+    }
   },
+  preview: {
+    port: parseInt(process.env.PORT) || 4173,
+    host: '0.0.0.0'
+  }
 });
