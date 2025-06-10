@@ -42,15 +42,16 @@ async def health_check():
     return {"status": "ok", "message": "PrimeFit API is running", "version": app.version}
 
 # Incluir rotas principais
+# Removendo o prefixo /api para as rotas que o frontend acessa diretamente
 app.include_router(auth.router, prefix="/auth", tags=["Autenticação"])
 app.include_router(cadastro.router, prefix="/api", tags=["Cadastro"])
 app.include_router(cliente.router, prefix="/api", tags=["Cliente"])
 app.include_router(upload_pdf.router, prefix="/api", tags=["Upload"])
-app.include_router(trainings.router, prefix="/api", tags=["Treinos"])
-app.include_router(assessments.router, prefix="/api", tags=["Avaliações"])
-app.include_router(progress.router, prefix="/api", tags=["Progresso"])
-app.include_router(messages.router, prefix="/api", tags=["Mensagens"])
-app.include_router(profiles.router, prefix="/api", tags=["Perfis"])
+app.include_router(trainings.router, tags=["Treinos"]) # Removido prefixo /api
+app.include_router(assessments.router, tags=["Avaliações"]) # Removido prefixo /api
+app.include_router(progress.router, tags=["Progresso"]) # Removido prefixo /api
+app.include_router(messages.router, tags=["Mensagens"]) # Removido prefixo /api
+app.include_router(profiles.router, tags=["Perfis"]) # Removido prefixo /api
 
 # Tratamento global de exceções
 @app.exception_handler(Exception)
