@@ -14,6 +14,7 @@ from auth import (
 )
 import os
 import uuid
+import traceback
 
 router = APIRouter()
 
@@ -30,6 +31,7 @@ class UsuarioCreate(BaseModel):
     cep: str
     telefone: str
     whatsapp: str
+    tipo_usuario: str = "client"
 
 class UsuarioLogin(BaseModel):
     email: EmailStr
@@ -48,9 +50,9 @@ class Agendamento(BaseModel):
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)
 def register(user: UsuarioCreate):
+    print("📥 Dados recebidos na rota /auth/register:", user.dict())
+    db_client = get_database_client()
     try:
-        db_client = get_database_client()
-
         # Verificar se email já existe
         existing_user = db_client.get_user_by_email(user.email)
         if existing_user:
@@ -71,26 +73,28 @@ def register(user: UsuarioCreate):
             "whatsapp": user.whatsapp,
             "is_admin": False,
             "treino_pdf": None,
-            "tipo_usuario": "client"
+            "tipo_usuario": user.tipo_usuario
         }
 
         # Criar usuário
         created_user = db_client.create_user(user_data)
-        db_client.close()
-
         return {"message": "Usuário cadastrado com sucesso!", "email": user.email}
 
     except HTTPException:
         raise
     except Exception as e:
-        print("❌ Erro no registro:", e)
+        print("❌ Erro no registro:")
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail="Erro interno ao registrar usuário.")
+    finally:
+        db_client.close()
+
 
 @router.post("/login", response_model=Token)
 def login(login_data: UsuarioLogin):
+    print("🔐 Tentativa de login:", login_data.email)
+    db_client = get_database_client()
     try:
-        db_client = get_database_client()
-
         # Buscar usuário
         user = db_client.get_user_by_email(login_data.email)
         if not user:
@@ -98,19 +102,4 @@ def login(login_data: UsuarioLogin):
 
         # Verificar senha
         if not verify_password(login_data.senha, user["senha_hash"]):
-            raise HTTPException(status_code=400, detail="Credenciais inválidas")
-
-        # Criar token
-        token = create_access_token({"sub": login_data.email})
-        db_client.close()
-
-        return {"access_token": token}
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        print("❌ Erro no login:", e)
-        raise HTTPException(status_code=500, detail="Erro interno no login.")
-
-# As demais rotas foram mantidas sem modificações
-# pois o foco era corrigir e validar a rota de register conforme solicitado
+            raise HTTPException(status_code=400, detail="Credenciais in_
