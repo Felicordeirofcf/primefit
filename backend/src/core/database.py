@@ -1,15 +1,15 @@
+import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from .models import Base
-import os
+from src.core.models import Base  # Certifique-se de que o caminho está correto
 
-# URL de conexão com o banco de dados PostgreSQL Railway
+# 🔐 Obter URL do banco de dados a partir do ambiente
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
 if not DATABASE_URL:
-    raise ValueError("DATABASE_URL não encontrada nas variáveis de ambiente")
+    raise ValueError("❌ DATABASE_URL não encontrada nas variáveis de ambiente")
 
-# Configuração do engine com pool de conexões
+# ⚙️ Criar o engine com boas práticas de pool
 engine = create_engine(
     DATABASE_URL,
     pool_size=10,
@@ -18,10 +18,11 @@ engine = create_engine(
     pool_recycle=300
 )
 
+# 🛠️ Criar o SessionLocal
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 def get_db():
-    """Dependency para obter sessão do banco de dados"""
+    """🔄 Dependency Injection para obter uma sessão de banco"""
     db = SessionLocal()
     try:
         yield db
@@ -29,10 +30,17 @@ def get_db():
         db.close()
 
 def create_tables():
-    """Cria todas as tabelas no banco de dados"""
-    Base.metadata.create_all(bind=engine)
+    """📦 Cria todas as tabelas definidas nos modelos"""
+    try:
+        Base.metadata.create_all(bind=engine)
+        print("✅ Tabelas criadas com sucesso.")
+    except Exception as e:
+        print(f"❌ Erro ao criar tabelas: {e}")
 
 def drop_tables():
-    """Remove todas as tabelas do banco de dados"""
-    Base.metadata.drop_all(bind=engine)
-
+    """🧨 Remove todas as tabelas (⚠️ use com cuidado!)"""
+    try:
+        Base.metadata.drop_all(bind=engine)
+        print("⚠️ Tabelas removidas com sucesso.")
+    except Exception as e:
+        print(f"❌ Erro ao remover tabelas: {e}")

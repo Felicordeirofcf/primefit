@@ -6,7 +6,6 @@ import uuid
 Base = declarative_base()
 
 class Usuario(Base):
-    """Modelo para usuários do sistema (clientes e admins)"""
     __tablename__ = "usuarios"
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
@@ -18,11 +17,12 @@ class Usuario(Base):
     cep = Column(String)
     telefone = Column(String)
     whatsapp = Column(String)
+    tipo_usuario = Column(String, default="client")  # ⬅️ Adicione esta linha
     is_admin = Column(Boolean, default=False)
-    treino_pdf = Column(String)  # URL do PDF de treino
-    tipo_usuario = Column(String, default="client")  # <-- ADICIONE ESTA LINHA
+    treino_pdf = Column(String)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
 
 class Cliente(Base):
     """Modelo para clientes (pode ser redundante com Usuario, mas mantendo por compatibilidade)"""
