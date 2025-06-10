@@ -43,7 +43,7 @@ const RegisterPage = () => {
       const registerResult = await signUp(email, password, {
         nome: fullName,
         email: email,
-        password: password,
+        senha: password,
         whatsapp: whatsapp,
       })
 
@@ -105,6 +105,7 @@ const RegisterPage = () => {
             <input
               type="email"
               id="email"
+              autoComplete="username"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
