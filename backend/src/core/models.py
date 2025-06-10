@@ -20,6 +20,7 @@ class Usuario(Base):
     whatsapp = Column(String)
     is_admin = Column(Boolean, default=False)
     treino_pdf = Column(String)  # URL do PDF de treino
+    tipo_usuario = Column(String, default="client")  # <-- ADICIONE ESTA LINHA
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
