@@ -45,13 +45,9 @@ apiClient.interceptors.response.use(
 export const authAPI = {
   login: async (email, password) => {
     try {
-      const response = await apiClient.post('/auth/token', new URLSearchParams({
-        username: email,
-        password: password,
-      }), {
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
+      const response = await apiClient.post('/auth/token', {
+        email: email,
+        senha: password,
       });
       
       // Salvar token e dados do usuário
@@ -64,9 +60,9 @@ export const authAPI = {
     }
   },
   
-  register: async (email, password) => {
+  register: async (userData) => {
     try {
-      const response = await apiClient.post('/auth/register', { email, password });
+      const response = await apiClient.post('/auth/register', userData);
       return { data: response.data, error: null };
     } catch (error) {
       console.error('Erro no registro:', error);
@@ -98,6 +94,20 @@ export const authAPI = {
     } catch (error) {
       console.error('Erro ao obter usuário atual:', error);
       return { data: null, error: error.response?.data?.detail || 'Erro ao obter usuário' };
+    }
+  },
+
+  uploadDocs: async (formData) => {
+    try {
+      const response = await apiClient.post('/auth/upload_docs', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      return { data: response.data, error: null };
+    } catch (error) {
+      console.error('Erro ao fazer upload de documentos:', error);
+      return { data: null, error: error.response?.data?.detail || 'Erro ao fazer upload de documentos' };
     }
   },
 };
@@ -256,6 +266,16 @@ export const trainingsAPI = {
       return { data: null, error: error.response?.data?.detail || 'Erro ao excluir treino' };
     }
   },
+
+  getSentTrainings: async (clientEmail) => {
+    try {
+      const response = await apiClient.get(`/api/treinos-enviados?cliente_email=${encodeURIComponent(clientEmail)}`);
+      return { data: response.data, error: null };
+    } catch (error) {
+      console.error('Erro ao obter treinos enviados:', error);
+      return { data: null, error: error.response?.data?.detail || 'Erro ao obter treinos enviados' };
+    }
+  },
 };
 
 // API de avaliações
@@ -365,8 +385,29 @@ export const adminAPI = {
       return { data: null, error: error.response?.data?.detail || 'Erro ao excluir usuário' };
     }
   },
+
+  getHistorico: async (clientEmail) => {
+    try {
+      const response = await apiClient.get(`/admin/historico/${encodeURIComponent(clientEmail)}`);
+      return { data: response.data, error: null };
+    } catch (error) {
+      console.error('Erro ao obter histórico:', error);
+      return { data: null, error: error.response?.data?.detail || 'Erro ao obter histórico' };
+    }
+  },
+
+  getEventos: async (clientEmail) => {
+    try {
+      const response = await apiClient.get(`/admin/eventos/${encodeURIComponent(clientEmail)}`);
+      return { data: response.data, error: null };
+    } catch (error) {
+      console.error('Erro ao obter eventos:', error);
+      return { data: null, error: error.response?.data?.detail || 'Erro ao obter eventos' };
+    }
+  },
 };
 
 // Exportar o cliente de API
 export default apiClient;
+
 

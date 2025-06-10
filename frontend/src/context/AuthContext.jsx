@@ -41,10 +41,10 @@ export const AuthProvider = ({ children }) => {
       // Tratar resposta do perfil
       if (profileError) {
         console.error('Erro ao buscar perfil:', profileError);
-        setUserProfile(prev => ({ 
-          ...(prev || {}), 
-          id: userId, 
-          email: userEmail, 
+        setUserProfile(prev => ({
+          ...(prev || {}),
+          id: userId,
+          email: userEmail,
           nome: prev?.nome || userEmail.split('@')[0] || 'Usuário',
           role: isAdminByEmail ? 'admin' : 'cliente'
         }));
@@ -57,11 +57,11 @@ export const AuthProvider = ({ children }) => {
         setUserProfile(profileData);
       } else {
          console.log('Perfil não encontrado, usando perfil básico');
-         setUserProfile({ 
-           id: userId, 
-           email: userEmail, 
-           nome: userEmail.split('@')[0] || 'Usuário', 
-           role: isAdminByEmail ? 'admin' : 'cliente' 
+         setUserProfile({
+           id: userId,
+           email: userEmail,
+           nome: userEmail.split('@')[0] || 'Usuário',
+           role: isAdminByEmail ? 'admin' : 'cliente'
          });
       }
 
@@ -74,12 +74,12 @@ export const AuthProvider = ({ children }) => {
     } catch (error) {
       console.error('Erro geral ao buscar perfil/admin:', error);
       const isAdminByEmail = userEmail === 'felpcordeirofcf@gmail.com';
-      setUserProfile(prev => ({ 
-        ...(prev || {}), 
-        id: userId, 
-        email: userEmail, 
-        nome: prev?.nome || userEmail.split('@')[0] || 'Usuário', 
-        role: isAdminByEmail ? 'admin' : (prev?.role || 'cliente') 
+      setUserProfile(prev => ({
+        ...(prev || {}),
+        id: userId,
+        email: userEmail,
+        nome: prev?.nome || userEmail.split('@')[0] || 'Usuário',
+        role: isAdminByEmail ? 'admin' : (prev?.role || 'cliente')
       }));
       setIsAdmin(isAdminByEmail); // Fallback para verificação por email
     }
@@ -198,7 +198,7 @@ export const AuthProvider = ({ children }) => {
     console.log(`signUp: Tentando cadastro para ${email}`);
     setLoading(true);
     try {
-      const { data, error } = await authAPI.register(email, password);
+      const { data, error } = await authAPI.register(userData); // Passa o objeto userData completo
       if (error) throw new Error(error);
       console.log('Cadastro bem-sucedido');
       return { data, error: null };
@@ -338,4 +338,5 @@ export const AuthProvider = ({ children }) => {
 };
 
 export { AuthContext };
+
 

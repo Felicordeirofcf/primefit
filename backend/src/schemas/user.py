@@ -11,16 +11,18 @@ class UserBase(BaseModel):
 
 class UserCreate(UserBase):
     """Esquema para criação de usuários"""
-    password: str = Field(..., min_length=6)
+    nome: str
+    senha: str = Field(..., min_length=6)
+    whatsapp: Optional[str] = None
 
 class UserLogin(UserBase):
     """Esquema para login de usuários"""
-    password: str
+    senha: str
 
 class UserUpdate(BaseModel):
     """Esquema para atualização de usuários"""
     email: Optional[EmailStr] = None
-    password: Optional[str] = Field(None, min_length=6)
+    senha: Optional[str] = Field(None, min_length=6)
     is_active: Optional[bool] = None
     role: Optional[str] = None
 
@@ -66,4 +68,6 @@ class ProfileResponse(ProfileBase):
 
     class Config:
         from_attributes = True
+
+
 

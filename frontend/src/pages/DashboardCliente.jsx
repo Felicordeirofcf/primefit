@@ -1,10 +1,13 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../hooks/useAuth";
+import { profilesAPI, adminAPI, trainingsAPI, authAPI } from "../api/apiClient";
 import './DashboardCliente.css';
 // Assuming a Spinner component exists or can be created/imported
 // import Spinner from '../components/common/Spinner'; 
 
 export default function DashboardCliente() {
+  const { user, isAuthenticated, signOut } = useAuth();
   const [cliente, setCliente] = useState(null);
   const [isLoadingCliente, setIsLoadingCliente] = useState(true); // Loading state for client data
   const [historico, setHistorico] = useState([]);
@@ -14,89 +17,103 @@ export default function DashboardCliente() {
   const [treinosPdf, setTreinosPdf] = useState([]);
   const [isLoadingTreinosPdf, setIsLoadingTreinosPdf] = useState(false); // Loading state for treinosPdf
   
-  const token = localStorage.getItem("token");
   const navigate = useNavigate();
 
   // Fetch Client Data
   useEffect(() => {
-    if (!token) {
-      navigate("/cliente");
+    if (!isAuthenticated) {
+      navigate("/login"); // Redirect to login if not authenticated
       return;
     }
 
-    setIsLoadingCliente(true); // Start loading client data
-    fetch("https://primefit-production-e300.up.railway.app/auth/clientes/me", {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then(res => {
-        if (!res.ok) {
-          localStorage.removeItem("token"); // Clear invalid token
-          throw new Error("Token inválido ou expirado");
+    const fetchClientData = async () => {
+      setIsLoadingCliente(true); // Start loading client data
+      try {
+        const { data, error } = await profilesAPI.getMyProfile();
+        if (error) {
+          console.error("Erro ao buscar dados do cliente:", error);
+          // If 401, apiClient interceptor will handle redirect
+          if (error.response?.status !== 401) {
+            navigate("/login"); // Redirect on other errors
+          }
+        } else {
+          setCliente(data);
         }
-        return res.json();
-      })
-      .then(data => {
-        setCliente(data);
-      })
-      .catch((err) => {
-        console.error("Erro ao buscar dados do cliente:", err.message);
-        navigate("/cliente"); // Redirect on error
-      })
-      .finally(() => {
+      } catch (err) {
+        console.error("Erro inesperado ao buscar dados do cliente:", err);
+        navigate("/login"); // Redirect on unexpected errors
+      } finally {
         setIsLoadingCliente(false); // Finish loading client data
-      });
-  }, [token, navigate]);
+      }
+    };
+
+    fetchClientData();
+  }, [isAuthenticated, navigate]);
 
   // Fetch Secondary Data (Historico, Eventos, Treinos)
   useEffect(() => {
     // Only run if client data is loaded and email exists
     if (!cliente?.email || isLoadingCliente) return; 
 
-    // --- Histórico ---
-    setIsLoadingHistorico(true);
-    fetch(`https://primefit-production-e300.up.railway.app/admin/historico/${encodeURIComponent(cliente.email)}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then(res => res.ok ? res.json() : [])
-      .then(data => setHistorico(Array.isArray(data) ? data : []))
-      .catch(err => {
-        console.error("Erro ao buscar histórico:", err.message);
-        setHistorico([]); // Set empty on error
-      })
-      .finally(() => setIsLoadingHistorico(false));
+    const fetchSecondaryData = async () => {
+      // --- Histórico ---
+      setIsLoadingHistorico(true);
+      try {
+        const { data, error } = await adminAPI.getHistorico(cliente.email);
+        if (error) {
+          console.error("Erro ao buscar histórico:", error);
+          setHistorico([]); // Set empty on error
+        } else {
+          setHistorico(Array.isArray(data) ? data : []);
+        }
+      } catch (err) {
+        console.error("Erro inesperado ao buscar histórico:", err);
+        setHistorico([]);
+      } finally {
+        setIsLoadingHistorico(false);
+      }
 
-    // --- Eventos ---
-    setIsLoadingEventos(true);
-    fetch(`https://primefit-production-e300.up.railway.app/admin/eventos/${encodeURIComponent(cliente.email)}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then(res => res.ok ? res.json() : [])
-      .then(data => setEventos(Array.isArray(data) ? data : []))
-      .catch(err => {
-        console.error("Erro ao buscar eventos:", err.message);
-        setEventos([]); // Set empty on error
-      })
-      .finally(() => setIsLoadingEventos(false));
+      // --- Eventos ---
+      setIsLoadingEventos(true);
+      try {
+        const { data, error } = await adminAPI.getEventos(cliente.email);
+        if (error) {
+          console.error("Erro ao buscar eventos:", error);
+          setEventos([]); // Set empty on error
+        } else {
+          setEventos(Array.isArray(data) ? data : []);
+        }
+      } catch (err) {
+        console.error("Erro inesperado ao buscar eventos:", err);
+        setEventos([]);
+      } finally {
+        setIsLoadingEventos(false);
+      }
 
-    // --- Treinos enviados em PDF ---
-    setIsLoadingTreinosPdf(true);
-    fetch(`https://primefit-production-e300.up.railway.app/cliente/treinos-enviados?cliente_email=${encodeURIComponent(cliente.email)}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then(res => res.ok ? res.json() : [])
-      .then(data => setTreinosPdf(Array.isArray(data) ? data : []))
-      .catch(err => {
-        console.error("Erro ao buscar treinos PDF:", err.message);
-        setTreinosPdf([]); // Set empty on error
-      })
-      .finally(() => setIsLoadingTreinosPdf(false));
+      // --- Treinos enviados em PDF ---
+      setIsLoadingTreinosPdf(true);
+      try {
+        const { data, error } = await trainingsAPI.getSentTrainings(cliente.email);
+        if (error) {
+          console.error("Erro ao buscar treinos PDF:", error);
+          setTreinosPdf([]); // Set empty on error
+        } else {
+          setTreinosPdf(Array.isArray(data) ? data : []);
+        }
+      } catch (err) {
+        console.error("Erro inesperado ao buscar treinos PDF:", err);
+        setTreinosPdf([]);
+      } finally {
+        setIsLoadingTreinosPdf(false);
+      }
+    };
 
-  }, [cliente, token, isLoadingCliente]); // Depend on cliente, token, and isLoadingCliente
+    fetchSecondaryData();
+  }, [cliente, isLoadingCliente]); // Depend on cliente and isLoadingCliente
 
-  const logout = () => {
-    localStorage.removeItem("token");
-    setCliente(null); // Clear client state on logout
-    navigate("/cliente");
+  const handleLogout = () => {
+    signOut();
+    navigate("/login");
   };
 
   const handleUpload = async (e) => {
@@ -109,13 +126,14 @@ export default function DashboardCliente() {
     formData.append("email", cliente.email); 
 
     try {
-      // Consider adding a loading state for the upload itself
-      const res = await fetch("https://primefit-production-e300.up.railway.app/auth/upload_docs", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-        body: formData,
-      });
-      alert(res.ok ? "✅ Arquivo enviado com sucesso!" : "❌ Erro ao enviar arquivo");
+      const { data, error } = await authAPI.uploadDocs(formData);
+      if (error) {
+        alert(`❌ Erro ao enviar arquivo: ${error.message || error}`);
+      } else {
+        alert("✅ Arquivo enviado com sucesso!");
+        // Optionally re-fetch treinosPdf to show the new upload
+        // You might want to implement a more robust state management for this
+      }
     } catch (error) {
       console.error("Erro no upload:", error);
       alert("❌ Falha ao enviar arquivo");
@@ -232,8 +250,9 @@ export default function DashboardCliente() {
       </div>
 
       {/* Logout Button */}
-      <button className="logout-btn" onClick={logout}>Sair</button>
+      <button className="logout-btn" onClick={handleLogout}>Sair</button>
     </div>
   );
 }
+
 

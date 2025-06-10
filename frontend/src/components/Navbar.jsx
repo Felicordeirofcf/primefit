@@ -3,25 +3,10 @@ import './Navbar.css';
 import { Link } from 'react-router-dom';
 import { Home, Flame, Briefcase, LogIn, Shield } from 'lucide-react';
 import logo from '../assets/primelogo.png';
+import { useAuth } from '../hooks/useAuth'; // Importar useAuth
 
 export default function Navbar() {
-  const [isAdmin, setIsAdmin] = useState(false);
-
-  useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (!token) return;
-
-    fetch("https://primefit-production-e300.up.railway.app/auth/clientes/me", {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        if (data?.email === "admin@prime.com") {
-          setIsAdmin(true);
-        }
-      })
-      .catch(() => setIsAdmin(false));
-  }, []);
+  const { isAuthenticated, isAdmin } = useAuth(); // Usar o hook useAuth
 
   return (
     <nav className="navbar">
@@ -49,12 +34,21 @@ export default function Navbar() {
               Consultoria
             </Link>
           </li>
-          <li>
-            <Link to="/cliente">
-              <LogIn size={18} style={{ marginRight: '5px' }} />
-              Login
-            </Link>
-          </li>
+          {!isAuthenticated ? (
+            <li>
+              <Link to="/cliente">
+                <LogIn size={18} style={{ marginRight: '5px' }} />
+                Login
+              </Link>
+            </li>
+          ) : (
+            <li>
+              <Link to="/dashboard">
+                <LogIn size={18} style={{ marginRight: '5px' }} />
+                Dashboard
+              </Link>
+            </li>
+          )}
           {isAdmin && (
             <li>
               <Link to="/admin">
@@ -114,3 +108,5 @@ export default function Navbar() {
     </nav>
   );
 }
+
+

@@ -2,13 +2,13 @@ import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { toast } from 'react-toastify'
-import { authAPI } from '../api/apiClient'
 
 const RegisterPage = () => {
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [whatsapp, setWhatsapp] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -21,7 +21,7 @@ const RegisterPage = () => {
     // Limpar erro anterior
     setError('')
 
-    if (!fullName || !email || !password || !confirmPassword) {
+    if (!fullName || !email || !password || !confirmPassword || !whatsapp) {
       setError('Por favor, preencha todos os campos')
       toast.error('Por favor, preencha todos os campos')
       return
@@ -44,7 +44,12 @@ const RegisterPage = () => {
 
     try {
       // Registra o usuário
-      const registerResult = await signUp(email, password, { full_name: fullName })
+      const registerResult = await signUp(email, password, {
+        nome: fullName,
+        email: email,
+        senha: password,
+        whatsapp: whatsapp,
+      })
 
       if (registerResult.data && !registerResult.error) {
         toast.success('Cadastro realizado com sucesso!')
@@ -145,6 +150,21 @@ const RegisterPage = () => {
             />
           </div>
 
+          <div>
+            <label htmlFor="whatsapp" className="block text-sm font-medium text-gray-300 mb-2">
+              WhatsApp
+            </label>
+            <input
+              type="text"
+              id="whatsapp"
+              value={whatsapp}
+              onChange={(e) => setWhatsapp(e.target.value)}
+              className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="Seu WhatsApp"
+              required
+            />
+          </div>
+
           <button
             type="submit"
             disabled={isLoading}
@@ -168,4 +188,5 @@ const RegisterPage = () => {
 }
 
 export default RegisterPage
+
 
