@@ -1,21 +1,11 @@
-from fastapi import APIRouter, HTTPException, status, Depends, UploadFile, File, Form
-from fastapi.security import OAuth2PasswordRequestForm
+from fastapi import APIRouter, HTTPException, status, Depends
 from pydantic import BaseModel, EmailStr
-from sqlalchemy.orm import Session
-from src.core.database import get_db
 from src.core.db_client import get_database_client
-from src.core.storage import get_storage_client
-from fastapi import Body
 from auth import (
     hash_password,
     verify_password,
-    create_access_token,
-    get_current_user,
-    require_admin,
-    decode_token
+    create_access_token
 )
-import os
-import uuid
 import traceback
 
 router = APIRouter()
@@ -41,22 +31,18 @@ class UsuarioLogin(BaseModel):
 
 class Token(BaseModel):
     access_token: str
-
-class Agendamento(BaseModel):
-    email_cliente: EmailStr
-    data: str  # formato ISO yyyy-mm-dd
+    token_type: str = "bearer"
 
 # ---------------------------
-# ✅ CLIENTE - Cadastro
+# ✅ REGISTRO DE USUÁRIO
 # ---------------------------
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)
 def register(user: UsuarioCreate):
-    print("📥 Dados recebidos na rota /auth/register:", user.dict())
+    print("📥 Registro:", user.dict())
     db_client = get_database_client()
     try:
-        existing_user = db_client.get_user_by_email(user.email)
-        if existing_user:
+        if db_client.get_user_by_email(user.email):
             raise HTTPException(status_code=400, detail="Email já cadastrado")
 
         hashed_password = hash_password(user.senha)
@@ -75,25 +61,22 @@ def register(user: UsuarioCreate):
             "tipo_usuario": user.tipo_usuario
         }
 
-        created_user = db_client.create_user(user_data)
+        db_client.create_user(user_data)
         return {"message": "Usuário cadastrado com sucesso!", "email": user.email}
 
-    except HTTPException:
-        raise
     except Exception as e:
-        print("❌ Erro no registro:")
-        traceback.print_exc()
+        print("❌ Erro no registro:", traceback.format_exc())
         raise HTTPException(status_code=500, detail="Erro interno ao registrar usuário.")
     finally:
         db_client.close()
 
 # ---------------------------
-# 🔐 LOGIN padrão personalizado
+# 🔐 LOGIN (JSON)
 # ---------------------------
 
 @router.post("/login", response_model=Token)
 def login(login_data: UsuarioLogin):
-    print("🔐 Tentativa de login:", login_data.email)
+    print("🔐 Login JSON:", login_data.email)
     db_client = get_database_client()
     try:
         user = db_client.get_user_by_email(login_data.email)
@@ -101,42 +84,32 @@ def login(login_data: UsuarioLogin):
             raise HTTPException(status_code=400, detail="Credenciais inválidas")
 
         token = create_access_token({"sub": login_data.email})
-        return {"access_token": token}
+        return {"access_token": token, "token_type": "bearer"}
 
-    except HTTPException:
-        raise
     except Exception as e:
-        print("❌ Erro no login:")
-        traceback.print_exc()
+        print("❌ Erro no login:", traceback.format_exc())
         raise HTTPException(status_code=500, detail="Erro interno no login.")
     finally:
         db_client.close()
 
 # ---------------------------
-# 🔐 LOGIN compatível com OAuth2 (para frontend usar /auth/token)
+# 🔐 LOGIN compatível com /auth/token (JSON)
 # ---------------------------
 
 @router.post("/token", response_model=Token)
-def token_login(credentials: dict = Body(...)):
-    email = credentials.get("email")
-    senha = credentials.get("senha")
-
-    print("🔐 Login JSON:", email)
-
+def token_login(credentials: UsuarioLogin):
+    print("🔐 Login /token:", credentials.email)
     db_client = get_database_client()
     try:
-        user = db_client.get_user_by_email(email)
-        if not user or not verify_password(senha, user["senha_hash"]):
+        user = db_client.get_user_by_email(credentials.email)
+        if not user or not verify_password(credentials.senha, user["senha_hash"]):
             raise HTTPException(status_code=400, detail="Credenciais inválidas")
 
-        token = create_access_token({"sub": email})
-        return {"access_token": token}
+        token = create_access_token({"sub": credentials.email})
+        return {"access_token": token, "token_type": "bearer"}
 
-    except HTTPException:
-        raise
     except Exception as e:
-        print("❌ Erro no login JSON:")
-        traceback.print_exc()
+        print("❌ Erro no /auth/token:", traceback.format_exc())
         raise HTTPException(status_code=500, detail="Erro interno no login.")
     finally:
         db_client.close()
