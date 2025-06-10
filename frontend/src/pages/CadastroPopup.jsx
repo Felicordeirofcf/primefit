@@ -1,23 +1,17 @@
-import React, { useState, useEffect } from 'react';
-import './CadastroPopup.css';
+import { useState } from "react";
+import "./CadastroCliente.css"; // ➕ Garanta que esse CSS existe
 
-export default function CadastroPopup() {
-  const [showPopup, setShowPopup] = useState(false);
+export default function CadastroCliente() {
   const [form, setForm] = useState({
-    nome: '',
-    email: '',
-    telefone: '',
-    whatsapp: '',
-    endereco: '',
-    cidade: '',
-    cep: ''
+    nome: "",
+    email: "",
+    senha: "",
+    endereco: "",
+    cidade: "",
+    cep: "",
+    telefone: "",
+    whatsapp: ""
   });
-  const [mensagem, setMensagem] = useState('');
-
-  useEffect(() => {
-    const timer = setTimeout(() => setShowPopup(true), 1000);
-    return () => clearTimeout(timer);
-  }, []);
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -25,41 +19,52 @@ export default function CadastroPopup() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    try {
+      const res = await fetch("https://primefit-production-e300.up.railway.app/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form)
+      });
 
-    const res = await fetch('https://primefit-production-e300.up.railway.app/cliente/clientes', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form)
-    });
-
-    if (res.ok) {
-      setMensagem('Cadastro realizado com sucesso!');
-      setTimeout(() => setShowPopup(false), 2000);
-    } else {
-      const erro = await res.json();
-      setMensagem(`Erro: ${erro.detail}`);
+      if (res.ok) {
+        alert("Cadastro realizado com sucesso!");
+        setForm({
+          nome: "",
+          email: "",
+          senha: "",
+          endereco: "",
+          cidade: "",
+          cep: "",
+          telefone: "",
+          whatsapp: ""
+        });
+      } else {
+        const erro = await res.json();
+        console.error("Erro ao cadastrar:", erro);
+        alert("Erro ao cadastrar: " + (erro.detail || JSON.stringify(erro)));
+      }
+    } catch (error) {
+      console.error("Erro na requisição:", error);
+      alert("Erro na requisição: " + error.message);
     }
   };
 
-  if (!showPopup) return null;
-
   return (
-    <div className="popup-overlay">
-      <div className="popup-form">
-        <h2>Receba benefícios e descontos exclusivos!</h2>
-        <form onSubmit={handleSubmit}>
-          <input name="nome" placeholder="Nome" value={form.nome} onChange={handleChange} required />
-          <input name="email" placeholder="E-mail" type="email" value={form.email} onChange={handleChange} required />
-          <input name="telefone" placeholder="Telefone" value={form.telefone} onChange={handleChange} />
-          <input name="whatsapp" placeholder="WhatsApp" value={form.whatsapp} onChange={handleChange} />
-          <input name="endereco" placeholder="Endereço" value={form.endereco} onChange={handleChange} />
-          <input name="cidade" placeholder="Cidade" value={form.cidade} onChange={handleChange} />
-          <input name="cep" placeholder="CEP" value={form.cep} onChange={handleChange} />
-          <button type="submit">Cadastrar</button>
-        </form>
-        <p>{mensagem}</p>
-        <button className="fechar" onClick={() => setShowPopup(false)}>X</button>
-      </div>
+    <div className="cadastro-container">
+      <h2>Cadastro de Cliente</h2>
+      <form onSubmit={handleSubmit} className="cadastro-form">
+        <input type="text" name="nome" value={form.nome} onChange={handleChange} placeholder="Nome completo" required />
+        <input type="email" name="email" value={form.email} onChange={handleChange} placeholder="E-mail" required />
+        <input type="password" name="senha" value={form.senha} onChange={handleChange} placeholder="Senha" required />
+        <input type="text" name="endereco" value={form.endereco} onChange={handleChange} placeholder="Endereço" required />
+        <input type="text" name="cidade" value={form.cidade} onChange={handleChange} placeholder="Cidade" required />
+        <input type="text" name="cep" value={form.cep} onChange={handleChange} placeholder="CEP" required />
+        <input type="text" name="telefone" value={form.telefone} onChange={handleChange} placeholder="Telefone" required />
+        <input type="text" name="whatsapp" value={form.whatsapp} onChange={handleChange} placeholder="WhatsApp" required />
+        <button type="submit">Cadastrar</button>
+      </form>
     </div>
   );
 }
+
+
