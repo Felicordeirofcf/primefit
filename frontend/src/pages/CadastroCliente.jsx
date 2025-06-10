@@ -19,27 +19,33 @@ export default function CadastroCliente() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const res = await fetch("https://primefit-production-e300.up.railway.app/auth/register", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form)
-    });
-
-    if (res.ok) {
-      alert("Cadastro realizado com sucesso!");
-      setForm({
-        nome: "",
-        email: "",
-        senha: "",
-        endereco: "",
-        cidade: "",
-        cep: "",
-        telefone: "",
-        whatsapp: ""
+    try {
+      const res = await fetch("https://primefit-production-e300.up.railway.app/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form )
       });
-    } else {
-      const erro = await res.json();
-      alert("Erro ao cadastrar: " + erro.detail);
+
+      if (res.ok) {
+        alert("Cadastro realizado com sucesso!");
+        setForm({
+          nome: "",
+          email: "",
+          senha: "",
+          endereco: "",
+          cidade: "",
+          cep: "",
+          telefone: "",
+          whatsapp: ""
+        });
+      } else {
+        const erro = await res.json();
+        console.error("Erro ao cadastrar:", erro);
+        alert("Erro ao cadastrar: " + (erro.detail || JSON.stringify(erro)));
+      }
+    } catch (error) {
+      console.error("Erro na requisição:", error);
+      alert("Erro na requisição: " + error.message);
     }
   };
 
