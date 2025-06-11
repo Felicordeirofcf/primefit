@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import or_
 
 # Assuming get_current_websocket_user will be added to src.api.endpoints.auth
-from src.api.endpoints.auth import get_current_user, get_admin_user
+from src.api.endpoints.auth import get_current_user, get_admin_user, get_current_websocket_user
 from src.core.database import get_db
 from src.schemas.models import Mensagem, MessageCreate, MessageResponse, Profile # Import Profile for checking receiver existence
 
@@ -152,7 +152,7 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, current_user: d
     # The current_user is now obtained from the WebSocket token
     # You can add a check here to ensure current_user["id"] matches user_id if needed
     if current_user["id"] != user_id:
-        print(f"WebSocket: Mismatch between token user_id ({current_user['id']}) and path user_id ({user_id}).")
+        print(f"WebSocket: Mismatch between token user_id ({current_user["id"]}) and path user_id ({user_id}).")
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
         return
 
