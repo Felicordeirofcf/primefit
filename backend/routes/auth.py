@@ -98,25 +98,31 @@ def login(login_data: UsuarioLogin):
 # ---------------------------
 
 @router.post("/token", response_model=Token)
-def token_login(form_data: OAuth2PasswordRequestForm = Depends()): # Alterado para receber Form Data
-    print("🔐 Login /token (Form Data):")
-    db_client = get_database_client()
+async def login_for_access_token(
+    form_data: OAuth2PasswordRequestForm = Depends(), 
+    db: Session = Depends(get_db)
+):
+    user = db.query(Profile).filter(Profile.email == form_data.username).first()
+
+    if not user:
+        raise HTTPException(status_code=400, detail="Usuário não encontrado")
+
+    if not user.senha_hash:
+        raise HTTPException(status_code=500, detail="Senha não está configurada para este usuário")
+
     try:
-        user = db_client.get_user_by_email(form_data.username) # 'username' é o campo de email
-        if not user or not verify_password(form_data.password, user["senha_hash"]):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST, # Alterado para 400 Bad Request
-                detail="Credenciais inválidas",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
-
-        token = create_access_token({"sub": form_data.username})
-        return {"access_token": token, "token_type": "bearer"}
-
+        if not verify_password(form_data.password, user.senha_hash):
+            raise HTTPException(status_code=400, detail="Credenciais inválidas")
     except Exception as e:
-        print("❌ Erro no /auth/token:", traceback.format_exc())
-        raise HTTPException(status_code=500, detail="Erro interno no login.")
-    finally:
-        db_client.close()
+        print("❌ Erro ao verificar senha:", e)
+        raise HTTPException(status_code=500, detail="Erro interno na verificação da senha")
+
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user.email, "user_id": str(user.id)},
+        expires_delta=access_token_expires
+    )
+    
+    return {"access_token": access_token, "token_type": "bearer"}
 
 

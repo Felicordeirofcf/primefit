@@ -66,10 +66,14 @@ async def login_for_access_token(
         raise HTTPException(status_code=400, detail="Usuário não encontrado")
 
     if not user.senha_hash:
-        raise HTTPException(status_code=500, detail="Senha não configurada para este usuário")
+        raise HTTPException(status_code=500, detail="Senha não está configurada para este usuário")
 
-    if not verify_password(form_data.password, user.senha_hash):
-        raise HTTPException(status_code=400, detail="Senha incorreta")
+    try:
+        if not verify_password(form_data.password, user.senha_hash):
+            raise HTTPException(status_code=400, detail="Credenciais inválidas")
+    except Exception as e:
+        print("❌ Erro ao verificar senha:", e)
+        raise HTTPException(status_code=500, detail="Erro interno na verificação da senha")
 
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
