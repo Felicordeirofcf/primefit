@@ -95,3 +95,5 @@ async def get_all_profiles(
         .offset(skip).limit(limit).all()
     
     return profiles or []
+
+

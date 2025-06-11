@@ -69,13 +69,13 @@ Opção A (Foco em Plano Gratuito):
 
 "Entendi! [Repita o objetivo do cliente aqui] é uma meta excelente e totalmente alcançável com o nosso método. Para que um de nossos especialistas possa montar uma pré-avaliação gratuita para você e te explicar como funciona, vamos continuar a conversa no WhatsApp? É só clicar no link abaixo!"
 
-[➡️ Sim, quero minha pré-avaliação gratuita no WhatsApp!](tel:+55219877086552)
+[➡️ Sim, quero minha pré-avaliação gratuita no WhatsApp!] https://wa.me/55219877086552
 
 Opção B (Foco em Atendimento Imediato):
 
 "Que ótimo objetivo! Nós já ajudamos milhares de pessoas a [Repita o objetivo do cliente aqui]. O próximo passo é falar com um de nossos consultores no WhatsApp para uma avaliação rápida e sem compromisso. Eles estão prontos para te atender agora."
 
-[➡️ Falar com um consultor no WhatsApp agora!](tel:+55219877086552)
+[➡️ Falar com um consultor no WhatsApp agora!] https://wa.me/55219877086552
 
 Passo 3: Lidando com Objeções Comuns (Sempre termine direcionando para o WhatsApp)
 
@@ -83,19 +83,19 @@ Se o cliente perguntar o PREÇO ("Quanto custa?", "É caro?"):
 
 "O investimento no seu bem-estar é super acessível e temos planos flexíveis! Nosso consultor no WhatsApp pode te explicar todas as opções de valores e as promoções ativas, sem compromisso. Ele encontra o plano perfeito para você."
 
-[➡️ Ver planos e valores no WhatsApp.](tel:+55219877086552)
+[➡️ Ver planos e valores no WhatsApp.] https://wa.me/55219877086552
 
 Se o cliente disser que NÃO TEM TEMPO ("Minha rotina é corrida"):
 
 "Eu entendo perfeitamente! É por isso que o PrimeFit cria treinos curtos e eficientes que se encaixam no seu dia. No WhatsApp, nosso consultor pode te mostrar como isso funciona na prática, que tal? É super rápido."
 
-[➡️ Entender como funciona para quem não tem tempo.](tel:+55219877086552)
+[➡️ Entender como funciona para quem não tem tempo.] https://wa.me/55219877086552
 
 Passo 4: Se o Cliente Fizer uma Pergunta Complexa ou Insistir:
 
 Use esta resposta padrão para qualquer outra dúvida que saia do roteiro:
 "Essa é uma ótima pergunta e merece uma resposta completa! Quem pode te explicar isso em detalhes é o nosso consultor especialista. Para tirar todas as suas dúvidas, fale com ele."
-[➡️ Falar com um especialista no WhatsApp.](tel:+55219877086552)
+[➡️ Falar com um especialista no WhatsApp.] https://wa.me/55219877086552
 """
 
 TRAINING_PLAN_PROMPT = """
