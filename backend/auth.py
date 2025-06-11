@@ -30,22 +30,22 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 # ---------------------------
 
 def hash_password(password: str) -> str:
-    """Gera hash seguro para uma senha."""
     return pwd_context.hash(password)
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Compara senha digitada com o hash salvo."""
     return pwd_context.verify(plain_password, hashed_password)
 
-def create_access_token(data: dict, expires_delta: timedelta = None) -> str:
-    """Cria JWT com tempo de expiração."""
-    to_encode = data.copy()
+def create_access_token(user_data: dict, expires_delta: timedelta = None) -> str:
+    """
+    Cria um token JWT com campos importantes do usuário.
+    Espera: { "sub": email, "id": user_id, "is_admin": bool }
+    """
+    to_encode = user_data.copy()
     expire = datetime.utcnow() + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 def decode_token(token: str) -> dict:
-    """Valida e decodifica token JWT."""
     try:
         return jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
     except JWTError:
@@ -58,51 +58,49 @@ def decode_token(token: str) -> dict:
 # 👤 Autenticação e autorização
 # ---------------------------
 
-def get_current_user(token: str = Depends(oauth2_scheme)) -> str:
-    """Retorna o e-mail do usuário autenticado pelo token."""
+def get_current_user(token: str = Depends(oauth2_scheme)) -> dict:
+    """
+    Retorna os dados do usuário autenticado via token:
+    { email, id, is_admin }
+    """
     payload = decode_token(token)
     email = payload.get("sub")
-    if not email:
+    user_id = payload.get("id")
+    is_admin = payload.get("is_admin", False)
+
+    if not email or not user_id:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Usuário não encontrado no token"
+            detail="Token sem informações suficientes"
         )
-    return email
 
-def require_admin(user_email: str = Depends(get_current_user)) -> str:
-    """Valida se o usuário autenticado é o administrador."""
-    try:
-        db_client = get_database_client()
-        user = db_client.get_user_by_email(user_email)
-        db_client.close()
-        
-        if not user or not user.get("is_admin", False):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Somente administradores têm acesso"
-            )
-        return user_email
-    except HTTPException:
-        raise
-    except Exception as e:
-        print("❌ Erro ao verificar admin:", e)
+    return {
+        "email": email,
+        "id": user_id,
+        "is_admin": is_admin
+    }
+
+def require_admin(current_user: dict = Depends(get_current_user)) -> dict:
+    """
+    Garante que o usuário autenticado seja admin.
+    """
+    if not current_user.get("is_admin", False):
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Erro interno na verificação de permissões"
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Somente administradores têm acesso"
         )
+    return current_user
 
 # ---------------------------
 # 📝 Registro de histórico
 # ---------------------------
 
 def registrar_alteracao(email_cliente: str, tipo: str, detalhe: str, autor: str) -> None:
-    """Registra alterações realizadas no perfil do cliente."""
     if not all([email_cliente, tipo, detalhe, autor]):
         print("⚠️ Dados insuficientes para registrar histórico.")
         return
-
     try:
-        # TODO: Implementar tabela de histórico se necessário
+        # TODO: Implementar persistência
         print(f"📝 Histórico: {tipo} - {detalhe} por {autor} para {email_cliente}")
     except Exception as e:
         print("❌ Erro ao registrar histórico:", str(e))
