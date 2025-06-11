@@ -49,7 +49,7 @@ export const authAPI = {
       formData.append('username', email);
       formData.append('password', password);
 
-      const response = await apiClient.post('/auth/token', formData, {
+      const response = await apiClient.post('auth/token', formData, {
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
         },

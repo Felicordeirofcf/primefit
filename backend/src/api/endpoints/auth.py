@@ -58,13 +58,12 @@ async def register(user_data: UserCreate, db: Session = Depends(get_db)):
 # ----------------------------
 @router.post("/token", response_model=Token)
 async def login_for_access_token(
-    username: str = Form(...),
-    password: str = Form(...),
+    form_data: OAuth2PasswordRequestForm = Depends(), 
     db: Session = Depends(get_db)
 ):
-    user = db.query(Profile).filter(Profile.email == username).first()
+    user = db.query(Profile).filter(Profile.email == form_data.username).first()
     
-    if not user or not verify_password(password, user.password_hash):
+    if not user or not verify_password(form_data.password, user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Email ou senha incorretos",

@@ -6,7 +6,7 @@ aiohappyeyeballs==2.4.4
     #   aiohttp
 aiohttp==3.11.11
     # via
-    #   sandbox-runtime (/builds/vida/manus-sandbox/sandbox/pyproject.toml)
+    #   sandbox-runtime (/builds/vida/manus-sandbox/sandbox/pyproject.toml )
     #   langchain
     #   langchain-fireworks
 aiosignal==1.3.2
@@ -15,7 +15,7 @@ aiosignal==1.3.2
     #   aiohttp
 annotated-types==0.7.0
     # via
-    #   sandbox-runtime (/builds/vida/manus-sandbox/sandbox/pyproject.toml)
+    #   sandbox-runtime (/builds/vida/manus-sandbox/sandbox/pyproject.toml )
     #   pydantic
 anthropic==0.42.0
     # via
@@ -33,11 +33,11 @@ argparse==1.4.0
     # via lmnr
 attrs==24.3.0
     # via
-    #   sandbox-runtime (/builds/vida/manus-sandbox/sandbox/pyproject.toml)
+    #   sandbox-runtime (/builds/vida/manus-sandbox/sandbox/pyproject.toml )
     #   aiohttp
 babel==2.16.0
     # via
-    #   sandbox-runtime (/builds/vida/manus-sandbox/sandbox/pyproject.toml)
+    #   sandbox-runtime (/builds/vida/manus-sandbox/sandbox/pyproject.toml )
     #   courlan
 backoff==2.2.1
     # via
@@ -65,7 +65,7 @@ cffi==1.17.1
     #   weasyprint
 charset-normalizer==3.4.1
     # via
-    #   sandbox-runtime (/builds/vida/manus-sandbox/sandbox/pyproject.toml)
+    #   sandbox-runtime (/builds/vida/manus-sandbox/sandbox/pyproject.toml )
     #   htmldate
     #   requests
     #   trafilatura
@@ -91,7 +91,7 @@ defusedxml==0.7.1
     #   sandbox-runtime (/builds/vida/manus-sandbox/sandbox/pyproject.toml)
     #   langchain-anthropic
 distro==1.9.0
-passlib[bcrypt]>=1.7.4
+passlib[bcrypt]==1.7.4
 
     # via
     #   sandbox-runtime (/builds/vida/manus-sandbox/sandbox/pyproject.toml)
@@ -111,7 +111,7 @@ frozenlist==1.5.0
     #   aiohttp
     #   aiosignal
 google-api-core==2.25.0
-    # via sandbox-runtime (/builds/vida/manus-sandbox/sandbox/pyproject.toml)
+    # via sandbox-runtime (/builds/vida/manus-sandbox/sandbox/pyproject.toml )
 google-auth==2.40.3
     # via google-api-core
 googleapis-common-protos==1.70.0
@@ -121,7 +121,7 @@ googleapis-common-protos==1.70.0
     #   opentelemetry-exporter-otlp-proto-http
 greenlet==3.1.1
     # via
-    #   sandbox-runtime (/builds/vida/manus-sandbox/sandbox/pyproject.toml)
+    #   sandbox-runtime (/builds/vida/manus-sandbox/sandbox/pyproject.toml )
     #   playwright
     #   sqlalchemy
 grpcio==1.73.0
@@ -138,16 +138,16 @@ html2text==2025.4.15
     # via maincontentextractor
 htmldate==1.9.3
     # via
-    #   sandbox-runtime (/builds/vida/manus-sandbox/sandbox/pyproject.toml)
+    #   sandbox-runtime (/builds/vida/manus-sandbox/sandbox/pyproject.toml )
     #   trafilatura
 httpcore==1.0.7
     # via
-    #   sandbox-runtime (/builds/vida/manus-sandbox/sandbox/pyproject.toml)
+    #   sandbox-runtime (/builds/vida/manus-sandbox/sandbox/pyproject.toml )
     #   httpx
     #   httpx-ws
 httpx==0.27.2
     # via
-    #   sandbox-runtime (/builds/vida/manus-sandbox/sandbox/pyproject.toml)
+    #   sandbox-runtime (/builds/vida/manus-sandbox/sandbox/pyproject.toml )
     #   anthropic
     #   fireworks-ai
     #   httpx-ws
@@ -156,11 +156,11 @@ httpx==0.27.2
     #   openai
 httpx-sse==0.4.0
     # via
-    #   sandbox-runtime (/builds/vida/manus-sandbox/sandbox/pyproject.toml)
+    #   sandbox-runtime (/builds/vida/manus-sandbox/sandbox/pyproject.toml )
     #   fireworks-ai
 httpx-ws==0.7.1
     # via
-    #   sandbox-runtime (/builds/vida/manus-sandbox/sandbox/pyproject.toml)
+    #   sandbox-runtime (/builds/vida/manus-sandbox/sandbox/pyproject.toml )
     #   fireworks-ai
 idna==3.10
     # via
@@ -173,7 +173,7 @@ importlib-metadata==8.7.0
     # via opentelemetry-api
 jiter==0.8.2
     # via
-    #   sandbox-runtime (/builds/vida/manus-sandbox/sandbox/pyproject.toml)
+    #   sandbox-runtime (/builds/vida/manus-sandbox/sandbox/pyproject.toml )
     #   anthropic
     #   openai
 jsonpatch==1.33
@@ -244,7 +244,7 @@ multidict==6.1.0
     #   aiohttp
     #   yarl
 nuitka==2.7.6
-    # via sandbox-runtime (/builds/vida/manus-sandbox/sandbox/pyproject.toml)
+    # via sandbox-runtime (/builds/vida/manus-sandbox/sandbox/pyproject.toml )
 numpy==1.26.4
     # via
     #   sandbox-runtime (/builds/vida/manus-sandbox/sandbox/pyproject.toml)
@@ -296,7 +296,7 @@ ordered-set==4.1.0
     # via nuitka
 orjson==3.10.13
     # via
-    #   sandbox-runtime (/builds/vida/manus-sandbox/sandbox/pyproject.toml)
+    #   sandbox-runtime (/builds/vida/manus-sandbox/sandbox/pyproject.toml )
     #   langsmith
 packaging==24.2
     # via
@@ -328,7 +328,7 @@ protobuf==5.29.5
     #   opentelemetry-proto
     #   proto-plus
 psutil==7.0.0
-    # via sandbox-runtime (/builds/vida/manus-sandbox/sandbox/pyproject.toml)
+    # via sandbox-runtime (/builds/vida/manus-sandbox/sandbox/pyproject.toml )
 ptyprocess==0.7.0
     # via
     #   sandbox-runtime (/builds/vida/manus-sandbox/sandbox/pyproject.toml)
@@ -371,7 +371,7 @@ pyphen==0.17.2
     # via weasyprint
 python-dateutil==2.9.0.post0
 google-generativeai>=0.5.0,<0.9.0
-bcrypt>=4.0.1
+bcrypt==4.1.3
 
     # via
     #   sandbox-runtime (/builds/vida/manus-sandbox/sandbox/pyproject.toml)
@@ -416,7 +416,7 @@ requests==2.32.3
     #   tiktoken
 requests-toolbelt==1.0.0
     # via
-    #   sandbox-runtime (/builds/vida/manus-sandbox/sandbox/pyproject.toml)
+    #   sandbox-runtime (/builds/vida/manus-sandbox/sandbox/pyproject.toml )
     #   langsmith
 resvg-py==0.2.0
     # via sandbox-runtime (/builds/vida/manus-sandbox/sandbox/pyproject.toml)
@@ -442,7 +442,7 @@ sniffio==1.3.1
     #   openai
 soupsieve==2.6
     # via
-    #   sandbox-runtime (/builds/vida/manus-sandbox/sandbox/pyproject.toml)
+    #   sandbox-runtime (/builds/vida/manus-sandbox/sandbox/pyproject.toml )
     #   beautifulsoup4
 sqlalchemy==2.0.36
     # via
@@ -505,7 +505,7 @@ typing-extensions==4.12.2
     #   typer
 tzlocal==5.2
     # via
-    #   sandbox-runtime (/builds/vida/manus-sandbox/sandbox/pyproject.toml)
+    #   sandbox-runtime (/builds/vida/manus-sandbox/sandbox/pyproject.toml )
     #   dateparser
 urllib3==2.3.0
     # via
@@ -536,7 +536,7 @@ wsproto==1.2.0
     #   httpx-ws
 yarl==1.18.3
     # via
-    #   sandbox-runtime (/builds/vida/manus-sandbox/sandbox/pyproject.toml)
+    #   sandbox-runtime (/builds/vida/manus-sandbox/sandbox/pyproject.toml )
     #   aiohttp
 zipp==3.23.0
     # via importlib-metadata
@@ -546,4 +546,3 @@ zstandard==0.23.0
     # via nuitka
    
 psycopg2-binary>=2.9.9
-
