@@ -91,6 +91,8 @@ defusedxml==0.7.1
     #   sandbox-runtime (/builds/vida/manus-sandbox/sandbox/pyproject.toml)
     #   langchain-anthropic
 distro==1.9.0
+passlib[bcrypt]>=1.7.4
+
     # via
     #   sandbox-runtime (/builds/vida/manus-sandbox/sandbox/pyproject.toml)
     #   anthropic
