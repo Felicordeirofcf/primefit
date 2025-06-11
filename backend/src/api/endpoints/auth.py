@@ -3,7 +3,7 @@ from typing import Optional
 
 import os
 from fastapi import APIRouter, Depends, HTTPException, status, WebSocket, Form
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from jose import jwt, JWTError
 
@@ -23,7 +23,7 @@ SECRET_KEY = os.getenv("SECRET_KEY", "seu_segredo_super_secreto_mude_em_producao
 ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
 
 router = APIRouter()
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
+oauth2_scheme = HTTPBearer()  # <- trocado aqui
 
 # ----------------------------
 # Registro de novo usuário
@@ -81,17 +81,24 @@ async def login_for_access_token(
 # ----------------------------
 # Obter usuário autenticado via token
 # ----------------------------
-async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+async def get_current_user(
+    token: HTTPAuthorizationCredentials = Depends(oauth2_scheme), 
+    db: Session = Depends(get_db)
+):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Credenciais inválidas",
         headers={"WWW-Authenticate": "Bearer"},
     )
     
-    payload = decode_access_token(token)
+    try:
+        payload = decode_access_token(token.credentials)
+    except JWTError:
+        raise credentials_exception
+
     if payload is None:
         raise credentials_exception
-    
+
     email = payload.get("sub")
     user_id = payload.get("user_id")
     
