@@ -57,11 +57,11 @@ class Evento(Base):
 
 # Modelos adicionais baseados na estrutura da API
 class Profile(Base):
-    """Perfis de usuário"""
     __tablename__ = "profiles"
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     user_id = Column(String, nullable=False)
+    email = Column(String, unique=True, nullable=False, index=True)  # ✅ Adicionado
     bio = Column(Text)
     avatar_url = Column(String)
     preferences = Column(Text)  # JSON string

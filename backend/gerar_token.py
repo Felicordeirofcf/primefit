@@ -1,15 +1,19 @@
-from jose import jwt
-from datetime import datetime, timedelta
+import requests
 
-SECRET_KEY = "sua_chave_secreta"
-ALGORITHM = "HS256"
+# Coloque aqui o seu token válido (sem < > e sem aspas extras)
+TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJmZWxpaXBlZmNmQGdtYWlsLmNvbSIsImV4cCI6MTc0OTYyNzU2OX0.o4tOH5cGJ8qgbAzLqyldAQQ7D2NQHattAdIRHJgy3rY"
 
-def gerar_token():
-    dados = {
-        "sub": "feliipefcf@gmail.com",
-        "exp": datetime.utcnow() + timedelta(hours=1)
-    }
-    token = jwt.encode(dados, SECRET_KEY, algorithm=ALGORITHM)
-    print(token)
+# URL da rota que estava retornando 401
+URL = "https://primefit-production-e300.up.railway.app/profiles?skip=0&limit=100"
 
-gerar_token()
+# Cabeçalho com o token JWT
+headers = {
+    "Authorization": f"Bearer {TOKEN}"
+}
+
+# Fazendo a requisição
+response = requests.get(URL, headers=headers)
+
+# Exibindo o resultado
+print("Status:", response.status_code)
+print("Resposta:", response.json())
