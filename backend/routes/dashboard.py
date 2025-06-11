@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from datetime import datetime, timedelta
@@ -11,12 +11,12 @@ from src.schemas.models import DashboardStats, Profile, TreinoEnviado, Progresso
 router = APIRouter()
 
 @router.get("/stats", response_model=DashboardStats)
-async def get_dashboard_stats(current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+async def get_dashboard_stats(current_user: Profile = Depends(get_current_user), db: Session = Depends(get_db)):
     """
     Obtém estatísticas para o dashboard (apenas para admins)
     """
     # Verifica se o usuário tem permissão de administrador
-    if current_user.get("role") != "admin":
+    if current_user.tipo_usuario != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Sem permissão para acessar estatísticas do dashboard"
@@ -56,12 +56,12 @@ async def get_dashboard_stats(current_user: dict = Depends(get_current_user), db
         )
 
 @router.get("/user-summary")
-async def get_user_summary(current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+async def get_user_summary(current_user: Profile = Depends(get_current_user), db: Session = Depends(get_db)):
     """
     Obtém resumo do usuário para o dashboard pessoal
     """
     try:
-        user_id = current_user["id"]
+        user_id = current_user.id
         
         # Busca perfil do usuário
         profile = db.query(Profile).filter(Profile.id == user_id).first()
@@ -99,17 +99,18 @@ async def get_user_summary(current_user: dict = Depends(get_current_user), db: S
             detail=f"Erro ao buscar resumo do usuário: {str(e)}"
         )
 
-@router.get("/recent-activity")
+# Corrigido o Operation ID para evitar duplicação
+@router.get("/recent-activity", operation_id="get_dashboard_recent_activity")
 async def get_recent_activity(
     limit: int = 10,
-    current_user: dict = Depends(get_current_user),
+    current_user: Profile = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
     Obtém atividades recentes do usuário
     """
     try:
-        user_id = current_user["id"]
+        user_id = current_user.id
         activities = []
         
         # Treinos recentes
@@ -152,15 +153,15 @@ async def get_recent_activity(
         )
 
 @router.get("/quick-stats")
-async def get_quick_stats(current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+async def get_quick_stats(current_user: Profile = Depends(get_current_user), db: Session = Depends(get_db)):
     """
     Obtém estatísticas rápidas para cards do dashboard
     """
     try:
-        user_id = current_user["id"]
+        user_id = current_user.id
         
         # Se for admin, retorna estatísticas gerais
-        if current_user.get("role") == "admin":
+        if current_user.tipo_usuario == "admin":
             return await get_admin_quick_stats(db) # Pass db session to admin quick stats
         
         # Para usuários comuns, retorna estatísticas pessoais
@@ -200,7 +201,7 @@ async def get_quick_stats(current_user: dict = Depends(get_current_user), db: Se
             detail=f"Erro ao buscar estatísticas rápidas: {str(e)}"
         )
 
-async def get_admin_quick_stats(db: Session):
+async def get_admin_quick_stats(db: Session) -> Dict[str, int]:
     """
     Obtém estatísticas rápidas para administradores
     """
@@ -229,5 +230,3 @@ async def get_admin_quick_stats(db: Session):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Erro ao buscar estatísticas rápidas do admin: {str(e)}"
         )
-
-

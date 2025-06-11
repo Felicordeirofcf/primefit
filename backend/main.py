@@ -1,9 +1,17 @@
 import os
+import logging
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
+
+# Configuração de logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+)
+logger = logging.getLogger(__name__)
 
 # Carrega variáveis de ambiente do arquivo .env
 load_dotenv()
@@ -47,7 +55,9 @@ except ImportError:
 app = FastAPI(
     title="PrimeFit API",
     description="API para o sistema PrimeFit - PostgreSQL + FastAPI",
-    version="2.0.0"
+    version="2.0.0",
+    docs_url="/docs",
+    redoc_url="/redoc",
 )
 
 # Middleware CORS (em produção, especifique domínios confiáveis)
@@ -62,8 +72,26 @@ app.add_middleware(
 # Arquivos estáticos (PDFs, imagens, etc)
 app.mount("/storage", StaticFiles(directory="./storage"), name="storage")
 
+# Rota raiz pública (não requer autenticação)
+@app.get("/", include_in_schema=False)
+async def root():
+    return {
+        "name": "PrimeFit API",
+        "version": app.version,
+        "docs": "/docs",
+        "health": "/health"
+    }
+
+# Rota favicon.ico pública
+@app.get("/favicon.ico", include_in_schema=False)
+async def favicon():
+    favicon_path = os.path.join("static", "favicon.ico")
+    if os.path.exists(favicon_path):
+        return FileResponse(favicon_path)
+    return JSONResponse(status_code=204)
+
 # Rota de verificação de status
-@app.get("/health")
+@app.get("/health", include_in_schema=True, tags=["Sistema"])
 async def health_check():
     return {
         "status": "ok",
@@ -82,6 +110,11 @@ app.include_router(progress.router, tags=["Progresso"])
 app.include_router(messages.router, tags=["Mensagens"])
 app.include_router(profiles.router, tags=["Perfis"])
 app.include_router(gemini.router, tags=["IA Gemini"])
+app.include_router(admin.router, tags=["Admin"])
+app.include_router(content.router, tags=["Conteúdo"])
+app.include_router(dashboard.router, tags=["Dashboard"])
+app.include_router(payments.router, tags=["Pagamentos"])
+app.include_router(users.router, tags=["Usuários"])
 
 if HAS_CHATBOT:
     app.include_router(chatbot.router, prefix="/api", tags=["Chatbot"])
@@ -89,7 +122,7 @@ if HAS_CHATBOT:
 # Tratamento global de erros (útil em produção para logs centralizados)
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    print(f"Erro não tratado: {exc}")
+    logger.error(f"Erro não tratado: {exc}", exc_info=True)
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content={"detail": "Erro interno no servidor."}
@@ -98,13 +131,9 @@ async def global_exception_handler(request: Request, exc: Exception):
 # Inicialização automática das tabelas ao iniciar a API
 @app.on_event("startup")
 async def startup_event():
-    create_tables()
-
-
-app.include_router(admin.router, tags=["Admin"])
-app.include_router(content.router, tags=["Conteúdo"])
-app.include_router(dashboard.router, tags=["Dashboard"])
-app.include_router(payments.router, tags=["Pagamentos"])
-app.include_router(users.router, tags=["Usuários"])
-
-
+    logger.info("Iniciando aplicação PrimeFit API")
+    try:
+        create_tables()
+        logger.info("✅ Tabelas criadas com sucesso.")
+    except Exception as e:
+        logger.error(f"❌ Erro ao criar tabelas: {e}", exc_info=True)

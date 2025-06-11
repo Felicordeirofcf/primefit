@@ -1,12 +1,16 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from sqlalchemy.orm import Session
 from sqlalchemy import func
+import logging
 
 from src.core.database import get_db
-from routes.auth import get_current_user, get_admin_user # Importação corrigida
+from routes.auth import get_current_user, get_admin_user
 from src.schemas.models import Profile as ProfileModel, PerfilResponse as ProfileResponse
-from src.schemas.user import ProfileUpdate # Assumindo ProfileUpdate está em src.schemas.user
+from src.schemas.user import ProfileUpdate
+
+# Configuração de logging
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -18,15 +22,16 @@ async def get_my_profile(
     current_user: ProfileModel = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    profile = db.query(ProfileModel).filter(ProfileModel.id == current_user.id).first()
-    
-    if not profile:
+    try:
+        # Não precisamos buscar o perfil novamente, já temos ele do get_current_user
+        # Apenas retorne o current_user diretamente
+        return current_user
+    except Exception as e:
+        logger.error(f"Erro ao obter perfil do usuário: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Perfil não encontrado"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro ao obter perfil: {str(e)}"
         )
-    
-    return profile
 
 # ----------------------------
 # Atualizar perfil do usuário atual
@@ -37,23 +42,34 @@ async def update_my_profile(
     current_user: ProfileModel = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    profile = db.query(ProfileModel).filter(ProfileModel.id == current_user.id).first()
-    
-    if not profile:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Perfil não encontrado"
-        )
+    try:
+        profile = db.query(ProfileModel).filter(ProfileModel.id == current_user.id).first()
+        
+        if not profile:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Perfil não encontrado"
+            )
 
-    for key, value in profile_data.dict(exclude_unset=True).items():
-        setattr(profile, key, value)
-    
-    profile.ultimo_login = func.now()
-    
-    db.commit()
-    db.refresh(profile)
-    
-    return profile
+        # Atualiza apenas os campos fornecidos
+        update_data = profile_data.dict(exclude_unset=True)
+        for key, value in update_data.items():
+            setattr(profile, key, value)
+        
+        profile.ultimo_login = func.now()
+        
+        db.commit()
+        db.refresh(profile)
+        
+        return profile
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Erro ao atualizar perfil: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro ao atualizar perfil: {str(e)}"
+        )
 
 # ----------------------------
 # Obter perfil por ID (com permissão)
@@ -64,21 +80,30 @@ async def get_profile_by_id(
     current_user: ProfileModel = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    if current_user.id != user_id and current_user.tipo_usuario != "admin": # Acesso ao atributo tipo_usuario
+    try:
+        if current_user.id != user_id and current_user.tipo_usuario != "admin":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Acesso negado"
+            )
+        
+        profile = db.query(ProfileModel).filter(ProfileModel.id == user_id).first()
+        
+        if not profile:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Perfil não encontrado"
+            )
+        
+        return profile
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Erro ao obter perfil por ID: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Acesso negado"
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro ao obter perfil: {str(e)}"
         )
-    
-    profile = db.query(ProfileModel).filter(ProfileModel.id == user_id).first()
-    
-    if not profile:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Perfil não encontrado"
-        )
-    
-    return profile
 
 # ----------------------------
 # Listar todos os perfis (somente admin)
@@ -90,11 +115,15 @@ async def get_all_profiles(
     current_user: ProfileModel = Depends(get_admin_user),
     db: Session = Depends(get_db)
 ):
-    profiles = db.query(ProfileModel)\
-        .order_by(ProfileModel.criado_em.desc())\
-        .offset(skip).limit(limit).all()
-    
-    return profiles or []
-
-
-
+    try:
+        profiles = db.query(ProfileModel)\
+            .order_by(ProfileModel.criado_em.desc())\
+            .offset(skip).limit(limit).all()
+        
+        return profiles or []
+    except Exception as e:
+        logger.error(f"Erro ao listar perfis: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro ao listar perfis: {str(e)}"
+        )
