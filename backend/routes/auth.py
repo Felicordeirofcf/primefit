@@ -1,4 +1,3 @@
-
 from fastapi import APIRouter, HTTPException, status, Depends
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
@@ -9,29 +8,18 @@ from pydantic import BaseModel, EmailStr
 import os
 import uuid
 
-from src.core.database import get_db # Assumindo que get_db está em src.core.database
-from src.schemas.models import Profile as ProfileModel, PerfilResponse # Importar o modelo Profile e o Pydantic model
-from src.core.auth_utils import verify_password, get_password_hash, create_access_token, decode_access_token # Importar do auth_utils
+from src.core.database import get_db
+from src.schemas.models import Profile as ProfileModel, PerfilResponse
+from src.core.auth_utils import verify_password, get_password_hash, create_access_token, decode_access_token, ACCESS_TOKEN_EXPIRE_MINUTES # Import ACCESS_TOKEN_EXPIRE_MINUTES
 
 router = APIRouter()
 
-# Configuração do OAuth2PasswordBearer
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token")
-
-# ---------------------------
-# 📦 MODELOS Pydantic
-# ---------------------------
 
 class UsuarioCreate(BaseModel):
     nome: str
     email: EmailStr
     senha: str
-    # Removendo campos não relacionados à autenticação para simplificar este arquivo
-    # endereco: str
-    # cidade: str
-    # cep: str
-    # telefone: str
-    # whatsapp: str
     tipo_usuario: str = "client"
 
 class Token(BaseModel):
@@ -40,10 +28,6 @@ class Token(BaseModel):
 
 class TokenData(BaseModel):
     email: Optional[str] = None
-
-# ---------------------------
-# ✅ REGISTRO DE USUÁRIO
-# ---------------------------
 
 @router.post("/register", status_code=status.HTTP_201_CREATED, response_model=PerfilResponse)
 async def register(
@@ -57,10 +41,10 @@ async def register(
     hashed_password = get_password_hash(user.senha)
     
     new_user = ProfileModel(
-        id=str(uuid.uuid4()), # Gerar um UUID para o ID
+        id=str(uuid.uuid4()),
         nome=user.nome,
         email=user.email,
-        password_hash=hashed_password, # Usar password_hash
+        password_hash=hashed_password,
         tipo_usuario=user.tipo_usuario,
         criado_em=datetime.utcnow(),
         ultimo_login=datetime.utcnow()
@@ -71,10 +55,6 @@ async def register(
     db.refresh(new_user)
     
     return new_user
-
-# ---------------------------
-# 🔐 LOGIN com OAuth2PasswordBearer
-# ---------------------------
 
 @router.post("/token", response_model=Token)
 async def login_for_access_token(
@@ -89,21 +69,17 @@ async def login_for_access_token(
             headers={"WWW-Authenticate": "Bearer"},
         )
     
-    access_token_expires = timedelta(minutes=os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 60 * 24 * 7))
+    # Usando a constante ACCESS_TOKEN_EXPIRE_MINUTES diretamente de auth_utils
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         data={"sub": user.email, "role": user.tipo_usuario}, expires_delta=access_token_expires
     )
     
-    # Atualizar ultimo_login
     user.ultimo_login = datetime.utcnow()
     db.commit()
     db.refresh(user)
 
     return {"access_token": access_token, "token_type": "bearer"}
-
-# ---------------------------
-# 🔑 Funções de Autenticação (Dependencies)
-# ---------------------------
 
 async def get_current_user(
     token: str = Depends(oauth2_scheme),
@@ -114,17 +90,22 @@ async def get_current_user(
         detail="Não foi possível validar as credenciais",
         headers={"WWW-Authenticate": "Bearer"},
     )
+    print(f"DEBUG: get_current_user received token: {token[:30]}...") # Log token
     try:
         payload = decode_access_token(token)
+        print(f"DEBUG: get_current_user decoded payload: {payload}") # Log payload
         email: str = payload.get("sub")
         if email is None:
+            print("DEBUG: Email is None in token payload.")
             raise credentials_exception
         token_data = TokenData(email=email)
-    except JWTError:
+    except JWTError as e:
+        print(f"DEBUG: JWTError during token decoding: {e}") # Log JWT error
         raise credentials_exception
     
     user = db.query(ProfileModel).filter(ProfileModel.email == token_data.email).first()
     if user is None:
+        print(f"DEBUG: User not found in DB for email: {token_data.email}")
         raise credentials_exception
     return user
 
@@ -137,5 +118,3 @@ async def get_admin_user(
             detail="Acesso negado. Requer privilégios de administrador."
         )
     return current_user
-
-
