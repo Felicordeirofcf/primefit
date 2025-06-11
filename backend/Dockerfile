@@ -9,9 +9,13 @@ ENV PYTHONUNBUFFERED=1
 # Diretório de trabalho no container
 WORKDIR /app
 
-# Copiar apenas o requirements.txt e instalar dependências primeiro (para cache eficiente)
+# ...
 COPY requirements.txt .
 
-# Forçar invalidação do cache para a instalação de dependências
-# Esta linha mudará a cada build, garantindo que a camada de pip install não seja cacheada
-# Removi a linha 'RUN echo 
+# Adicione esta linha para forçar a reinstalação de bcrypt e passlib
+RUN pip uninstall -y bcrypt passlib || true # Use || true para evitar falha se não estiverem instalados
+
+# Instala pip atualizado e as dependências do projeto
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
+# ...
