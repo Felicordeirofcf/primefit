@@ -2,7 +2,7 @@
 Utilitários de autenticação para o backend
 """
 import os
-import jwt
+from jose import jwt, JWTError
 from datetime import datetime, timedelta
 from passlib.context import CryptContext
 from dotenv import load_dotenv
