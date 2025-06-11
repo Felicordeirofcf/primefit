@@ -199,7 +199,8 @@ export const messagesAPI = {
   
   connectWebSocket: (userId, tokenParam = null) => {
   const token = tokenParam || localStorage.getItem('auth_token');
-  const ws = new WebSocket(`${WEBSOCKET_URL}/messages/ws/${userId}?token=${token}`);
+  const ws = new WebSocket(`wss://primefit-production-e300.up.railway.app/ws/messages/ws/${user?.id}?token=${token}`);
+
 
   ws.onopen = () => {
     console.log('WebSocket conectado');
