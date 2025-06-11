@@ -68,7 +68,16 @@ async def update_my_profile(
         db.commit()
         db.refresh(profile)
         
-        return profile
+        # Retorna um dicionário explícito em vez do objeto SQLAlchemy
+        return {
+            "id": profile.id,
+            "nome": profile.nome,
+            "email": profile.email,
+            "tipo_usuario": profile.tipo_usuario,
+            "criado_em": profile.criado_em,
+            "ultimo_login": profile.ultimo_login
+            # Adicione outros campos conforme necessário
+        }
     except HTTPException:
         raise
     except Exception as e:
@@ -102,7 +111,16 @@ async def get_profile_by_id(
                 detail="Perfil não encontrado"
             )
         
-        return profile
+        # Retorna um dicionário explícito em vez do objeto SQLAlchemy
+        return {
+            "id": profile.id,
+            "nome": profile.nome,
+            "email": profile.email,
+            "tipo_usuario": profile.tipo_usuario,
+            "criado_em": profile.criado_em,
+            "ultimo_login": profile.ultimo_login
+            # Adicione outros campos conforme necessário
+        }
     except HTTPException:
         raise
     except Exception as e:
@@ -127,7 +145,20 @@ async def get_all_profiles(
             .order_by(ProfileModel.criado_em.desc())\
             .offset(skip).limit(limit).all()
         
-        return profiles or []
+        # Converte cada perfil para um dicionário para evitar problemas de serialização
+        result = []
+        for profile in profiles:
+            result.append({
+                "id": profile.id,
+                "nome": profile.nome,
+                "email": profile.email,
+                "tipo_usuario": profile.tipo_usuario,
+                "criado_em": profile.criado_em,
+                "ultimo_login": profile.ultimo_login
+                # Adicione outros campos conforme necessário
+            })
+        
+        return result
     except Exception as e:
         logger.error(f"Erro ao listar perfis: {str(e)}")
         raise HTTPException(
