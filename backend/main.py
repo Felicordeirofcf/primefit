@@ -26,6 +26,14 @@ from routes import (
     gemini
 )
 
+# 🚨 Se você tiver ou for criar chatbot.py, importe aqui:
+try:
+    from routes import chatbot
+    HAS_CHATBOT = True
+except ImportError:
+    chatbot = None
+    HAS_CHATBOT = False
+
 # Inicialização do app
 app = FastAPI(
     title="PrimeFit API",
@@ -33,10 +41,10 @@ app = FastAPI(
     version="2.0.0"
 )
 
-# CORS (atualmente liberado para todas as origens — restringir em produção)
+# CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],  # Recomendado restringir isso em produção
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -66,6 +74,9 @@ app.include_router(messages.router, tags=["Mensagens"])
 app.include_router(profiles.router, tags=["Perfis"])
 app.include_router(gemini.router, tags=["IA Gemini"])
 
+if HAS_CHATBOT:
+    app.include_router(chatbot.router, prefix="/api", tags=["Chatbot"])
+
 # Tratamento global de erros
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
@@ -75,7 +86,7 @@ async def global_exception_handler(request: Request, exc: Exception):
         content={"detail": "Erro interno no servidor."}
     )
 
-# Inicialização do banco de dados ao subir a API
+# Inicialização do banco de dados
 @app.on_event("startup")
 async def startup_event():
     create_tables()
