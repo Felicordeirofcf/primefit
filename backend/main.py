@@ -5,12 +5,16 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
 
-# Carregar variáveis de ambiente do .env
+# Carrega variáveis de ambiente do arquivo .env
 load_dotenv()
 
-# Banco de dados e models
+# Banco de dados
 from src.core.database import create_tables
 from src.core.models import Base
+
+# Modelos com títulos únicos (para evitar conflito no Swagger)
+from backend.routes.cadastro import ClienteCreate
+from backend.routes.cliente import ClienteRead
 
 # Rotas
 from routes import (
@@ -23,10 +27,10 @@ from routes import (
     progress,
     messages,
     profiles,
-    gemini
+    gemini,
 )
 
-# 🚨 Se você tiver ou for criar chatbot.py, importe aqui:
+# Chatbot (opcional)
 try:
     from routes import chatbot
     HAS_CHATBOT = True
@@ -41,10 +45,10 @@ app = FastAPI(
     version="2.0.0"
 )
 
-# CORS
+# Middleware CORS (em produção, especifique domínios confiáveis)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Recomendado restringir isso em produção
+    allow_origins=["*"],  # 🔒 RECOMENDADO restringir isso em produção
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -53,7 +57,7 @@ app.add_middleware(
 # Arquivos estáticos (PDFs, imagens, etc)
 app.mount("/storage", StaticFiles(directory="./storage"), name="storage")
 
-# Rota de verificação de status da API
+# Rota de verificação de status
 @app.get("/health")
 async def health_check():
     return {
@@ -62,7 +66,7 @@ async def health_check():
         "version": app.version
     }
 
-# Inclusão de rotas
+# Inclusão das rotas organizadas por funcionalidade
 app.include_router(auth.router, prefix="/auth", tags=["Autenticação"])
 app.include_router(cadastro.router, prefix="/api", tags=["Cadastro"])
 app.include_router(cliente.router, prefix="/api", tags=["Cliente"])
@@ -77,7 +81,7 @@ app.include_router(gemini.router, tags=["IA Gemini"])
 if HAS_CHATBOT:
     app.include_router(chatbot.router, prefix="/api", tags=["Chatbot"])
 
-# Tratamento global de erros
+# Tratamento global de erros (útil em produção para logs centralizados)
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     print(f"Erro não tratado: {exc}")
@@ -86,7 +90,7 @@ async def global_exception_handler(request: Request, exc: Exception):
         content={"detail": "Erro interno no servidor."}
     )
 
-# Inicialização do banco de dados
+# Inicialização automática das tabelas ao iniciar a API
 @app.on_event("startup")
 async def startup_event():
     create_tables()

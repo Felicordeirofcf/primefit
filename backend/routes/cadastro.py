@@ -5,7 +5,7 @@ from src.core.db_client import get_database_client
 router = APIRouter()
 
 # 📦 Modelo de dados para cadastro de clientes/leads
-class Cliente(BaseModel):
+class ClienteCreate(BaseModel):
     nome: str = Field(..., min_length=2, max_length=100)
     email: EmailStr
     telefone: str = Field(..., min_length=8)

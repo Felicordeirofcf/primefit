@@ -7,7 +7,7 @@ from typing import List
 router = APIRouter()
 
 # 📌 Modelo de cadastro de cliente
-class Cliente(BaseModel):
+class ClienteRead(BaseModel):
     nome: str
     email: EmailStr
     telefone: str
