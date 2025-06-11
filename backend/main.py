@@ -13,8 +13,8 @@ from src.core.database import create_tables
 from src.core.models import Base
 
 # Modelos com títulos únicos (para evitar conflito no Swagger)
-from backend.routes.cadastro import ClienteCreate
-from backend.routes.cliente import ClienteRead
+from routes.cadastro import ClienteCreate
+from routes.cliente import ClienteRead
 
 # Rotas
 from routes import (
