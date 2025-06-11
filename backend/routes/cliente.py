@@ -27,7 +27,7 @@ class TreinoEnviadoOut(BaseModel):
     enviado_em: str
 
 # ✅ Cadastro público
-@router.post("/clientes")
+@router.post("/clientes", operation_id="cadastrar_cliente_post")
 async def cadastrar_cliente(data: Cliente):
     try:
         db_client = get_database_client()
@@ -59,7 +59,8 @@ async def cadastrar_cliente(data: Cliente):
 @router.get(
     "/treinos-enviados",
     response_model=List[TreinoEnviadoOut],
-    dependencies=[Depends(get_current_user)]
+    dependencies=[Depends(get_current_user)],
+    operation_id="listar_treinos_enviados_get"
 )
 async def listar_treinos_enviados(user_email: str = Depends(get_current_user)):
     try:
