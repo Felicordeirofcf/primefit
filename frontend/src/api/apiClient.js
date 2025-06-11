@@ -197,18 +197,25 @@ export const messagesAPI = {
     }
   },
   
-  connectWebSocket: (userId) => {
-  const token = localStorage.getItem('auth_token');
+  connectWebSocket: (userId, tokenParam = null) => {
+  const token = tokenParam || localStorage.getItem('auth_token');
   const ws = new WebSocket(`${WEBSOCKET_URL}/messages/ws/${userId}?token=${token}`);
 
   ws.onopen = () => {
     console.log('WebSocket conectado');
     // Enviar ping a cada 30 segundos para manter a conexão
-    setInterval(() => {
+    ws.pingInterval = setInterval(() => {
       if (ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({ type: 'ping' }));
       }
     }, 30000);
+  };
+
+  ws.onclose = () => {
+    console.warn('WebSocket desconectado');
+    if (ws.pingInterval) {
+      clearInterval(ws.pingInterval);
+    }
   };
 
   return ws;
