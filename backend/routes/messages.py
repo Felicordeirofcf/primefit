@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import or_
 
 # Assuming get_current_websocket_user will be added to src.api.endpoints.auth
-from src.api.endpoints.auth import get_current_user, get_admin_user, get_current_websocket_user
+from src.api.endpoints.auth import get_current_user, get_admin_user
 from src.core.database import get_db
 from src.schemas.models import Mensagem, MessageCreate, MessageResponse, Profile # Import Profile for checking receiver existence
 
