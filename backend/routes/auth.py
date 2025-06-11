@@ -1,4 +1,3 @@
-
 from fastapi import APIRouter, HTTPException, status, Depends
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
@@ -8,10 +7,23 @@ from jose import jwt, JWTError
 from pydantic import BaseModel, EmailStr
 import os
 import uuid
+import logging
 
-from src.core.database import get_db # Assumindo que get_db está em src.core.database
-from src.schemas.models import Profile as ProfileModel, PerfilResponse # Importar o modelo Profile e o Pydantic model
-from src.core.auth_utils import verify_password, get_password_hash, create_access_token, decode_access_token # Importar do auth_utils
+from src.core.database import get_db
+from src.schemas.models import Profile as ProfileModel, PerfilResponse
+from src.core.auth_utils import verify_password, get_password_hash, create_access_token, decode_access_token
+
+# Configuração de logging
+logger = logging.getLogger(__name__)
+
+# Patch para o erro do bcrypt
+def _patch_bcrypt():
+    import bcrypt
+    if not hasattr(bcrypt, '__about__'):
+        bcrypt.__about__ = {'__version__': bcrypt.__version__}
+
+# Chame a função no início do arquivo
+_patch_bcrypt()
 
 router = APIRouter()
 
@@ -26,12 +38,6 @@ class UsuarioCreate(BaseModel):
     nome: str
     email: EmailStr
     senha: str
-    # Removendo campos não relacionados à autenticação para simplificar este arquivo
-    # endereco: str
-    # cidade: str
-    # cep: str
-    # telefone: str
-    # whatsapp: str
     tipo_usuario: str = "client"
 
 class Token(BaseModel):
@@ -57,10 +63,10 @@ async def register(
     hashed_password = get_password_hash(user.senha)
     
     new_user = ProfileModel(
-        id=str(uuid.uuid4()), # Gerar um UUID para o ID
+        id=str(uuid.uuid4()),
         nome=user.nome,
         email=user.email,
-        password_hash=hashed_password, # Usar password_hash
+        password_hash=hashed_password,
         tipo_usuario=user.tipo_usuario,
         criado_em=datetime.utcnow(),
         ultimo_login=datetime.utcnow()
@@ -89,7 +95,10 @@ async def login_for_access_token(
             headers={"WWW-Authenticate": "Bearer"},
         )
     
-    access_token_expires = timedelta(minutes=os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 60 * 24 * 7))
+    # Usando uma constante para o tempo de expiração do token
+    ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 60 * 24 * 7))
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    
     access_token = create_access_token(
         data={"sub": user.email, "role": user.tipo_usuario}, expires_delta=access_token_expires
     )
@@ -114,23 +123,27 @@ async def get_current_user(
         detail="Não foi possível validar as credenciais",
         headers={"WWW-Authenticate": "Bearer"},
     )
-    print(f"DEBUG: get_current_user received token: {token[:30]}...") # Log token
+    
     try:
+        logger.debug(f"Recebido token: {token[:15]}...")
         payload = decode_access_token(token)
-        print(f"DEBUG: get_current_user decoded payload: {payload}") # Log payload
+        logger.debug(f"Payload decodificado: {payload}")
+        
         email: str = payload.get("sub")
         if email is None:
-            print("DEBUG: Email is None in token payload.")
+            logger.warning("Email não encontrado no payload do token")
             raise credentials_exception
+            
         token_data = TokenData(email=email)
     except JWTError as e:
-        print(f"DEBUG: JWTError during token decoding: {e}") # Log JWT error
+        logger.error(f"Erro ao decodificar JWT: {e}")
         raise credentials_exception
     
     user = db.query(ProfileModel).filter(ProfileModel.email == token_data.email).first()
     if user is None:
-        print(f"DEBUG: User not found in DB for email: {token_data.email}")
+        logger.warning(f"Usuário não encontrado para email: {token_data.email}")
         raise credentials_exception
+        
     return user
 
 async def get_admin_user(
@@ -142,5 +155,3 @@ async def get_admin_user(
             detail="Acesso negado. Requer privilégios de administrador."
         )
     return current_user
-
-
