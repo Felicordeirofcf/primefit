@@ -20,7 +20,9 @@ logger = logging.getLogger(__name__)
 def _patch_bcrypt():
     import bcrypt
     if not hasattr(bcrypt, '__about__'):
-        bcrypt.__about__ = {'__version__': bcrypt.__version__}
+        # Versão corrigida do patch
+        bcrypt.__about__ = {}
+        bcrypt.__about__['__version__'] = getattr(bcrypt, '__version__', '1.0.0')
 
 # Chame a função no início do arquivo
 _patch_bcrypt()

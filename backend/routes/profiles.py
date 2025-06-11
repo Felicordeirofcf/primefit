@@ -23,9 +23,16 @@ async def get_my_profile(
     db: Session = Depends(get_db)
 ):
     try:
-        # Não precisamos buscar o perfil novamente, já temos ele do get_current_user
-        # Apenas retorne o current_user diretamente
-        return current_user
+        # Convertemos explicitamente para um dicionário para evitar problemas de serialização
+        return {
+            "id": current_user.id,
+            "nome": current_user.nome,
+            "email": current_user.email,
+            "tipo_usuario": current_user.tipo_usuario,
+            "criado_em": current_user.criado_em,
+            "ultimo_login": current_user.ultimo_login
+            # Adicione outros campos conforme necessário
+        }
     except Exception as e:
         logger.error(f"Erro ao obter perfil do usuário: {str(e)}")
         raise HTTPException(
