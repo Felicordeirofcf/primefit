@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, WebSocket, Query
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from datetime import timedelta, datetime
 from typing import Optional
@@ -111,3 +111,30 @@ async def get_admin_user(current_user: Profile = Depends(get_current_user)):
             detail="Permissão negada. Acesso restrito a administradores."
         )
     return current_user
+
+async def get_current_websocket_user(websocket: WebSocket, token: str = Query(...), db: Session = Depends(get_db)):
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Credenciais inválidas para WebSocket",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    
+    payload = decode_access_token(token)
+    if payload is None:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Token inválido")
+        raise credentials_exception
+    
+    email: str = payload.get("sub")
+    user_id: str = payload.get("user_id")
+    
+    if email is None or user_id is None:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Token inválido")
+        raise credentials_exception
+    
+    user = db.query(Profile).filter(Profile.id == user_id, Profile.email == email).first()
+    
+    if not user:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Usuário não encontrado")
+        raise credentials_exception
+    
+    return user
