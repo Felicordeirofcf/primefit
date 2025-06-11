@@ -11,8 +11,14 @@ const MainLayout = () => {
         <Outlet />
       </main>
       <Footer />
+      <ChatBot type="pre-venda" />
     </div>
   )
 }
 
 export default MainLayout
+
+
+import ChatBot from '../ChatBot';
+
+
