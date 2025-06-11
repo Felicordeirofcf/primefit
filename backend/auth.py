@@ -20,7 +20,7 @@ if not SECRET_KEY:
     raise RuntimeError("❌ JWT_SECRET não definida nas variáveis de ambiente.")
 
 # 🛡️ Autenticação Bearer OAuth2
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token")
 
 # 🔑 Criptografia de senha
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
