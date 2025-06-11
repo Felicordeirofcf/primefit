@@ -11,7 +11,7 @@ class ClienteCreate(BaseModel):
     telefone: str = Field(..., min_length=8)
 
 @router.post("/clientes", status_code=status.HTTP_201_CREATED)
-async def cadastrar_cliente(data: Cliente):
+async def cadastrar_cliente(data: ClienteCreate):  # Corrigido aqui
     """
     📥 Rota pública para captação de leads/clientes.
     Salva no PostgreSQL se o e-mail ainda não estiver cadastrado.

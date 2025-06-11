@@ -6,7 +6,13 @@ from typing import List
 
 router = APIRouter()
 
-# 📌 Modelo de cadastro de cliente
+# 📌 Modelo de entrada para cadastro de cliente
+class Cliente(BaseModel):
+    nome: str
+    email: EmailStr
+    telefone: str
+
+# 📌 Modelo de resposta para leitura de cliente (opcional, se quiser usá-lo em rotas GET futuramente)
 class ClienteRead(BaseModel):
     nome: str
     email: EmailStr
@@ -50,7 +56,11 @@ async def cadastrar_cliente(data: Cliente):
         raise HTTPException(status_code=500, detail="Erro interno.")
 
 # 📥 NOVA ROTA: listar treinos PDF enviados para o cliente autenticado
-@router.get("/treinos-enviados", response_model=List[TreinoEnviadoOut], dependencies=[Depends(get_current_user)])
+@router.get(
+    "/treinos-enviados",
+    response_model=List[TreinoEnviadoOut],
+    dependencies=[Depends(get_current_user)]
+)
 async def listar_treinos_enviados(user_email: str = Depends(get_current_user)):
     try:
         db_client = get_database_client()
