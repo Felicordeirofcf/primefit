@@ -48,7 +48,7 @@ app = FastAPI(
 # Middleware CORS (em produção, especifique domínios confiáveis)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # 🔒 RECOMENDADO restringir isso em produção
+    allow_origins=["https://renewed-miracle-production.up.railway.app"],  # 🔒 RECOMENDADO restringir isso em produção
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

@@ -48,8 +48,8 @@ const ChatBot = ({ type = 'pre-venda' }) => {
 
     try {
       const endpoint = type === 'pre-venda' 
-        ? '/api/chatbot/pre-venda'
-        : '/api/chatbot/support';
+        ? 'https://primefit-production-e300.up.railway.app/api/chatbot/pre-venda'
+        : 'https://primefit-production-e300.up.railway.app/api/chatbot/support';
 
       const conversationHistory = messages.map(msg => ({
         role: msg.sender === 'user' ? 'user' : 'assistant',
