@@ -3,22 +3,33 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.sql import func
 from pydantic import BaseModel, EmailStr
 from typing import Optional, List
-from datetime import datetime # Adicionado import para datetime
+from datetime import datetime
 
 Base = declarative_base()
 
-class Profile(Base):
-    __tablename__ = "profiles"
+# Modelo SQLAlchemy para a tabela usuarios (anteriormente profiles)
+class Usuario(Base):
+    __tablename__ = "usuarios"  # Nome da tabela no PostgreSQL
 
     id = Column(String, primary_key=True)
     nome = Column(String)
     email = Column(String, unique=True, index=True)
-    password_hash = Column(String)  # hash da senha
+    senha_hash = Column(String)  # Coluna para hash de senha
+    password_hash = Column(String)  # Coluna alternativa para hash de senha
+    tipo_usuario = Column(String, default="client")
     role = Column(String, default="client")
-    tipo_usuario = Column(String, default="client")  # ✅ CAMPO ADICIONADO
-    criado_em = Column(DateTime, default=func.now())
-    ultimo_login = Column(DateTime, default=func.now())
+    is_admin = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+    endereco = Column(String, nullable=True)
+    cidade = Column(String, nullable=True)
+    cep = Column(String, nullable=True)
+    telefone = Column(String, nullable=True)
+    whatsapp = Column(String, nullable=True)
+    treino_pdf = Column(String, nullable=True)
 
+# Alias para compatibilidade com código existente
+Profile = Usuario
 
 class TreinoEnviado(Base):
     __tablename__ = "treinos_enviados"
@@ -51,6 +62,7 @@ class Avaliacao(Base):
     altura = Column(Float)
     percentual_gordura = Column(Float)
     massa_muscular = Column(Float)
+    status = Column(String, default="pendente")  # Adicionado campo status
 
 class Mensagem(Base):
     __tablename__ = "mensagens"
@@ -60,6 +72,8 @@ class Mensagem(Base):
     assunto = Column(String)
     conteudo = Column(String)
     enviado_em = Column(DateTime, default=func.now())
+    lida = Column(Boolean, default=False)  # Adicionado campo lida
+    respondida = Column(Boolean, default=False)  # Adicionado campo respondida
 
 class Assinatura(Base):
     __tablename__ = "assinaturas"
@@ -95,27 +109,46 @@ class Plan(Base):
     is_active = Column(Boolean, default=True)
 
 # Pydantic Models
-class PerfilResponse(BaseModel):
+class UsuarioResponse(BaseModel):
     id: str
     nome: Optional[str] = None
     email: EmailStr
-    role: str
-    criado_em: datetime
-    ultimo_login: Optional[datetime] = None
+    tipo_usuario: str
+    role: Optional[str] = None
+    is_admin: Optional[bool] = None
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+    endereco: Optional[str] = None
+    cidade: Optional[str] = None
+    cep: Optional[str] = None
+    telefone: Optional[str] = None
+    whatsapp: Optional[str] = None
 
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}  # Compatível com Pydantic V2
+
+# Alias para compatibilidade com código existente
+ProfileResponse = UsuarioResponse
+PerfilResponse = UsuarioResponse
 
 class Cadastro(BaseModel):
     nome: str
     email: EmailStr
-    senha: str # Renomeado de 'password' para 'senha' para corresponder ao frontend
-    endereco: str
-    cidade: str
-    cep: str
-    telefone: str
-    whatsapp: str
-    tipo_usuario: str # Adicionado para corresponder ao frontend
+    senha: str
+    endereco: Optional[str] = None
+    cidade: Optional[str] = None
+    cep: Optional[str] = None
+    telefone: Optional[str] = None
+    whatsapp: Optional[str] = None
+    tipo_usuario: str = "client"
+
+class UsuarioUpdate(BaseModel):
+    nome: Optional[str] = None
+    email: Optional[EmailStr] = None
+    endereco: Optional[str] = None
+    cidade: Optional[str] = None
+    cep: Optional[str] = None
+    telefone: Optional[str] = None
+    whatsapp: Optional[str] = None
 
 class PaymentCreate(BaseModel):
     user_id: str
@@ -132,8 +165,7 @@ class PaymentResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 class PlanResponse(BaseModel):
     id: str
@@ -143,11 +175,7 @@ class PlanResponse(BaseModel):
     duration_months: int
     is_active: bool
 
-    class Config:
-        from_attributes = True
-
-
-
+    model_config = {"from_attributes": True}
 
 class MessageCreate(BaseModel):
     usuario_id: str
@@ -160,12 +188,10 @@ class MessageResponse(BaseModel):
     assunto: str
     conteudo: str
     enviado_em: datetime
+    lida: Optional[bool] = False
+    respondida: Optional[bool] = False
 
-    class Config:
-        from_attributes = True
-
-
-
+    model_config = {"from_attributes": True}
 
 class TreinoCreate(BaseModel):
     usuario_id: str
@@ -179,11 +205,7 @@ class TreinoResponse(BaseModel):
     url_pdf: str
     enviado_em: datetime
 
-    class Config:
-        from_attributes = True
-
-
-
+    model_config = {"from_attributes": True}
 
 class AvaliacaoCreate(BaseModel):
     usuario_id: str
@@ -202,12 +224,9 @@ class AvaliacaoResponse(BaseModel):
     altura: float
     percentual_gordura: float
     massa_muscular: float
+    status: Optional[str] = "pendente"
 
-    class Config:
-        from_attributes = True
-
-
-
+    model_config = {"from_attributes": True}
 
 class DashboardStats(BaseModel):
     total_usuarios: int
@@ -215,11 +234,7 @@ class DashboardStats(BaseModel):
     assinaturas_ativas: int
     receita_mensal: float
 
-    class Config:
-        from_attributes = True
-
-
-
+    model_config = {"from_attributes": True}
 
 class ProgressoCreate(BaseModel):
     usuario_id: str
@@ -237,11 +252,7 @@ class ProgressoResponse(BaseModel):
     percentual_gordura: float
     massa_muscular: float
 
-    class Config:
-        from_attributes = True
-
-
-
+    model_config = {"from_attributes": True}
 
 class Content(Base):
     __tablename__ = "content"
@@ -252,7 +263,7 @@ class Content(Base):
     body = Column(String)
     author_id = Column(String)
     category = Column(String)
-    tags = Column(String) # Assuming tags are stored as a comma-separated string for simplicity
+    tags = Column(String)  # Assuming tags are stored as a comma-separated string for simplicity
     image_url = Column(String)
     published = Column(Boolean, default=True)
     created_at = Column(DateTime, default=func.now())
@@ -267,9 +278,6 @@ class Comment(Base):
     text = Column(String)
     created_at = Column(DateTime, default=func.now())
 
-
-
-
 class ContentCreate(BaseModel):
     title: str
     summary: str
@@ -279,8 +287,7 @@ class ContentCreate(BaseModel):
     image_url: Optional[str] = None
     published: bool = True
 
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 class ContentResponse(BaseModel):
     id: str
@@ -295,8 +302,7 @@ class ContentResponse(BaseModel):
     created_at: datetime
     updated_at: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 class CommentCreate(BaseModel):
     text: str
@@ -308,11 +314,7 @@ class CommentResponse(BaseModel):
     text: str
     created_at: datetime
 
-    class Config:
-        from_attributes = True
-
-
-
+    model_config = {"from_attributes": True}
 
 class PlanCreate(BaseModel):
     name: str
