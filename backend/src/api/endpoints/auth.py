@@ -1,9 +1,11 @@
 from datetime import timedelta, datetime
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+import os
+from fastapi import APIRouter, Depends, HTTPException, status, WebSocket
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
+from jose import jwt, JWTError
 
 from src.core.auth_utils import (
     verify_password, 
@@ -16,6 +18,10 @@ from src.core.database import get_db
 from src.schemas.models import PerfilResponse as UserResponse, CadastroSimples as UserCreate, Profile
 from src.schemas.user import Token
 
+# Variáveis de ambiente para JWT
+SECRET_KEY = os.getenv("JWT_SECRET", "chave_padrao")
+ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
+
 router = APIRouter()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
 
@@ -24,9 +30,6 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
 # ----------------------------
 @router.post("/register", response_model=UserResponse)
 async def register(user_data: UserCreate, db: Session = Depends(get_db)):
-    """
-    Registra um novo usuário com dados simplificados.
-    """
     existing_user = db.query(Profile).filter(Profile.email == user_data.email).first()
     if existing_user:
         raise HTTPException(
@@ -58,9 +61,6 @@ async def login_for_access_token(
     form_data: OAuth2PasswordRequestForm = Depends(), 
     db: Session = Depends(get_db)
 ):
-    """
-    Autentica um usuário e retorna um token de acesso.
-    """
     user = db.query(Profile).filter(Profile.email == form_data.username).first()
     
     if not user or not verify_password(form_data.password, user.password_hash):
@@ -79,7 +79,7 @@ async def login_for_access_token(
     return {"access_token": access_token, "token_type": "bearer"}
 
 # ----------------------------
-# Utilitário: obter usuário autenticado via token
+# Obter usuário autenticado via token
 # ----------------------------
 async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
     credentials_exception = HTTPException(
@@ -105,7 +105,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = De
     return user
 
 # ----------------------------
-# Verifica se o usuário está autenticado
+# Verifica se o usuário está ativo
 # ----------------------------
 async def get_current_active_user(current_user: Profile = Depends(get_current_user)):
     return current_user
@@ -120,3 +120,19 @@ async def get_admin_user(current_user: Profile = Depends(get_current_user)):
             detail="Permissão negada. Acesso restrito a administradores."
         )
     return current_user
+
+# ----------------------------
+# Autenticação WebSocket via token na query
+# ----------------------------
+async def get_current_websocket_user(websocket: WebSocket):
+    token = websocket.query_params.get("token")
+    if not token:
+        await websocket.close(code=1008)
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Token ausente")
+
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        return payload  # ou: return {"email": payload["sub"], "user_id": payload["user_id"]}
+    except JWTError:
+        await websocket.close(code=1008)
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Token inválido")
