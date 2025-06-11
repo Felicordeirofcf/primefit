@@ -7,6 +7,7 @@ from auth import (
     create_access_token
 )
 import traceback
+from fastapi.security import OAuth2PasswordRequestForm # Importar OAuth2PasswordRequestForm
 
 router = APIRouter()
 
@@ -93,19 +94,23 @@ def login(login_data: UsuarioLogin):
         db_client.close()
 
 # ---------------------------
-# 🔐 LOGIN compatível com /auth/token (JSON)
+# 🔐 LOGIN compatível com /auth/token (Form Data)
 # ---------------------------
 
 @router.post("/token", response_model=Token)
-def token_login(credentials: UsuarioLogin):
-    print("🔐 Login /token:", credentials.email)
+def token_login(form_data: OAuth2PasswordRequestForm = Depends()): # Alterado para receber Form Data
+    print("🔐 Login /token (Form Data):")
     db_client = get_database_client()
     try:
-        user = db_client.get_user_by_email(credentials.email)
-        if not user or not verify_password(credentials.senha, user["senha_hash"]):
-            raise HTTPException(status_code=400, detail="Credenciais inválidas")
+        user = db_client.get_user_by_email(form_data.username) # 'username' é o campo de email
+        if not user or not verify_password(form_data.password, user["senha_hash"]):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, # Alterado para 400 Bad Request
+                detail="Credenciais inválidas",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
 
-        token = create_access_token({"sub": credentials.email})
+        token = create_access_token({"sub": form_data.username})
         return {"access_token": token, "token_type": "bearer"}
 
     except Exception as e:
@@ -113,3 +118,5 @@ def token_login(credentials: UsuarioLogin):
         raise HTTPException(status_code=500, detail="Erro interno no login.")
     finally:
         db_client.close()
+
+
