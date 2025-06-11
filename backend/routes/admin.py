@@ -1,156 +1,350 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, EmailStr
-from passlib.context import CryptContext
-from auth import require_admin
-from src.core.db_client import get_database_client
-from datetime import datetime
-import os
+from fastapi import APIRouter, Depends, HTTPException, status
+from typing import List, Optional
+from datetime import datetime, timedelta
+from sqlalchemy.orm import Session
+from src.core.database import get_db
+from routes.auth import get_current_user
+from src.schemas.models import PerfilResponse as UserProfile, Profile, TreinoEnviado, Progresso, Avaliacao, Mensagem, Assinatura
 
 router = APIRouter()
 
-# 🔐 Hasher de senha
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-# 📦 Modelo para criação de novo admin
-class NovoAdmin(BaseModel):
-    email: EmailStr
-    senha: str
-
-# =============================
-# 🔐 CRIAR NOVO ADMINISTRADOR
-# =============================
-@router.post("/criar", dependencies=[Depends(require_admin)])
-async def criar_admin(data: NovoAdmin):
+@router.get("/stats/overview")
+async def get_admin_overview(current_user: UserProfile = Depends(get_current_user), db: Session = Depends(get_db)):
+    """
+    Retorna estatísticas gerais para o painel administrativo
+    """
+    # Verificar se o usuário é admin
+    if current_user.role != 'admin':
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Acesso negado. Apenas administradores podem acessar este endpoint."
+        )
+    
     try:
-        db_client = get_database_client()
+        # Total de usuários
+        total_users = db.query(Profile).count()
         
-        # Verificar se email já existe
-        existing_user = db_client.get_user_by_email(data.email)
-        if existing_user:
-            raise HTTPException(status_code=400, detail="Esse e-mail já está cadastrado")
-
-        hashed = pwd_context.hash(data.senha)
-
-        novo_admin = {
-            "nome": "Administrador",
-            "email": data.email,
-            "senha_hash": hashed,
-            "endereco": "Admin Street",
-            "cidade": "Adminville",
-            "cep": "00000-000",
-            "telefone": "000000000",
-            "whatsapp": "000000000",
-            "is_admin": True,
-            "treino_pdf": None
+        # Usuários ativos (logaram nos últimos 30 dias)
+        thirty_days_ago = datetime.now() - timedelta(days=30)
+        active_users = db.query(Profile).filter(Profile.ultimo_login >= thirty_days_ago).count()
+        
+        # Total de treinos enviados
+        total_trainings = db.query(TreinoEnviado).count()
+        
+        # Total de registros de progresso
+        total_progress = db.query(Progresso).count()
+        
+        # Total de avaliações
+        total_assessments = db.query(Avaliacao).count()
+        
+        # Total de mensagens
+        total_messages = db.query(Mensagem).count()
+        
+        # Assinaturas ativas
+        active_subscriptions = db.query(Assinatura).filter(Assinatura.status == 'ativa').count()
+        
+        # Receita total (soma dos valores pagos das assinaturas ativas)
+        revenue_data = db.query(Assinatura.valor_pago).filter(Assinatura.status == 'ativa').all()
+        total_revenue = sum(float(sub[0] or 0) for sub in revenue_data)
+        
+        return {
+            "total_users": total_users,
+            "active_users": active_users,
+            "total_trainings": total_trainings,
+            "total_progress": total_progress,
+            "total_assessments": total_assessments,
+            "total_messages": total_messages,
+            "active_subscriptions": active_subscriptions,
+            "total_revenue": total_revenue,
+            "user_growth_rate": round((active_users / total_users * 100) if total_users > 0 else 0, 1)
         }
-
-        db_client.create_user(novo_admin)
-        db_client.close()
         
-        return {"message": "Novo administrador criado com sucesso!"}
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro ao buscar estatísticas: {str(e)}"
+        )
 
+@router.get("/users")
+async def get_all_users(
+    page: int = 1,
+    limit: int = 20,
+    search: Optional[str] = None,
+    current_user: UserProfile = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Lista todos os usuários com paginação e busca
+    """
+    if current_user.role != 'admin':
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Acesso negado. Apenas administradores podem acessar este endpoint."
+        )
+    
+    try:
+        # Calcular offset para paginação
+        offset = (page - 1) * limit
+        
+        # Construir query base
+        query = db.query(Profile)
+        
+        # Aplicar filtro de busca se fornecido
+        if search:
+            query = query.filter(Profile.nome.ilike(f'%{search}%') | Profile.email.ilike(f'%{search}%'))
+        
+        # Buscar total de registros para paginação
+        total_count = query.count()
+
+        # Aplicar paginação e ordenação
+        users = query.order_by(Profile.criado_em.desc()).offset(offset).limit(limit).all()
+        
+        return {
+            "users": users,
+            "pagination": {
+                "page": page,
+                "limit": limit,
+                "total": total_count,
+                "pages": (total_count + limit - 1) // limit
+            }
+        }
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro ao buscar usuários: {str(e)}"
+        )
+
+@router.get("/users/{user_id}/details")
+async def get_user_details(
+    user_id: str,
+    current_user: UserProfile = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Retorna detalhes completos de um usuário específico
+    """
+    if current_user.role != 'admin':
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Acesso negado. Apenas administradores podem acessar este endpoint."
+        )
+    
+    try:
+        # Buscar dados do usuário
+        user = db.query(Profile).filter(Profile.id == user_id).first()
+        
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Usuário não encontrado"
+            )
+        
+        # Buscar treinos do usuário
+        trainings = db.query(TreinoEnviado).filter(TreinoEnviado.usuario_id == user_id).all()
+        
+        # Buscar progresso do usuário
+        progress = db.query(Progresso).filter(Progresso.usuario_id == user_id).order_by(Progresso.data_medicao.desc()).all()
+        
+        # Buscar avaliações do usuário
+        assessments = db.query(Avaliacao).filter(Avaliacao.usuario_id == user_id).all()
+        
+        # Buscar mensagens do usuário
+        messages = db.query(Mensagem).filter(Mensagem.usuario_id == user_id).order_by(Mensagem.enviado_em.desc()).all()
+        
+        # Buscar assinaturas do usuário
+        subscriptions = db.query(Assinatura).filter(Assinatura.usuario_id == user_id).order_by(Assinatura.data_inicio.desc()).all()
+        
+        return {
+            "user": user,
+            "trainings": trainings,
+            "progress": progress,
+            "assessments": assessments,
+            "messages": messages,
+            "subscriptions": subscriptions,
+            "summary": {
+                "total_trainings": len(trainings),
+                "total_progress": len(progress),
+                "total_assessments": len(assessments),
+                "total_messages": len(messages),
+                "active_subscription": any(sub.status == 'ativa' for sub in subscriptions)
+            }
+        }
+        
     except HTTPException:
         raise
     except Exception as e:
-        print("❌ Erro ao criar admin:", e)
-        raise HTTPException(status_code=500, detail=f"Erro ao criar admin: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro ao buscar detalhes do usuário: {str(e)}"
+        )
 
-# =============================
-# 📋 LISTAR CLIENTES
-# =============================
-@router.get("/clientes", dependencies=[Depends(require_admin)])
-async def listar_clientes():
+@router.get("/recent-activity")
+async def get_recent_activity(
+    limit: int = 50,
+    current_user: UserProfile = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Retorna atividades recentes do sistema
+    """
+    if current_user.role != 'admin':
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Acesso negado. Apenas administradores podem acessar este endpoint."
+        )
+    
     try:
-        db_client = get_database_client()
-        users = db_client.get_all_users()
+        activities = []
         
-        # Remover senhas do retorno
+        # Buscar registros recentes de diferentes tabelas
+        
+        # Novos usuários
+        users = db.query(Profile).order_by(Profile.criado_em.desc()).limit(10).all()
         for user in users:
-            user.pop("senha_hash", None)
+            activities.append({
+                "type": "new_user",
+                "title": f"Novo usuário: {user.nome or user.email}",
+                "description": "Usuário se cadastrou na plataforma",
+                "date": user.criado_em,
+                "user_id": user.id
+            })
         
-        db_client.close()
-        return users
+        # Treinos enviados
+        trainings = db.query(TreinoEnviado).order_by(TreinoEnviado.enviado_em.desc()).limit(10).all()
+        for training in trainings:
+            activities.append({
+                "type": "training_sent",
+                "title": f"Treino enviado: {training.nome_arquivo}",
+                "description": "Novo treino foi enviado para o usuário",
+                "date": training.enviado_em,
+                "user_id": training.usuario_id
+            })
+        
+        # Progresso registrado
+        progress_entries = db.query(Progresso).order_by(Progresso.data_medicao.desc()).limit(10).all()
+        for progress_entry in progress_entries:
+            activities.append({
+                "type": "progress_logged",
+                "title": f"Progresso registrado: {progress_entry.peso}kg",
+                "description": "Usuário registrou novo progresso",
+                "date": progress_entry.data_medicao,
+                "user_id": progress_entry.usuario_id
+            })
+        
+        # Mensagens enviadas
+        messages = db.query(Mensagem).order_by(Mensagem.enviado_em.desc()).limit(10).all()
+        for message in messages:
+            activities.append({
+                "type": "message_sent",
+                "title": f"Mensagem: {message.assunto}",
+                "description": "Nova mensagem foi enviada",
+                "date": message.enviado_em,
+                "user_id": message.usuario_id
+            })
+        
+        # Ordenar todas as atividades por data
+        activities.sort(key=lambda x: x['date'], reverse=True)
+        
+        # Limitar ao número solicitado
+        return activities[:limit]
         
     except Exception as e:
-        print("❌ Erro ao listar clientes:", e)
-        raise HTTPException(status_code=500, detail=f"Erro ao listar clientes: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro ao buscar atividades recentes: {str(e)}"
+        )
 
-# =============================
-# 📤 ENVIAR TREINO E REGISTRAR HISTÓRICO
-# =============================
-@router.post("/enviar-treino/{cliente_email}", dependencies=[Depends(require_admin)])
-async def enviar_treino(cliente_email: str, treino: dict):
+@router.get("/analytics/users")
+async def get_user_analytics(current_user: UserProfile = Depends(get_current_user), db: Session = Depends(get_db)):
+    """
+    Retorna análises de usuários para gráficos
+    """
+    if current_user.role != 'admin':
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Acesso negado. Apenas administradores podem acessar este endpoint."
+        )
+    
     try:
-        db_client = get_database_client()
+        # Usuários por mês (últimos 12 meses)
+        monthly_users = []
+        for i in range(12):
+            start_date = (datetime.now() - timedelta(days=30 * (i + 1))).replace(day=1)
+            end_date = (datetime.now() - timedelta(days=30 * i)).replace(day=1)
+            
+            count = db.query(Profile).filter(
+                Profile.criado_em >= start_date,
+                Profile.criado_em < end_date
+            ).count()
+            
+            monthly_users.append({
+                "month": start_date.strftime("%Y-%m"),
+                "count": count
+            })
         
-        # Atualizar dados do cliente
-        updates = {
-            "treino_pdf": treino.get("treino_pdf")
+        monthly_users.reverse()
+        
+        # Distribuição por planos
+        plan_distribution_query = db.query(Assinatura.plano_id, func.count(Assinatura.plano_id)).filter(Assinatura.status == 'ativa').group_by(Assinatura.plano_id).all()
+        
+        plan_distribution = {plan_id: count for plan_id, count in plan_distribution_query}
+        
+        return {
+            "monthly_users": monthly_users,
+            "plan_distribution": [
+                {"label": "Série Única", "value": plan_distribution.get('serie_unica', 0)},
+                {"label": "Consultoria Completa", "value": plan_distribution.get('consultoria_completa', 0)}
+            ]
         }
         
-        db_client.update_user(cliente_email, updates)
-        db_client.close()
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro ao buscar análises de usuários: {str(e)}"
+        )
 
-        # Log do histórico (pode ser implementado em tabela específica se necessário)
-        print(f"📝 Treino enviado para {cliente_email} - Admin")
-
-        return {"message": "Treino enviado com sucesso!"}
+@router.put("/users/{user_id}/role")
+async def update_user_role(
+    user_id: str,
+    role: str,
+    current_user: UserProfile = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Atualiza o papel de um usuário
+    """
+    if current_user.role != 'admin':
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Acesso negado. Apenas administradores podem acessar este endpoint."
+        )
+    
+    if role not in ['client', 'admin', 'trainer']:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Papel inválido. Use: client, admin ou trainer"
+        )
+    
+    try:
+        user = db.query(Profile).filter(Profile.id == user_id).first()
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Usuário não encontrado"
+            )
+        user.role = role
+        db.commit()
+        db.refresh(user)
         
-    except Exception as e:
-        print("❌ Erro ao enviar treino:", e)
-        raise HTTPException(status_code=500, detail=f"Erro ao enviar treino: {str(e)}")
-
-# =============================
-# 📖 HISTÓRICO DE ALTERAÇÕES
-# =============================
-@router.get("/historico/{email_cliente}", dependencies=[Depends(require_admin)])
-async def obter_historico(email_cliente: str):
-    try:
-        # TODO: Implementar tabela de histórico se necessário
-        return {"message": "Histórico não implementado ainda", "cliente": email_cliente}
+        return {"message": "Papel do usuário atualizado com sucesso", "user": user}
         
+    except HTTPException:
+        raise
     except Exception as e:
-        print("❌ Erro ao obter histórico:", e)
-        raise HTTPException(status_code=500, detail=f"Erro ao obter histórico: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro ao atualizar papel do usuário: {str(e)}"
+        )
 
-# =============================
-# 📅 EVENTOS AGENDADOS
-# =============================
-@router.get("/eventos/{email_cliente}", dependencies=[Depends(require_admin)])
-async def listar_eventos_cliente(email_cliente: str):
-    try:
-        db_client = get_database_client()
-        # TODO: Implementar busca de eventos se necessário
-        db_client.close()
-        return {"message": "Eventos não implementados ainda", "cliente": email_cliente}
-    except Exception as e:
-        print("❌ Erro ao buscar eventos:", e)
-        raise HTTPException(status_code=500, detail=f"Erro ao buscar eventos: {str(e)}")
 
-# =============================
-# 🧪 INSERIR HISTÓRICO TESTE
-# =============================
-@router.post("/historico/teste", dependencies=[Depends(require_admin)])
-async def inserir_historico_teste():
-    try:
-        # TODO: Implementar tabela de histórico se necessário
-        print("📝 Histórico de teste - funcionalidade não implementada")
-        return {"message": "Registro de teste simulado com sucesso!"}
-    except Exception as e:
-        print("❌ Erro no teste:", e)
-        raise HTTPException(status_code=500, detail=f"Erro ao inserir histórico de teste: {str(e)}")
-
-# =============================
-# 📁 LISTAR TREINOS ENVIADOS
-# =============================
-@router.get("/treinos-enviados", dependencies=[Depends(require_admin)])
-async def listar_treinos_enviados(cliente_email: str = Query(...)):
-    try:
-        db_client = get_database_client()
-        trainings = db_client.get_trainings_by_client_email(cliente_email)
-        db_client.close()
-        return trainings
-        
-    except Exception as e:
-        print("❌ Erro ao listar treinos:", e)
-        raise HTTPException(status_code=500, detail=f"Erro ao listar treinos enviados: {str(e)}")

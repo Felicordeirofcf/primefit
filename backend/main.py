@@ -28,6 +28,11 @@ from routes import (
     messages,
     profiles,
     gemini,
+    admin,
+    content,
+    dashboard,
+    payments,
+    users,
 )
 
 # Chatbot (opcional)
@@ -94,3 +99,12 @@ async def global_exception_handler(request: Request, exc: Exception):
 @app.on_event("startup")
 async def startup_event():
     create_tables()
+
+
+app.include_router(admin.router, tags=["Admin"])
+app.include_router(content.router, tags=["Conteúdo"])
+app.include_router(dashboard.router, tags=["Dashboard"])
+app.include_router(payments.router, tags=["Pagamentos"])
+app.include_router(users.router, tags=["Usuários"])
+
+

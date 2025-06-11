@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 from src.core.database import get_db
-from src.api.endpoints.auth import get_current_user
+from routes.auth import get_current_user
 from src.schemas.models import Profile, Content, ContentCreate, ContentResponse, Comment, CommentCreate, CommentResponse
 
 router = APIRouter()
