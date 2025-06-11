@@ -152,7 +152,8 @@ const AdminChat = () => {
 
     // Inicializar WebSocket
     try {
-      const ws = messagesAPI.connectWebSocket(user.id);
+      const token = localStorage.getItem('auth_token');
+const ws = messagesAPI.connectWebSocket(user.id, token);
       
       ws.onmessage = (event) => {
         const data = JSON.parse(event.data);
