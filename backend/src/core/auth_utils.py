@@ -2,7 +2,8 @@
 Utilitários de autenticação para o backend
 """
 import os
-from jose import jwt, JWTError
+from jose import jwt
+from jose.exceptions import JWTError  # <- Correção: import correto do erro
 from datetime import datetime, timedelta
 from passlib.context import CryptContext
 from dotenv import load_dotenv
@@ -21,38 +22,18 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 def verify_password(plain_password, hashed_password):
     """
     Verifica se a senha em texto plano corresponde ao hash armazenado.
-    
-    Args:
-        plain_password (str): Senha em texto plano
-        hashed_password (str): Hash da senha armazenada
-        
-    Returns:
-        bool: True se a senha corresponder ao hash
     """
     return pwd_context.verify(plain_password, hashed_password)
 
 def get_password_hash(password):
     """
     Gera um hash seguro para a senha.
-    
-    Args:
-        password (str): Senha em texto plano
-        
-    Returns:
-        str: Hash da senha
     """
     return pwd_context.hash(password)
 
 def create_access_token(data: dict, expires_delta: timedelta = None):
     """
     Cria um token JWT de acesso.
-    
-    Args:
-        data (dict): Dados a serem codificados no token
-        expires_delta (timedelta, optional): Tempo de expiração do token
-        
-    Returns:
-        str: Token JWT codificado
     """
     to_encode = data.copy()
     if expires_delta:
@@ -67,16 +48,9 @@ def create_access_token(data: dict, expires_delta: timedelta = None):
 def decode_access_token(token: str):
     """
     Decodifica e valida um token JWT.
-    
-    Args:
-        token (str): Token JWT a ser decodificado
-        
-    Returns:
-        dict: Dados decodificados do token ou None se inválido
     """
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         return payload
-    except jwt.PyJWTError:
+    except JWTError:  # <- Correção aqui
         return None
-
