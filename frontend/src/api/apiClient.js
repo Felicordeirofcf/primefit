@@ -198,21 +198,21 @@ export const messagesAPI = {
   },
   
   connectWebSocket: (userId) => {
-    const token = localStorage.getItem('auth_token');
-    const ws = new WebSocket(`${WEBSOCKET_URL}/messages/ws/${userId}?token=${token}`);
-    
-    ws.onopen = () => {
-      console.log('WebSocket conectado');
-      // Enviar ping a cada 30 segundos para manter a conexão
-      setInterval(() => {
-        if (ws.readyState === WebSocket.OPEN) {
-          ws.send(JSON.stringify({ type: 'ping' }));
-        }
-      }, 30000);
-    };
-    
-    return ws;
-  },
+  const token = localStorage.getItem('auth_token');
+  const ws = new WebSocket(`${WEBSOCKET_URL}/messages/ws/${userId}?token=${token}`);
+
+  ws.onopen = () => {
+    console.log('WebSocket conectado');
+    // Enviar ping a cada 30 segundos para manter a conexão
+    setInterval(() => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'ping' }));
+      }
+    }, 30000);
+  };
+
+  return ws;
+},
 };
 
 // API de treinos

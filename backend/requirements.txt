@@ -371,6 +371,8 @@ pyphen==0.17.2
     # via weasyprint
 python-dateutil==2.9.0.post0
 google-generativeai>=0.5.0,<0.9.0
+bcrypt>=4.0.1
+
     # via
     #   sandbox-runtime (/builds/vida/manus-sandbox/sandbox/pyproject.toml)
     #   dateparser
