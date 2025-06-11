@@ -1,18 +1,37 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from typing import List, Optional, Dict, Any
+from typing import List, Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 import logging
+from pydantic import BaseModel, EmailStr
+from datetime import datetime
 
 from src.core.database import get_db
 from routes.auth import get_current_user, get_admin_user
-from src.schemas.models import Profile as ProfileModel, PerfilResponse as ProfileResponse
+from src.schemas.models import Profile as ProfileModel
 from src.schemas.user import ProfileUpdate
 
 # Configuração de logging
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+# ---------------------------
+# 📦 MODELOS Pydantic para serialização
+# ---------------------------
+
+class ProfileResponse(BaseModel):
+    id: str
+    nome: str
+    email: EmailStr
+    tipo_usuario: str
+    criado_em: datetime
+    ultimo_login: Optional[datetime] = None
+    
+    class Config:
+        orm_mode = True  # Permite converter diretamente de objeto SQLAlchemy
+        # Para Pydantic v2, use:
+        # model_config = {"from_attributes": True}
 
 # ----------------------------
 # Obter perfil do usuário atual
@@ -23,16 +42,8 @@ async def get_my_profile(
     db: Session = Depends(get_db)
 ):
     try:
-        # Convertemos explicitamente para um dicionário para evitar problemas de serialização
-        return {
-            "id": current_user.id,
-            "nome": current_user.nome,
-            "email": current_user.email,
-            "tipo_usuario": current_user.tipo_usuario,
-            "criado_em": current_user.criado_em,
-            "ultimo_login": current_user.ultimo_login
-            # Adicione outros campos conforme necessário
-        }
+        # Usando orm_mode para converter automaticamente
+        return current_user
     except Exception as e:
         logger.error(f"Erro ao obter perfil do usuário: {str(e)}")
         raise HTTPException(
@@ -68,16 +79,8 @@ async def update_my_profile(
         db.commit()
         db.refresh(profile)
         
-        # Retorna um dicionário explícito em vez do objeto SQLAlchemy
-        return {
-            "id": profile.id,
-            "nome": profile.nome,
-            "email": profile.email,
-            "tipo_usuario": profile.tipo_usuario,
-            "criado_em": profile.criado_em,
-            "ultimo_login": profile.ultimo_login
-            # Adicione outros campos conforme necessário
-        }
+        # Retorna o objeto diretamente, orm_mode fará a conversão
+        return profile
     except HTTPException:
         raise
     except Exception as e:
@@ -111,16 +114,8 @@ async def get_profile_by_id(
                 detail="Perfil não encontrado"
             )
         
-        # Retorna um dicionário explícito em vez do objeto SQLAlchemy
-        return {
-            "id": profile.id,
-            "nome": profile.nome,
-            "email": profile.email,
-            "tipo_usuario": profile.tipo_usuario,
-            "criado_em": profile.criado_em,
-            "ultimo_login": profile.ultimo_login
-            # Adicione outros campos conforme necessário
-        }
+        # Retorna o objeto diretamente, orm_mode fará a conversão
+        return profile
     except HTTPException:
         raise
     except Exception as e:
@@ -145,20 +140,8 @@ async def get_all_profiles(
             .order_by(ProfileModel.criado_em.desc())\
             .offset(skip).limit(limit).all()
         
-        # Converte cada perfil para um dicionário para evitar problemas de serialização
-        result = []
-        for profile in profiles:
-            result.append({
-                "id": profile.id,
-                "nome": profile.nome,
-                "email": profile.email,
-                "tipo_usuario": profile.tipo_usuario,
-                "criado_em": profile.criado_em,
-                "ultimo_login": profile.ultimo_login
-                # Adicione outros campos conforme necessário
-            })
-        
-        return result
+        # Retorna a lista diretamente, orm_mode fará a conversão de cada item
+        return profiles
     except Exception as e:
         logger.error(f"Erro ao listar perfis: {str(e)}")
         raise HTTPException(
