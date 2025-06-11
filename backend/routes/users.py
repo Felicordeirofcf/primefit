@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from typing import List, Optional
 from sqlalchemy.orm import Session
 from src.core.database import get_db
-from src.api.endpoints.auth import get_current_user
+from routes.auth import get_current_user
 from src.schemas.models import Profile as UserProfile, PerfilResponse as UserResponse, Cadastro as UserUpdate # Assuming Cadastro is used for UserUpdate
 
 router = APIRouter()
