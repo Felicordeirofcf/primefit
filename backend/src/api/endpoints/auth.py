@@ -2,7 +2,7 @@ from datetime import timedelta, datetime
 from typing import Optional
 import os
 
-from fastapi import APIRouter, Depends, HTTPException, status, WebSocket, Form
+from fastapi import APIRouter, Depends, HTTPException, status, WebSocket
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from jose import jwt, JWTError
@@ -42,7 +42,7 @@ async def register(user_data: UserCreate, db: Session = Depends(get_db)):
     new_profile = Profile(
         nome=user_data.nome,
         email=user_data.email,
-        senha_hash=hashed_password,  # <- corrigido aqui
+        senha_hash=hashed_password,
         criado_em=datetime.utcnow(),
         ultimo_login=datetime.utcnow()
     )
@@ -63,10 +63,13 @@ async def login_for_access_token(
     user = db.query(Profile).filter(Profile.email == form_data.username).first()
 
     if not user:
-        raise HTTPException(status_code=401, detail="Usuário não encontrado")
-    
-    if not verify_password(form_data.password, user.senha_hash):  # <- corrigido aqui
-        raise HTTPException(status_code=401, detail="Senha incorreta")
+        raise HTTPException(status_code=400, detail="Usuário não encontrado")
+
+    if not user.senha_hash:
+        raise HTTPException(status_code=500, detail="Senha não configurada para este usuário")
+
+    if not verify_password(form_data.password, user.senha_hash):
+        raise HTTPException(status_code=400, detail="Senha incorreta")
 
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
