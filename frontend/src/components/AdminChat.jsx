@@ -12,9 +12,8 @@ import { Separator } from './ui/separator';
 import { Badge } from './ui/badge';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Send, User, Bell } from 'lucide-react';
+import { Send, User } from 'lucide-react';
 
-// Dados mock para quando a API não estiver disponível
 const mockUsers = [
   { id: 'user1', nome: 'Maria Silva', email: 'maria@example.com', role: 'user', avatar_url: null },
   { id: 'user2', nome: 'João Santos', email: 'joao@example.com', role: 'user', avatar_url: null },
@@ -23,63 +22,21 @@ const mockUsers = [
 
 const mockMessages = {
   user1: [
-    { 
-      id: '1', 
-      sender_id: 'user1', 
-      receiver_id: 'admin', 
-      content: 'Olá! Gostaria de saber mais sobre os planos de treino.', 
-      created_at: '2025-06-05T10:00:00Z',
-      is_read: true
-    },
-    { 
-      id: '2', 
-      sender_id: 'admin', 
-      receiver_id: 'user1', 
-      content: 'Olá Maria! Claro, temos planos personalizados para diferentes objetivos. Qual é o seu objetivo principal?', 
-      created_at: '2025-06-05T10:05:00Z',
-      is_read: true
-    },
-    { 
-      id: '3', 
-      sender_id: 'user1', 
-      receiver_id: 'admin', 
-      content: 'Quero perder peso e ganhar resistência.', 
-      created_at: '2025-06-05T10:10:00Z',
-      is_read: false
-    },
+    { id: '1', sender_id: 'user1', receiver_id: 'admin', content: 'Olá! Gostaria de saber mais sobre os planos de treino.', created_at: '2025-06-05T10:00:00Z', is_read: true },
+    { id: '2', sender_id: 'admin', receiver_id: 'user1', content: 'Olá Maria! Claro, temos planos personalizados para diferentes objetivos. Qual é o seu objetivo principal?', created_at: '2025-06-05T10:05:00Z', is_read: true },
+    { id: '3', sender_id: 'user1', receiver_id: 'admin', content: 'Quero perder peso e ganhar resistência.', created_at: '2025-06-05T10:10:00Z', is_read: false },
   ],
   user2: [
-    { 
-      id: '4', 
-      sender_id: 'user2', 
-      receiver_id: 'admin', 
-      content: 'Bom dia! Preciso remarcar minha avaliação física.', 
-      created_at: '2025-06-04T09:00:00Z',
-      is_read: true
-    },
-    { 
-      id: '5', 
-      sender_id: 'admin', 
-      receiver_id: 'user2', 
-      content: 'Bom dia João! Claro, para quando você gostaria de remarcar?', 
-      created_at: '2025-06-04T09:15:00Z',
-      is_read: true
-    },
+    { id: '4', sender_id: 'user2', receiver_id: 'admin', content: 'Bom dia! Preciso remarcar minha avaliação física.', created_at: '2025-06-04T09:00:00Z', is_read: true },
+    { id: '5', sender_id: 'admin', receiver_id: 'user2', content: 'Bom dia João! Claro, para quando você gostaria de remarcar?', created_at: '2025-06-04T09:15:00Z', is_read: true },
   ],
   user3: [
-    { 
-      id: '6', 
-      sender_id: 'user3', 
-      receiver_id: 'admin', 
-      content: 'Oi! Estou com dificuldade para acessar meu treino no aplicativo.', 
-      created_at: '2025-06-03T14:00:00Z',
-      is_read: true
-    },
+    { id: '6', sender_id: 'user3', receiver_id: 'admin', content: 'Oi! Estou com dificuldade para acessar meu treino no aplicativo.', created_at: '2025-06-03T14:00:00Z', is_read: true },
   ],
 };
 
 const AdminChat = () => {
-  const { user, userProfile, isAuthenticated, loading, isAdmin } = useAuth();
+  const { user, isAuthenticated, loading, isAdmin } = useAuth();
   const [clients, setClients] = useState([]);
   const [selectedClient, setSelectedClient] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -89,23 +46,16 @@ const AdminChat = () => {
   const [unreadCounts, setUnreadCounts] = useState({});
   const messagesEndRef = useRef(null);
 
-  // Inicializar WebSocket e carregar clientes
   useEffect(() => {
     if (!isAuthenticated || !user || !isAdmin) return;
 
     const loadClients = async () => {
       try {
-        // Tentar carregar todos os usuários
         const { data, error } = await profilesAPI.getAllProfiles();
-        
         if (error || !data) {
           console.error('Erro ao carregar clientes:', error);
-          // Usar dados mock
           setClients(mockUsers);
-          // Selecionar o primeiro cliente por padrão
           setSelectedClient(mockUsers[0]);
-          
-          // Definir contagens de mensagens não lidas mock
           const mockUnreadCounts = {};
           mockUsers.forEach(client => {
             const clientMessages = mockMessages[client.id] || [];
@@ -115,16 +65,11 @@ const AdminChat = () => {
           });
           setUnreadCounts(mockUnreadCounts);
         } else {
-          // Filtrar apenas usuários comuns
           const filteredClients = data.filter(profile => profile.role === 'user');
           setClients(filteredClients);
-          
-          // Selecionar o primeiro cliente por padrão
           if (filteredClients.length > 0) {
             setSelectedClient(filteredClients[0]);
           }
-          
-          // Carregar contagens de mensagens não lidas
           const unreadCountsObj = {};
           for (const client of filteredClients) {
             try {
@@ -142,7 +87,6 @@ const AdminChat = () => {
         }
       } catch (error) {
         console.error('Erro ao carregar clientes:', error);
-        // Usar dados mock
         setClients(mockUsers);
         setSelectedClient(mockUsers[0]);
       } finally {
@@ -150,29 +94,19 @@ const AdminChat = () => {
       }
     };
 
-    // Inicializar WebSocket
     try {
       const token = localStorage.getItem('auth_token');
-const ws = messagesAPI.connectWebSocket(user.id, token);
-      
+      const ws = messagesAPI.connectWebSocket(user.id, token);
       ws.onmessage = (event) => {
         const data = JSON.parse(event.data);
-        
         if (data.type === 'new_message') {
           const newMsg = data.data;
-          
-          // Adicionar nova mensagem à lista se for do cliente selecionado
-          if (selectedClient && 
-              (newMsg.sender_id === selectedClient.id || newMsg.receiver_id === selectedClient.id)) {
+          if (selectedClient && (newMsg.sender_id === selectedClient.id || newMsg.receiver_id === selectedClient.id)) {
             setMessages(prev => [...prev, newMsg]);
-            
-            // Marcar como lida se for do cliente selecionado
             if (newMsg.sender_id === selectedClient.id) {
               messagesAPI.markAsRead(newMsg.id);
             }
           }
-          
-          // Atualizar contagem de mensagens não lidas
           if (newMsg.sender_id !== user.id && !newMsg.is_read) {
             setUnreadCounts(prev => ({
               ...prev,
@@ -181,15 +115,12 @@ const ws = messagesAPI.connectWebSocket(user.id, token);
           }
         }
       };
-      
       ws.onerror = (error) => {
         console.error('Erro no WebSocket:', error);
       };
-      
       ws.onclose = () => {
         console.log('WebSocket fechado');
       };
-      
       setWebsocket(ws);
     } catch (error) {
       console.error('Erro ao inicializar WebSocket:', error);
@@ -197,7 +128,6 @@ const ws = messagesAPI.connectWebSocket(user.id, token);
 
     loadClients();
 
-    // Limpar WebSocket ao desmontar
     return () => {
       if (websocket && websocket.readyState === WebSocket.OPEN) {
         websocket.close();
@@ -205,32 +135,23 @@ const ws = messagesAPI.connectWebSocket(user.id, token);
     };
   }, [isAuthenticated, user, isAdmin]);
 
-  // Carregar mensagens quando o cliente selecionado mudar
   useEffect(() => {
     if (!selectedClient || !user) return;
-
     const loadMessages = async () => {
       try {
         const { data, error } = await messagesAPI.getConversation(selectedClient.id);
-        
         if (error || !data) {
           console.error('Erro ao carregar mensagens:', error);
-          // Usar dados mock
           const clientMockMessages = mockMessages[selectedClient.id] || [];
           setMessages(clientMockMessages);
         } else {
           setMessages(data);
-          
-          // Marcar mensagens como lidas
           const unreadMessages = data.filter(
             msg => msg.sender_id === selectedClient.id && !msg.is_read
           );
-          
           for (const msg of unreadMessages) {
             await messagesAPI.markAsRead(msg.id);
           }
-          
-          // Atualizar contagem de mensagens não lidas
           if (unreadMessages.length > 0) {
             setUnreadCounts(prev => ({
               ...prev,
@@ -240,33 +161,25 @@ const ws = messagesAPI.connectWebSocket(user.id, token);
         }
       } catch (error) {
         console.error('Erro ao carregar mensagens:', error);
-        // Usar dados mock
         const clientMockMessages = mockMessages[selectedClient.id] || [];
         setMessages(clientMockMessages);
       }
     };
-
     loadMessages();
   }, [selectedClient, user]);
 
-  // Rolar para a última mensagem quando as mensagens mudarem
   useEffect(() => {
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages]);
 
-  // Enviar mensagem
   const handleSendMessage = async () => {
     if (!newMessage.trim() || !selectedClient) return;
-
     try {
-      // Enviar via API
       const { data, error } = await messagesAPI.sendMessage(selectedClient.id, newMessage);
-      
       if (error) {
         console.error('Erro ao enviar mensagem:', error);
-        // Adicionar mensagem localmente mesmo com erro
         const mockMessage = {
           id: `local-${Date.now()}`,
           sender_id: user.id,
@@ -277,12 +190,10 @@ const ws = messagesAPI.connectWebSocket(user.id, token);
         };
         setMessages(prev => [...prev, mockMessage]);
       } else if (data) {
-        // Adicionar mensagem à lista
         setMessages(prev => [...prev, data]);
       }
     } catch (error) {
       console.error('Erro ao enviar mensagem:', error);
-      // Adicionar mensagem localmente mesmo com erro
       const mockMessage = {
         id: `local-${Date.now()}`,
         sender_id: user.id,
@@ -293,50 +204,13 @@ const ws = messagesAPI.connectWebSocket(user.id, token);
       };
       setMessages(prev => [...prev, mockMessage]);
     } finally {
-      // Limpar campo de mensagem
       setNewMessage('');
     }
   };
 
-  // Renderizar conteúdo com base no estado de carregamento
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-4 text-lg">Carregando...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold mb-4">Acesso Negado</h2>
-          <p className="mb-4">Você precisa estar logado para acessar esta página.</p>
-          <Button asChild>
-            <a href="/login">Fazer Login</a>
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  if (!isAdmin) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-center">
-          <h2 className="text-2xl font-bold mb-4">Acesso Restrito</h2>
-          <p className="mb-4">Esta página é restrita a administradores.</p>
-          <Button asChild>
-            <a href="/dashboard">Voltar ao Dashboard</a>
-          </Button>
-        </div>
-      </div>
-    );
-  }
+  if (loading) return <div className="flex items-center justify-center h-screen">Carregando...</div>;
+  if (!isAuthenticated) return <div className="flex items-center justify-center h-screen">Você precisa estar logado.</div>;
+  if (!isAdmin) return <div className="flex items-center justify-center h-screen">Acesso restrito.</div>;
 
   return (
     <div className="container mx-auto p-4">
