@@ -45,7 +45,7 @@ apiClient.interceptors.response.use(
 export const authAPI = {
   login: async (email, password) => {
     try {
-      const response = await apiClient.post('/auth/token', {
+      const response = await apiClient.post('auth/token', {
         email: email,
         senha: password,
       });

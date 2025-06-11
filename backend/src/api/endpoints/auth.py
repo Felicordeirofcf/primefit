@@ -23,7 +23,7 @@ SECRET_KEY = os.getenv("JWT_SECRET_KEY", "chave_padrao")
 ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
 
 router = APIRouter()
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
 
 # ----------------------------
 # Registro de novo usuário
