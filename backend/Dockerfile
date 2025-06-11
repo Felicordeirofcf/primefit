@@ -14,18 +14,4 @@ COPY requirements.txt .
 
 # Forçar invalidação do cache para a instalação de dependências
 # Esta linha mudará a cada build, garantindo que a camada de pip install não seja cacheada
-RUN echo "Build timestamp: $(date +%s)"
-
-# Instala pip atualizado e as dependências do projeto
-RUN pip install --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
-
-# Copia o restante da aplicação
-COPY . .
-
-# Expõe a porta usada pelo Railway (geralmente 8080 ou a porta injetada)
-EXPOSE 8080
-
-# Comando para iniciar o servidor com Uvicorn usando a variável de ambiente PORT
-# 'main:app' refere-se ao arquivo main.py e à instância 'app' dentro dele
-CMD uvicorn main:app --host 0.0.0.0 --port $PORT
+# Removi a linha 'RUN echo 
