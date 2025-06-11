@@ -19,7 +19,7 @@ from src.schemas.models import PerfilResponse as UserResponse, CadastroSimples a
 from src.schemas.user import Token
 
 # Variáveis de ambiente para JWT
-SECRET_KEY = os.getenv("JWT_SECRET", "chave_padrao")
+SECRET_KEY = os.getenv("JWT_SECRET_KEY", "chave_padrao")
 ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
 
 router = APIRouter()
