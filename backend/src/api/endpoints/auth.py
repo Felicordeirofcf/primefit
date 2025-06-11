@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from datetime import timedelta, datetime
 from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
 from src.core.auth_utils import (
@@ -18,20 +19,21 @@ from src.schemas.user import Token
 router = APIRouter()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
 
+# ----------------------------
+# Registro de novo usuário
+# ----------------------------
 @router.post("/register", response_model=UserResponse)
 async def register(user_data: UserCreate, db: Session = Depends(get_db)):
     """
     Registra um novo usuário com dados simplificados.
     """
     existing_user = db.query(Profile).filter(Profile.email == user_data.email).first()
-    
     if existing_user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Email já está em uso"
         )
     
-    # Corrigido: usar senha (como está no Pydantic)
     hashed_password = get_password_hash(user_data.senha)
 
     new_profile = Profile(
@@ -39,8 +41,8 @@ async def register(user_data: UserCreate, db: Session = Depends(get_db)):
         email=user_data.email,
         password_hash=hashed_password,
         role="client",
-        criado_em=datetime.now(),
-        ultimo_login=datetime.now()
+        criado_em=datetime.utcnow(),
+        ultimo_login=datetime.utcnow()
     )
     db.add(new_profile)
     db.commit()
@@ -48,21 +50,20 @@ async def register(user_data: UserCreate, db: Session = Depends(get_db)):
     
     return new_profile
 
+# ----------------------------
+# Login com retorno de token
+# ----------------------------
 @router.post("/token", response_model=Token)
-async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+async def login_for_access_token(
+    form_data: OAuth2PasswordRequestForm = Depends(), 
+    db: Session = Depends(get_db)
+):
     """
     Autentica um usuário e retorna um token de acesso.
     """
     user = db.query(Profile).filter(Profile.email == form_data.username).first()
     
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Email ou senha incorretos",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    
-    if not verify_password(form_data.password, user.password_hash):
+    if not user or not verify_password(form_data.password, user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Email ou senha incorretos",
@@ -77,6 +78,9 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
     
     return {"access_token": access_token, "token_type": "bearer"}
 
+# ----------------------------
+# Utilitário: obter usuário autenticado via token
+# ----------------------------
 async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -88,22 +92,27 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = De
     if payload is None:
         raise credentials_exception
     
-    email: str = payload.get("sub")
-    user_id: str = payload.get("user_id")
+    email = payload.get("sub")
+    user_id = payload.get("user_id")
     
-    if email is None or user_id is None:
+    if not email or not user_id:
         raise credentials_exception
     
     user = db.query(Profile).filter(Profile.id == user_id, Profile.email == email).first()
-    
     if not user:
         raise credentials_exception
     
     return user
 
+# ----------------------------
+# Verifica se o usuário está autenticado
+# ----------------------------
 async def get_current_active_user(current_user: Profile = Depends(get_current_user)):
     return current_user
 
+# ----------------------------
+# Verifica se o usuário é admin
+# ----------------------------
 async def get_admin_user(current_user: Profile = Depends(get_current_user)):
     if current_user.role != "admin" and current_user.email != "felpcordeirofcf@gmail.com":
         raise HTTPException(
