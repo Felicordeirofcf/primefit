@@ -1,7 +1,7 @@
 from datetime import timedelta, datetime
 from typing import Optional
-
 import os
+
 from fastapi import APIRouter, Depends, HTTPException, status, WebSocket, Form
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
@@ -23,7 +23,7 @@ SECRET_KEY = os.getenv("SECRET_KEY", "seu_segredo_super_secreto_mude_em_producao
 ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
 
 router = APIRouter()
-oauth2_scheme = HTTPBearer()  # <- trocado aqui
+oauth2_scheme = HTTPBearer()
 
 # ----------------------------
 # Registro de novo usuário
@@ -42,8 +42,7 @@ async def register(user_data: UserCreate, db: Session = Depends(get_db)):
     new_profile = Profile(
         nome=user_data.nome,
         email=user_data.email,
-        password_hash=hashed_password,
-        role="client",
+        senha_hash=hashed_password,  # <- corrigido aqui
         criado_em=datetime.utcnow(),
         ultimo_login=datetime.utcnow()
     )
@@ -62,17 +61,16 @@ async def login_for_access_token(
     db: Session = Depends(get_db)
 ):
     user = db.query(Profile).filter(Profile.email == form_data.username).first()
+
+    if not user:
+        raise HTTPException(status_code=401, detail="Usuário não encontrado")
     
-    if not user or not verify_password(form_data.password, user.password_hash):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Email ou senha incorretos",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    
+    if not verify_password(form_data.password, user.senha_hash):  # <- corrigido aqui
+        raise HTTPException(status_code=401, detail="Senha incorreta")
+
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": user.email, "user_id": user.id, "role": user.role},
+        data={"sub": user.email, "user_id": str(user.id)},
         expires_delta=access_token_expires
     )
     
@@ -121,7 +119,7 @@ async def get_current_active_user(current_user: Profile = Depends(get_current_us
 # Verifica se o usuário é admin
 # ----------------------------
 async def get_admin_user(current_user: Profile = Depends(get_current_user)):
-    if current_user.role != "admin" and current_user.email != "felpcordeirofcf@gmail.com":
+    if current_user.email != "feliipefcf@gmail.com":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Permissão negada. Acesso restrito a administradores."
@@ -139,7 +137,7 @@ async def get_current_websocket_user(websocket: WebSocket):
 
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        return payload  # ou: return {"email": payload["sub"], "user_id": payload["user_id"]}
+        return payload
     except JWTError:
         await websocket.close(code=1008)
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Token inválido")
