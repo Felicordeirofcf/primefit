@@ -11,11 +11,11 @@ from src.schemas.user import ProfileUpdate # Assuming ProfileUpdate is in src.sc
 router = APIRouter()
 
 @router.get("/me", response_model=ProfileResponse)
-async def get_my_profile(current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+async def get_my_profile(current_user: ProfileModel = Depends(get_current_user), db: Session = Depends(get_db)):
     """
     Obtém o perfil do usuário atual.
     """
-    profile = db.query(ProfileModel).filter(ProfileModel.id == current_user["id"]).first()
+    profile = db.query(ProfileModel).filter(ProfileModel.id == current_user.id).first()
     
     if not profile:
         raise HTTPException(
@@ -26,11 +26,11 @@ async def get_my_profile(current_user: dict = Depends(get_current_user), db: Ses
     return profile
 
 @router.put("/me", response_model=ProfileResponse)
-async def update_my_profile(profile_data: ProfileUpdate, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+async def update_my_profile(profile_data: ProfileUpdate, current_user: ProfileModel = Depends(get_current_user), db: Session = Depends(get_db)):
     """
     Atualiza o perfil do usuário atual.
     """
-    profile = db.query(ProfileModel).filter(ProfileModel.id == current_user["id"]).first()
+    profile = db.query(ProfileModel).filter(ProfileModel.id == current_user.id).first()
     
     if not profile:
         raise HTTPException(
@@ -48,12 +48,12 @@ async def update_my_profile(profile_data: ProfileUpdate, current_user: dict = De
     return profile
 
 @router.get("/{user_id}", response_model=ProfileResponse)
-async def get_profile_by_id(user_id: str, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+async def get_profile_by_id(user_id: str, current_user: ProfileModel = Depends(get_current_user), db: Session = Depends(get_db)):
     """
     Obtém o perfil de um usuário específico.
     """
     # Verificar se o usuário atual é o proprietário do perfil ou um admin
-    if current_user["id"] != user_id and current_user.get("role") != "admin":
+    if current_user.id != user_id and current_user.role != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Acesso negado"
@@ -70,12 +70,10 @@ async def get_profile_by_id(user_id: str, current_user: dict = Depends(get_curre
     return profile
 
 @router.get("/", response_model=List[ProfileResponse])
-async def get_all_profiles(skip: int = 0, limit: int = 100, current_user: dict = Depends(get_admin_user), db: Session = Depends(get_db)):
+async def get_all_profiles(skip: int = 0, limit: int = 100, current_user: ProfileModel = Depends(get_admin_user), db: Session = Depends(get_db)):
     """
     Obtém todos os perfis (apenas para administradores).
     """
     profiles = db.query(ProfileModel).order_by(ProfileModel.criado_em.desc()).offset(skip).limit(limit).all()
     
     return profiles or []
-
-

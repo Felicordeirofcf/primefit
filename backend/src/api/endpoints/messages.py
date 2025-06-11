@@ -21,7 +21,7 @@ class ConnectionManager:
         await websocket.accept()
         self.active_connections[user_id] = websocket
     
-    def disconnect(self, user_id: str):
+    async def disconnect(self, user_id: str):
         if user_id in self.active_connections:
             del self.active_connections[user_id]
     
@@ -35,8 +35,21 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
+# Helper function to get admin profile
+async def get_admin_profile(db: Session = Depends(get_db)):
+    admin_user = db.query(Profile).filter(Profile.role == "admin").first()
+    if not admin_user:
+        # Fallback to specific email if no user with role \'admin\'
+        admin_user = db.query(Profile).filter(Profile.email == "felpcordeirofcf@gmail.com").first()
+    if not admin_user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Admin user not found"
+        )
+    return admin_user
+
 @router.post("/", response_model=MessageResponse)
-async def create_message(message: MessageCreate, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+async def create_message(message: MessageCreate, current_user: Profile = Depends(get_current_user), db: Session = Depends(get_db)):
     """
     Cria uma nova mensagem.
     """
@@ -82,21 +95,36 @@ async def create_message(message: MessageCreate, current_user: dict = Depends(ge
     return db_message
 
 @router.get("/", response_model=List[MessageResponse])
-async def get_my_messages(current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+async def get_my_messages(current_user: Profile = Depends(get_current_user), db: Session = Depends(get_db)):
     """
     Obtém todas as mensagens do usuário atual.
     """
-    messages = db.query(Mensagem).filter(Mensagem.usuario_id == current_user["id"]).order_by(Mensagem.enviado_em.desc()).all()
+    messages = db.query(Mensagem).filter(Mensagem.usuario_id == current_user.id).order_by(Mensagem.enviado_em.desc()).all()
     
     return messages or []
 
 @router.get("/conversation/{other_user_id}", response_model=List[MessageResponse])
-async def get_conversation(other_user_id: str, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+async def get_conversation(
+    other_user_id: str,
+    current_user: Profile = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
     """
     Obtém a conversa entre o usuário atual e outro usuário.
+    
+    NOTA: O modelo Mensagem atual (com apenas \'usuario_id\' como destinatário)
+    não permite uma representação completa de uma conversa bidirecional (remetente/destinatário).
+    Esta implementação retorna todas as mensagens onde o usuário atual OU o outro usuário
+    é o destinatário. Para uma conversa completa, o modelo Mensagem precisaria de \'sender_id\' e \'receiver_id\'.
     """
-    # Verificar se o outro usuário existe
-    other_user = db.query(Profile).filter(Profile.id == other_user_id).first()
+    target_user_id = other_user_id
+
+    if other_user_id == "admin":
+        admin_profile = await get_admin_profile(db)
+        target_user_id = admin_profile.id
+    
+    # Verificar se o usuário alvo existe (seja o ID original ou o ID do admin resolvido)
+    other_user = db.query(Profile).filter(Profile.id == target_user_id).first()
     
     if not other_user:
         raise HTTPException(
@@ -104,30 +132,24 @@ async def get_conversation(other_user_id: str, current_user: dict = Depends(get_
             detail="Usuário não encontrado"
         )
     
-    # Obter as mensagens da conversa
+    # Consulta para mensagens onde o destinatário é o usuário atual OU o usuário alvo
+    # Esta é uma solução paliativa devido à limitação do modelo Mensagem.
     messages = db.query(Mensagem).filter(
         or_(
-            (Mensagem.usuario_id == current_user["id"]) & (Mensagem.usuario_id == other_user_id), # This logic needs to be refined for sender/receiver
-            (Mensagem.usuario_id == other_user_id) & (Mensagem.usuario_id == current_user["id"])
+            Mensagem.usuario_id == current_user.id,
+            Mensagem.usuario_id == target_user_id
         )
     ).order_by(Mensagem.enviado_em.asc()).all()
-    
-    # NOTE: The Mensagem model only has `usuario_id`. It needs `sender_id` and `receiver_id` to properly handle conversations.
-    # For now, I'm adapting based on the existing model, but this will need a schema change if true conversations are needed.
-    
-    # Marcar mensagens recebidas como lidas (assuming a field like `is_read` exists in Mensagem model)
-    # db.query(Mensagem).filter(Mensagem.usuario_id == other_user_id, Mensagem.usuario_id == current_user["id"], Mensagem.is_read == False).update({"is_read": True})
-    # db.commit()
     
     return messages or []
 
 @router.put("/read/{message_id}")
-async def mark_message_as_read(message_id: str, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+async def mark_message_as_read(message_id: str, current_user: Profile = Depends(get_current_user), db: Session = Depends(get_db)):
     """
     Marca uma mensagem como lida.
     """
     # Verificar se a mensagem existe e pertence ao usuário
-    message = db.query(Mensagem).filter(Mensagem.id == message_id, Mensagem.usuario_id == current_user["id"]).first()
+    message = db.query(Mensagem).filter(Mensagem.id == message_id, Mensagem.usuario_id == current_user.id).first()
     
     if not message:
         raise HTTPException(
@@ -135,7 +157,7 @@ async def mark_message_as_read(message_id: str, current_user: dict = Depends(get
             detail="Mensagem não encontrada ou você não tem permissão para acessá-la"
         )
     
-    # Marcar como lida (assuming a field like `is_read` exists in Mensagem model)
+    # Marcar como lida (assuming a field like \'is_read\' exists in Mensagem model)
     # message.is_read = True
     # db.commit()
     # db.refresh(message)
@@ -214,5 +236,3 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, db: Session = D
     except Exception as e:
         print(f"Erro no WebSocket: {e}")
         manager.disconnect(user_id)
-
-

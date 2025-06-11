@@ -13,7 +13,7 @@ const apiClient = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-});
+} );
 
 // Interceptor para adicionar token de autenticação
 apiClient.interceptors.request.use(
@@ -45,9 +45,14 @@ apiClient.interceptors.response.use(
 export const authAPI = {
   login: async (email, password) => {
     try {
-      const response = await apiClient.post('auth/token', {
-        email: email,
-        senha: password,
+      const formData = new URLSearchParams();
+      formData.append('username', email);
+      formData.append('password', password);
+
+      const response = await apiClient.post('auth/token', formData, {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
       });
       
       // Salvar token e dados do usuário
@@ -417,5 +422,3 @@ export const adminAPI = {
 
 // Exportar o cliente de API
 export default apiClient;
-
-
