@@ -152,7 +152,7 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, current_user: d
     # The current_user is now obtained from the WebSocket token
     # You can add a check here to ensure current_user["id"] matches user_id if needed
     if current_user["id"] != user_id:
-        print(f"WebSocket: Mismatch between token user_id ({current_user["id"]}) and path user_id ({user_id}).")
+        print(f"WebSocket: Mismatch between token user_id ({current_user['id']}) and path user_id ({user_id}).")
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
         return
 

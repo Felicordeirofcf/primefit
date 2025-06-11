@@ -12,7 +12,7 @@ from src.core.models import Base
 load_dotenv()
 
 # Importar rotas
-from routes import auth, cadastro, cliente, upload_pdf, trainings, assessments, progress, messages, profiles
+from routes import auth, cadastro, cliente, upload_pdf, trainings, assessments, progress, messages, profiles, gemini
 
 # Criar aplicação FastAPI
 app = FastAPI(
@@ -52,6 +52,7 @@ app.include_router(assessments.router, tags=["Avaliações"]) # Removido prefixo
 app.include_router(progress.router, tags=["Progresso"]) # Removido prefixo /api
 app.include_router(messages.router, tags=["Mensagens"]) # Removido prefixo /api
 app.include_router(profiles.router, tags=["Perfis"]) # Removido prefixo /api
+app.include_router(gemini.router, tags=["IA Gemini"]) # Novas funcionalidades de IA
 
 # Tratamento global de exceções
 @app.exception_handler(Exception)

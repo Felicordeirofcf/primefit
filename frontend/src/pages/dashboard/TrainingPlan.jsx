@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../hooks/useAuth'; // Assuming useAuth provides user, loading, and session
+import SmartTraining from '../../components/SmartTraining';
+import NutritionRecommendations from '../../components/NutritionRecommendations';
+import ChatBot from '../../components/ChatBot';
 
 // API URL from environment variables
 const API_URL = import.meta.env.VITE_API_URL;
@@ -174,12 +177,38 @@ const TrainingPlan = () => {
   // 5. Show main content (training list and details)
   return (
     <div className="p-4 md:p-6 lg:p-8 space-y-6 bg-gray-50 min-h-screen">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2 md:mb-0">Meus Treinos</h1>
-        <div className="text-sm text-gray-500">
-          {trainings.length} treino{trainings.length !== 1 ? 's' : ''} disponível{trainings.length !== 1 ? 'is' : ''}
-        </div>
+      {/* Tabs para diferentes seções */}
+      <div className="flex space-x-1 bg-gray-100 rounded-lg p-1 mb-6">
+        <button className="flex-1 flex items-center justify-center py-3 px-4 rounded-md bg-white text-blue-600 shadow-sm">
+          Treinos Tradicionais
+        </button>
+        <button 
+          onClick={() => window.location.hash = '#smart-training'}
+          className="flex-1 flex items-center justify-center py-3 px-4 rounded-md text-gray-600 hover:text-gray-800"
+        >
+          Treinos Inteligentes
+        </button>
+        <button 
+          onClick={() => window.location.hash = '#nutrition'}
+          className="flex-1 flex items-center justify-center py-3 px-4 rounded-md text-gray-600 hover:text-gray-800"
+        >
+          Nutrição
+        </button>
       </div>
+
+      {/* Conteúdo baseado na hash da URL */}
+      {window.location.hash === '#smart-training' ? (
+        <SmartTraining />
+      ) : window.location.hash === '#nutrition' ? (
+        <NutritionRecommendations />
+      ) : (
+        <>
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center">
+            <h1 className="text-3xl font-bold text-gray-900 mb-2 md:mb-0">Meus Treinos</h1>
+            <div className="text-sm text-gray-500">
+              {trainings.length} treino{trainings.length !== 1 ? 's' : ''} disponível{trainings.length !== 1 ? 'is' : ''}
+            </div>
+          </div>
 
       {trainings.length > 0 ? (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -366,9 +395,13 @@ const TrainingPlan = () => {
           {/* <button className="...">Entrar em Contato</button> */}
         </div>
       )}
+        </>
+      )}
+      
+      {/* Chatbot de Suporte */}
+      <ChatBot type="support" />
     </div>
   );
 };
 
 export default TrainingPlan;
-

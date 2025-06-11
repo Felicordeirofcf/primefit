@@ -1,10 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException, status, WebSocket, Query
+from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from datetime import timedelta, datetime
 from typing import Optional
 from sqlalchemy.orm import Session
-from jose import jwt, JWTError
-import os
 
 from src.core.auth_utils import (
     verify_password, 
@@ -19,10 +17,6 @@ from src.schemas.user import Token
 
 router = APIRouter()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
-
-# Definições de chave secreta e algoritmo (devem ser carregadas de variáveis de ambiente em produção)
-SECRET_KEY = os.getenv("SECRET_KEY", "super-secret-key") # Use uma chave forte em produção
-ALGORITHM = os.getenv("ALGORITHM", "HS256")
 
 @router.post("/register", response_model=UserResponse)
 async def register(user_data: UserCreate, db: Session = Depends(get_db)):
@@ -117,31 +111,3 @@ async def get_admin_user(current_user: Profile = Depends(get_current_user)):
             detail="Permissão negada. Acesso restrito a administradores."
         )
     return current_user
-
-async def get_current_websocket_user(websocket: WebSocket, db: Session = Depends(get_db)):
-    token = websocket.query_params.get("token")
-    if token is None:
-        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Token ausente")
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Token ausente")
-    
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        email: str = payload.get("sub")
-        user_id: str = payload.get("user_id")
-
-        if email is None or user_id is None:
-            await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Token inválido")
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Token inválido")
-        
-        user = db.query(Profile).filter(Profile.id == user_id, Profile.email == email).first()
-        
-        if not user:
-            await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Usuário não encontrado")
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Usuário não encontrado")
-        
-        return user
-    except JWTError:
-        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Token inválido")
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Token inválido")
-
-

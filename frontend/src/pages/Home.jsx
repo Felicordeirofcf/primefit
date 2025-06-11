@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import logo from '../assets/primelogo.png';
 import produto1 from '../assets/ozenfitdepoimento.jpg';
 import produto2 from '../assets/ozenfitdepoimento2.jpg';
+import ChatBot from '../components/ChatBot';
 
 export default function Home() {
   const imagens = [produto1, produto2];
@@ -114,6 +115,9 @@ export default function Home() {
           <footer>— Camila R., Curitiba - PR</footer>
         </blockquote>
       </section>
+      
+      {/* Chatbot de Pré-venda */}
+      <ChatBot type="pre-venda" />
     </div>
   );
 }

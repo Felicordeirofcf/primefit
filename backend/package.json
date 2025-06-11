@@ -1,0 +1,20 @@
+{
+  "name": "primefit-backend",
+  "version": "2.0.0",
+  "description": "Backend do PrimeFit com IA Gemini",
+  "main": "main.py",
+  "scripts": {
+    "start": "python3.11 -m uvicorn main:app --host 0.0.0.0 --port 8000",
+    "dev": "python3.11 -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload",
+    "test": "python3.11 test_gemini.py"
+  },
+  "dependencies": {
+    "fastapi": "^0.115.12",
+    "uvicorn": "^0.34.3",
+    "google-generativeai": "^0.8.5",
+    "python-dotenv": "^1.1.0",
+    "sqlalchemy": "^2.0.41",
+    "psycopg2-binary": "^2.9.10"
+  }
+}
+
