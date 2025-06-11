@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Configurações de segurança
-SECRET_KEY = os.getenv("JWT_SECRET_KEY", "seu_segredo_super_secreto_mude_em_producao")
+SECRET_KEY = os.getenv("SECRET_KEY", "seu_segredo_super_secreto_mude_em_producao")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 dias
 
