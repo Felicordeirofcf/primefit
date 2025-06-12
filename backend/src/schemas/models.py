@@ -14,8 +14,7 @@ class Usuario(Base):
     id = Column(String, primary_key=True)
     nome = Column(String)
     email = Column(String, unique=True, index=True)
-    senha_hash = Column(String)  # Coluna para hash de senha
-    password_hash = Column(String)  # Coluna alternativa para hash de senha
+    senha_hash = Column(String)  # Apenas esta coluna para hash de senha
     tipo_usuario = Column(String, default="client")
     role = Column(String, default="client")
     is_admin = Column(Boolean, default=False)

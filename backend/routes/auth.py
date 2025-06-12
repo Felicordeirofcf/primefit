@@ -32,15 +32,12 @@ def authenticate_user(db: Session, email: str, password: str):
             logger.warning(f"Tentativa de login com email não cadastrado: {email}")
             return False
         
-        # Verifica se a senha está correta
-        # Tenta primeiro password_hash, depois senha_hash para compatibilidade
-        stored_hash = user.password_hash if hasattr(user, "password_hash") and user.password_hash else getattr(user, "senha_hash", None)
-        
-        if not stored_hash:
+        # Verifica se a senha está correta - usando apenas senha_hash
+        if not hasattr(user, "senha_hash") or not user.senha_hash:
             logger.error(f"Usuário {email} não tem hash de senha armazenado")
             return False
         
-        if not verify_password(password, stored_hash):
+        if not verify_password(password, user.senha_hash):
             logger.warning(f"Senha incorreta para usuário: {email}")
             return False
         
