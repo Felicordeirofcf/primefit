@@ -8,6 +8,7 @@ import logging
 
 from src.core.database import get_db
 from src.core.auth_utils import verify_password, get_password_hash, create_access_token, decode_access_token
+from src.core.models import Usuario
 from src.schemas.user import UserCreate, UsuarioResponse
 
 # Configuração de logging
