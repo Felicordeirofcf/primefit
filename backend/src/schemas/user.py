@@ -6,9 +6,9 @@ from typing import Optional
 from datetime import datetime
 from enum import Enum # Importar Enum
 
-class TipoUsuarioEnum(str, Enum):
+class RoleEnum(str, Enum):
     admin = "admin"
-    client = "client" # Alterado de 'cliente' para 'client' para corresponder ao default do modelo Usuario
+    cliente = "cliente"
 
 class UserBase(BaseModel):
     """Esquema base para usuários"""
@@ -19,7 +19,8 @@ class UserCreate(UserBase):
     nome: str
     senha: str = Field(..., min_length=6)
     whatsapp: Optional[str] = None
-    tipo_usuario: TipoUsuarioEnum = TipoUsuarioEnum.client # Usar o Enum
+    tipo_usuario: Optional[str] = "client" # Mantido para compatibilidade, mas role será o principal
+    role: RoleEnum = RoleEnum.cliente # Usar o Enum para role
     endereco: Optional[str] = None
     cidade: Optional[str] = None
     cep: Optional[str] = None
@@ -96,6 +97,7 @@ class UsuarioResponse(UserBase):
     cep: Optional[str] = None
     telefone: Optional[str] = None
     whatsapp: Optional[str] = None
+    role: str # Adicionado o campo role ao UsuarioResponse
 
     class Config:
         from_attributes = True

@@ -185,9 +185,9 @@ async def register_user(user_data: UserCreate, db: Session = Depends(get_db)):
             nome=user_data.nome,
             email=user_data.email,
             senha_hash=hashed_password,
-            tipo_usuario=user_data.tipo_usuario,
-            role=user_data.tipo_usuario, # Manter role se estiver no modelo Usuario
-            is_admin=user_data.tipo_usuario == "admin",
+            tipo_usuario=user_data.tipo_usuario, # Manter tipo_usuario se ainda for usado em algum lugar
+            role=user_data.role, # Usar user_data.role
+            is_admin=user_data.role == "admin", # Usar user_data.role para is_admin
             created_at=datetime.now(),
             updated_at=datetime.now(),
             endereco=user_data.endereco,
