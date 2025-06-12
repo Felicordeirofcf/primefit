@@ -22,7 +22,7 @@ from src.core.models import Base
 
 # Modelos com títulos únicos (para evitar conflito no Swagger)
 from src.schemas.user import UserCreate # Corrigido: Importando UserCreate do local correto
-from routes.cliente import ClienteRead # Mantido, mas pode precisar de revisão se ClienteRead não for mais usado
+# from routes.cliente import ClienteRead # Removido: ClienteRead não é mais usado
 
 # Rotas
 from routes import (
