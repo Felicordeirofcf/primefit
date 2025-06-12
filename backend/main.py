@@ -2,7 +2,7 @@ import os
 import logging
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, FileResponse, Response # Importar Response
+from fastapi.responses import JSONResponse, FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
 
@@ -21,8 +21,8 @@ from src.core.database import create_tables
 from src.core.models import Base
 
 # Modelos com títulos únicos (para evitar conflito no Swagger)
-from routes.cadastro import ClienteCreate
-from routes.cliente import ClienteRead
+from src.schemas.user import UserCreate # Corrigido: Importando UserCreate do local correto
+from routes.cliente import ClienteRead # Mantido, mas pode precisar de revisão se ClienteRead não for mais usado
 
 # Rotas
 from routes import (
