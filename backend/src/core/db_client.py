@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 from .database import get_db, SessionLocal
-from .models import Usuario, Cliente, TreinoEnviado, Evento
+from .models import Usuario, TreinoEnviado, Evento # Removido Cliente
 from typing import Optional, List
 from datetime import datetime
 import uuid
@@ -57,22 +57,6 @@ class DatabaseClient:
         return [self._user_to_dict(user) for user in users]
 
     # ---------------------------
-    # 👥 Operações de Cliente (opcional)
-    # ---------------------------
-    def create_client(self, client_data: dict) -> dict:
-        """Cria um novo cliente"""
-        client = Cliente(**client_data)
-        self.db.add(client)
-        self.db.commit()
-        self.db.refresh(client)
-        return self._client_to_dict(client)
-
-    def get_client_by_email(self, email: str) -> Optional[dict]:
-        """Busca cliente por email"""
-        client = self.db.query(Cliente).filter(Cliente.email == email).first()
-        return self._client_to_dict(client) if client else None
-
-    # ---------------------------
     # 🏋️ Treinos
     # ---------------------------
     def create_training_record(self, training_data: dict) -> dict:
@@ -85,8 +69,9 @@ class DatabaseClient:
 
     def get_trainings_by_client_email(self, client_email: str) -> List[dict]:
         """Busca treinos enviados para um cliente específico"""
+        # Assumindo que TreinoEnviado tem um campo para o email do cliente
         trainings = self.db.query(TreinoEnviado).filter(
-            TreinoEnviado.cliente_email == client_email
+            TreinoEnviado.usuario_id == client_email # Alterado para usuario_id, assumindo que é o email ou ID do usuário
         ).order_by(TreinoEnviado.enviado_em.desc()).all()
         return [self._training_to_dict(training) for training in trainings]
 
@@ -118,22 +103,16 @@ class DatabaseClient:
             "is_admin": user.is_admin,
             "treino_pdf": user.treino_pdf,
             "created_at": user.created_at.isoformat() if user.created_at else None,
-            "updated_at": user.updated_at.isoformat() if user.updated_at else None
+            "updated_at": user.updated_at.isoformat() if user.updated_at else None,
+            "role": user.role # Adicionado role
         }
 
-    def _client_to_dict(self, client: Cliente) -> dict:
-        return {
-            "id": client.id,
-            "nome": client.nome,
-            "email": client.email,
-            "telefone": client.telefone,
-            "created_at": client.created_at.isoformat() if client.created_at else None
-        }
+    # Removido _client_to_dict e métodos relacionados a Cliente
 
     def _training_to_dict(self, training: TreinoEnviado) -> dict:
         return {
             "id": training.id,
-            "cliente_email": training.cliente_email,
+            "usuario_id": training.usuario_id, # Alterado para usuario_id
             "url_pdf": training.url_pdf,
             "nome_arquivo": training.nome_arquivo,
             "enviado_em": training.enviado_em.isoformat() if training.enviado_em else None
@@ -155,3 +134,5 @@ class DatabaseClient:
 # ---------------------------
 def get_database_client() -> DatabaseClient:
     return DatabaseClient()
+
+
