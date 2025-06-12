@@ -15,6 +15,10 @@ class UserCreate(UserBase):
     senha: str = Field(..., min_length=6)
     whatsapp: Optional[str] = None
     tipo_usuario: str = "client" # Adicionado o campo tipo_usuario
+    endereco: Optional[str] = None # Adicionado o campo endereco
+    cidade: Optional[str] = None # Adicionado o campo cidade
+    cep: Optional[str] = None # Adicionado o campo cep
+    telefone: Optional[str] = None # Adicionado o campo telefone
 
 class UserLogin(UserBase):
     """Esquema para login de usuários"""
