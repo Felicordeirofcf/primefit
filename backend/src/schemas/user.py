@@ -14,6 +14,7 @@ class UserCreate(UserBase):
     nome: str
     senha: str = Field(..., min_length=6)
     whatsapp: Optional[str] = None
+    tipo_usuario: str = "client" # Adicionado o campo tipo_usuario
 
 class UserLogin(UserBase):
     """Esquema para login de usuários"""
@@ -89,5 +90,7 @@ class UsuarioResponse(UserBase):
 
     class Config:
         from_attributes = True
+
+
 
 
