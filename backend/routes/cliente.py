@@ -47,20 +47,41 @@ async def cadastrar_cliente(user_data: UserCreate): # Usar UserCreate
         print("❌ Erro no cadastro de cliente:", e)
         raise HTTPException(status_code=500, detail=f"Erro interno: {str(e)}")
 
-# 📥 ROTA: listar treinos PDF enviados para o cliente autenticado
+# 📥 ROTA: listar treinos PDF enviados com filtros dinâmicos
 @router.get(
     "/treinos-enviados",
     response_model=List[TreinoEnviadoOut],
     dependencies=[Depends(get_current_user)],
     operation_id="listar_treinos_enviados_get"
 )
-async def listar_treinos_enviados(current_user: UsuarioResponse = Depends(get_current_user)): # Obter o objeto Usuario
+async def listar_treinos_enviados(
+    # Query parameters para filtros dinâmicos
+    usuario_id: Optional[str] = None,
+    nome_arquivo: Optional[str] = None,
+    # Parâmetros de paginação
+    skip: int = 0,
+    limit: int = 100,
+    current_user: UsuarioResponse = Depends(get_current_user)
+): # Obter o objeto Usuario
     try:
         db_client = get_database_client()
         
-        # Buscar treinos enviados para o usuário pelo ID ou email
-        # Assumindo que TreinoEnviado.usuario_id armazena o ID do usuário
-        trainings = db_client.get_trainings_by_client_email(current_user.id) # Usar current_user.id
+        # Se usuario_id não for especificado, usar o ID do usuário atual
+        target_user_id = usuario_id if usuario_id else current_user.id
+        
+        # Buscar treinos enviados com filtros
+        # Esta implementação depende da estrutura do db_client
+        # Assumindo que existe um método que aceita filtros
+        if nome_arquivo:
+            trainings = db_client.get_trainings_by_filters(
+                usuario_id=target_user_id,
+                nome_arquivo=nome_arquivo,
+                skip=skip,
+                limit=limit
+            )
+        else:
+            trainings = db_client.get_trainings_by_client_email(target_user_id)
+        
         db_client.close()
         
         return trainings

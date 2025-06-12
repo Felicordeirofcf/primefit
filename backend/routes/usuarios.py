@@ -186,10 +186,19 @@ async def get_profile_by_id(
         )
 
 # ----------------------------
-# Listar todos os perfis (somente admin)
+# Listar todos os perfis com filtros dinâmicos (somente admin)
 # ----------------------------
 @router.get("/", response_model=List[UsuarioResponse])
 async def get_all_profiles(
+    # Query parameters para filtros dinâmicos
+    email: Optional[str] = None,
+    nome: Optional[str] = None,
+    tipo_usuario: Optional[str] = None,
+    cidade: Optional[str] = None,
+    telefone: Optional[str] = None,
+    whatsapp: Optional[str] = None,
+    role: Optional[str] = None,
+    # Parâmetros de paginação
     skip: int = 0,
     limit: int = 100,
     current_user: UsuarioModel = Depends(get_current_user),
@@ -206,8 +215,31 @@ async def get_all_profiles(
                 detail="Acesso negado. Requer privilégios de administrador."
             )
         
-        usuarios = db.query(UsuarioModel)\
-            .order_by(UsuarioModel.created_at.desc())\
+        # Construção da query base
+        query = db.query(UsuarioModel)
+        
+        # Aplicação de filtros dinâmicos
+        if email:
+            query = query.filter(UsuarioModel.email == email)
+        if nome:
+            query = query.filter(UsuarioModel.nome.ilike(f"%{nome}%"))
+        if tipo_usuario:
+            query = query.filter(UsuarioModel.tipo_usuario == tipo_usuario)
+        if cidade:
+            query = query.filter(UsuarioModel.cidade.ilike(f"%{cidade}%"))
+        if telefone:
+            query = query.filter(UsuarioModel.telefone == telefone)
+        if whatsapp:
+            query = query.filter(UsuarioModel.whatsapp == whatsapp)
+        if role:
+            # Filtro por role, considerando que pode ser igual ao tipo_usuario
+            query = query.filter(
+                (UsuarioModel.role == role) | 
+                (UsuarioModel.tipo_usuario == role)
+            )
+        
+        # Execução da query com ordenação e paginação
+        usuarios = query.order_by(UsuarioModel.created_at.desc())\
             .offset(skip).limit(limit).all()
         
         # Converte cada usuário para um dicionário para evitar problemas de serialização
@@ -228,6 +260,9 @@ async def get_all_profiles(
                 "is_admin": getattr(usuario, "is_admin", False),
                 "role": getattr(usuario, "role", usuario.tipo_usuario)
             })
+        
+        logger.info(f"Filtros aplicados - email: {email}, nome: {nome}, tipo_usuario: {tipo_usuario}, cidade: {cidade}, telefone: {telefone}, whatsapp: {whatsapp}, role: {role}")
+        logger.info(f"Retornando {len(result)} usuários")
         
         return result
     except HTTPException:

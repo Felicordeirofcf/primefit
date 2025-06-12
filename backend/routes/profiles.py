@@ -126,19 +126,38 @@ async def get_profile_by_id(
         )
 
 # ----------------------------
-# Listar todos os perfis (somente admin)
+# Listar todos os perfis com filtros dinâmicos (somente admin)
 # ----------------------------
 @router.get("/", response_model=List[ProfileResponse])
 async def get_all_profiles(
+    # Query parameters para filtros dinâmicos
+    email: Optional[str] = None,
+    nome: Optional[str] = None,
+    tipo_usuario: Optional[str] = None,
+    # Parâmetros de paginação
     skip: int = 0,
     limit: int = 100,
     current_user: ProfileModel = Depends(get_admin_user),
     db: Session = Depends(get_db)
 ):
     try:
-        profiles = db.query(ProfileModel)\
-            .order_by(ProfileModel.criado_em.desc())\
+        # Construção da query base
+        query = db.query(ProfileModel)
+        
+        # Aplicação de filtros dinâmicos
+        if email:
+            query = query.filter(ProfileModel.email == email)
+        if nome:
+            query = query.filter(ProfileModel.nome.ilike(f"%{nome}%"))
+        if tipo_usuario:
+            query = query.filter(ProfileModel.tipo_usuario == tipo_usuario)
+        
+        # Execução da query com ordenação e paginação
+        profiles = query.order_by(ProfileModel.criado_em.desc())\
             .offset(skip).limit(limit).all()
+        
+        logger.info(f"Filtros aplicados - email: {email}, nome: {nome}, tipo_usuario: {tipo_usuario}")
+        logger.info(f"Retornando {len(profiles)} perfis")
         
         # Retorna a lista diretamente, orm_mode fará a conversão de cada item
         return profiles

@@ -9,6 +9,12 @@ router = APIRouter()
 
 @router.get("/", response_model=List[UserResponse])
 async def get_users(
+    # Query parameters para filtros dinâmicos
+    email: Optional[str] = None,
+    nome: Optional[str] = None,
+    role: Optional[str] = None,
+    tipo_usuario: Optional[str] = None,
+    # Parâmetros de paginação
     skip: int = 0, 
     limit: int = 100,
     current_user: dict = Depends(get_current_user),
@@ -22,7 +28,22 @@ async def get_users(
         )
     
     try:
-        users = db.query(UserProfile).offset(skip).limit(limit).all()
+        # Construção da query base
+        query = db.query(UserProfile)
+        
+        # Aplicação de filtros dinâmicos
+        if email:
+            query = query.filter(UserProfile.email == email)
+        if nome:
+            query = query.filter(UserProfile.nome.ilike(f"%{nome}%"))
+        if role:
+            query = query.filter(UserProfile.role == role)
+        if tipo_usuario:
+            query = query.filter(UserProfile.tipo_usuario == tipo_usuario)
+        
+        # Execução da query com paginação
+        users = query.offset(skip).limit(limit).all()
+        
         return users
     except Exception as e:
         raise HTTPException(
