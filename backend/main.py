@@ -88,7 +88,7 @@ async def favicon():
     favicon_path = os.path.join("static", "favicon.ico")
     if os.path.exists(favicon_path):
         return FileResponse(favicon_path)
-    return JSONResponse(status_code=204)
+    return JSONResponse(content=None, status_code=204)
 
 # Rota de verificação de status
 @app.get("/health", include_in_schema=True, tags=["Sistema"])

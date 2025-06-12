@@ -186,7 +186,7 @@ async def register_user(user_data: UserCreate, db: Session = Depends(get_db)):
             email=user_data.email,
             senha_hash=hashed_password,
             tipo_usuario=user_data.tipo_usuario,
-            role=user_data.tipo_usuario,
+            role=user_data.tipo_usuario, # Manter role se estiver no modelo Usuario
             is_admin=user_data.tipo_usuario == "admin",
             created_at=datetime.now(),
             updated_at=datetime.now(),
@@ -204,7 +204,7 @@ async def register_user(user_data: UserCreate, db: Session = Depends(get_db)):
         logger.info(f"Usuário registrado com sucesso: {user_data.email}")
         
         # Retorna o usuário criado
-        return UsuarioResponse(**new_user.__dict__)
+        return UsuarioResponse.model_validate(new_user) # Alterado para model_validate
     except HTTPException:
         raise
     except Exception as e:
@@ -213,6 +213,5 @@ async def register_user(user_data: UserCreate, db: Session = Depends(get_db)):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Erro no registro: {str(e)}"
         )
-
 
 

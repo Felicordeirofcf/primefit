@@ -11,12 +11,12 @@ Base = declarative_base()
 class Usuario(Base):
     __tablename__ = "usuarios"  # Nome da tabela no PostgreSQL
 
-    id = Column(String, primary_key=True)
-    nome = Column(String)
+    id = Column(String, primary_key=True, index=True)
+    nome = Column(String, nullable=False)
     email = Column(String, unique=True, index=True)
-    senha_hash = Column(String)  # Apenas esta coluna para hash de senha
-    tipo_usuario = Column(String, default="client")
-    role = Column(String, default="client")
+    senha_hash = Column(String, nullable=False)
+    tipo_usuario = Column(String, nullable=False, default="client")
+    role = Column(String, nullable=False, default="client")
     is_admin = Column(Boolean, default=False)
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
@@ -327,3 +327,5 @@ class CadastroSimples(BaseModel):
     email: EmailStr
     senha: str
     whatsapp: str
+
+
