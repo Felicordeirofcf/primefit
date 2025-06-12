@@ -2,14 +2,14 @@ import os
 import logging
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi.responses import JSONResponse, FileResponse, Response # Importar Response
 from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
 
 # Configuração de logging
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
 
@@ -88,7 +88,7 @@ async def favicon():
     favicon_path = os.path.join("static", "favicon.ico")
     if os.path.exists(favicon_path):
         return FileResponse(favicon_path)
-    return JSONResponse(content=None, status_code=204)
+    return Response(status_code=204) # Corrigido para usar Response com status_code=204
 
 # Rota de verificação de status
 @app.get("/health", include_in_schema=True, tags=["Sistema"])
@@ -137,3 +137,5 @@ async def startup_event():
         logger.info("✅ Tabelas criadas com sucesso.")
     except Exception as e:
         logger.error(f"❌ Erro ao criar tabelas: {e}", exc_info=True)
+
+
