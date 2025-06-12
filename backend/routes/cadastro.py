@@ -8,7 +8,6 @@ import uuid
 
 router = APIRouter()
 
-# 📦 Modelo de dados para cadastro de clientes/leads - Agora usa UserCreate
 @router.post("/clientes", response_model=UsuarioResponse, status_code=status.HTTP_201_CREATED)
 async def cadastrar_cliente(user_data: UserCreate):
     """
@@ -18,15 +17,12 @@ async def cadastrar_cliente(user_data: UserCreate):
     try:
         db_client = get_database_client()
 
-        # 🔎 Verifica duplicidade por e-mail
         existing_user = db_client.get_user_by_email(user_data.email)
         if existing_user:
             raise HTTPException(status_code=400, detail="E-mail já cadastrado.")
 
-        # 🔐 Gera hash da senha
         hashed_password = get_password_hash(user_data.senha)
 
-        # Prepara dados para inserção
         user_data_dict = user_data.model_dump()
         user_data_dict["senha_hash"] = hashed_password
         del user_data_dict["senha"]
@@ -36,7 +32,6 @@ async def cadastrar_cliente(user_data: UserCreate):
         user_data_dict["updated_at"] = datetime.now()
         user_data_dict["is_admin"] = (user_data.role == RoleEnum.admin)
 
-        # 📤 Insere no banco
         created_user = db_client.create_user(user_data_dict)
         db_client.close()
 
