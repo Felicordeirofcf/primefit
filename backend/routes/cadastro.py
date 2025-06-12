@@ -22,9 +22,4 @@ async def cadastrar_cliente(user_data: UserCreate):  # Usar user_data do tipo Us
         if existing_user:
             raise HTTPException(status_code=400, detail="E-mail já cadastrado.")
 
-        # 📤 Insere novo usuário com role de cliente
-        # user_data já contém todos os campos necessários, incluindo role
-        # A senha deve ser hashed antes de ser passada para o banco de dados
-        # Para simplificar aqui, vamos assumir que a senha será hashed no auth.py ou em um serviço de usuário
-        # Se esta rota for apenas para 
-
+      
