@@ -107,6 +107,17 @@ class Plan(Base):
     duration_months = Column(Integer)
     is_active = Column(Boolean, default=True)
 
+# Adicionando a classe Evento (tabela 'eventos')
+class Evento(Base):
+    __tablename__ = "eventos"
+
+    id = Column(String, primary_key=True)
+    email_cliente = Column(String)
+    data = Column(DateTime)
+    tipo = Column(String)
+    status = Column(String)
+    created_at = Column(DateTime, default=func.now())
+
 # Pydantic Models
 class UsuarioResponse(BaseModel):
     id: str

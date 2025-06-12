@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 from .database import get_db, SessionLocal
-from .models import Usuario, TreinoEnviado, Event # Corrigido: Evento para Event
+from .models import Usuario, TreinoEnviado, Evento # Corrigido: Event para Evento
 from typing import Optional, List
 from datetime import datetime
 import uuid
@@ -80,7 +80,7 @@ class DatabaseClient:
     # ---------------------------
     def create_event(self, event_data: dict) -> dict:
         """Cria um novo evento"""
-        event = Event(**event_data) # Corrigido: Evento para Event
+        event = Evento(**event_data) # Corrigido: Event para Evento
         self.db.add(event)
         self.db.commit()
         self.db.refresh(event)
@@ -118,7 +118,7 @@ class DatabaseClient:
             "enviado_em": training.enviado_em.isoformat() if training.enviado_em else None
         }
 
-    def _event_to_dict(self, event: Event) -> dict: # Corrigido: Evento para Event
+    def _event_to_dict(self, event: Evento) -> dict: # Corrigido: Event para Evento
         return {
             "id": event.id,
             "email_cliente": event.email_cliente,
