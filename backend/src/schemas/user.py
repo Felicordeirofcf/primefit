@@ -71,3 +71,23 @@ class ProfileResponse(ProfileBase):
 
 
 
+
+
+class UsuarioResponse(UserBase):
+    """Esquema para resposta de usuários, excluindo a senha hash"""
+    id: str
+    nome: str
+    tipo_usuario: str
+    is_admin: bool
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+    endereco: Optional[str] = None
+    cidade: Optional[str] = None
+    cep: Optional[str] = None
+    telefone: Optional[str] = None
+    whatsapp: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+

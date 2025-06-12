@@ -8,7 +8,7 @@ import logging
 
 from src.core.database import get_db
 from src.core.auth_utils import verify_password, get_password_hash, create_access_token, decode_access_token
-from src.schemas.models import Usuario, UsuarioResponse, Cadastro
+from src.schemas.user import UserCreate, UsuarioResponse
 
 # Configuração de logging
 logging.basicConfig(level=logging.INFO)
@@ -163,7 +163,7 @@ async def login_for_access_token(
 
 # Rota para registro de novos usuários
 @router.post("/register", response_model=UsuarioResponse, status_code=status.HTTP_201_CREATED)
-async def register_user(user_data: Cadastro, db: Session = Depends(get_db)):
+async def register_user(user_data: UserCreate, db: Session = Depends(get_db)):
     try:
         logger.info(f"Tentativa de registro para email: {user_data.email}")
         
@@ -183,7 +183,7 @@ async def register_user(user_data: Cadastro, db: Session = Depends(get_db)):
             id=str(uuid.uuid4()),
             nome=user_data.nome,
             email=user_data.email,
-            password_hash=hashed_password,
+            senha_hash=hashed_password,
             tipo_usuario=user_data.tipo_usuario,
             role=user_data.tipo_usuario,
             is_admin=user_data.tipo_usuario == "admin",
@@ -203,21 +203,7 @@ async def register_user(user_data: Cadastro, db: Session = Depends(get_db)):
         logger.info(f"Usuário registrado com sucesso: {user_data.email}")
         
         # Retorna o usuário criado
-        return {
-            "id": str(new_user.id),
-            "nome": new_user.nome,
-            "email": new_user.email,
-            "tipo_usuario": new_user.tipo_usuario,
-            "role": new_user.role,
-            "is_admin": new_user.is_admin,
-            "created_at": new_user.created_at,
-            "updated_at": new_user.updated_at,
-            "endereco": new_user.endereco,
-            "cidade": new_user.cidade,
-            "cep": new_user.cep,
-            "telefone": new_user.telefone,
-            "whatsapp": new_user.whatsapp
-        }
+        return UsuarioResponse(**new_user.__dict__)
     except HTTPException:
         raise
     except Exception as e:
