@@ -71,8 +71,8 @@ class Mensagem(Base):
     assunto = Column(String)
     conteudo = Column(String)
     enviado_em = Column(DateTime, default=func.now())
-    lida = Column(Boolean, default=False)  # Adicionado campo lida
-    respondida = Column(Boolean, default=False)  # Adicionado campo respondida
+
+    respondi
 
 class Assinatura(Base):
     __tablename__ = "assinaturas"
@@ -187,7 +187,7 @@ class MessageResponse(BaseModel):
     assunto: str
     conteudo: str
     enviado_em: datetime
-    lida: Optional[bool] = False
+
     respondida: Optional[bool] = False
 
     model_config = {"from_attributes": True}

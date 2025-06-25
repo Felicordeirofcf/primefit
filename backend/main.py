@@ -106,7 +106,7 @@ app.include_router(upload_pdf.router, prefix="/api", tags=["Upload"])
 app.include_router(trainings.router, prefix="/api", tags=["Treinos"])         # ✅ corrigido
 app.include_router(assessments.router, prefix="/api", tags=["Avaliações"])    # ✅ corrigido
 app.include_router(progress.router, prefix="/api", tags=["Progresso"])        # ✅ corrigido
-app.include_router(messages.router, prefix="/messages", tags=["Mensagens"])
+app.include_router(messages.router, prefix="/api", tags=["Mensagens"])
 app.include_router(profiles.router, prefix="/profiles", tags=["Perfis"])
 app.include_router(gemini.router, prefix="/gemini", tags=["IA Gemini"])
 app.include_router(admin.router, prefix="/api", tags=["Admin"])

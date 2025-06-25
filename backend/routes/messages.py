@@ -103,7 +103,7 @@ async def get_my_messages(current_user: Profile = Depends(get_current_user), db:
     
     return messages or []
 
-@router.get("/conversation/{other_user_id}", response_model=List[MessageResponse])
+@router.get("/api/conversation/{other_user_id}", response_model=List[MessageResponse])
 async def get_conversation(
     other_user_id: str,
     current_user: Profile = Depends(get_current_user),
