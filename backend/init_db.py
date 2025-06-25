@@ -1,4 +1,6 @@
-#!/usr/bin/env python3
+from dotenv import load_dotenv
+
+load_dotenv()
 """
 Script para inicializar o banco de dados PostgreSQL
 Cria todas as tabelas necessárias para o PrimeFit
@@ -14,7 +16,7 @@ sys.path.append(str(Path(__file__).parent / "src"))
 from src.core.database import create_tables, engine
 from src.core.models import Base
 from src.core.db_client import get_database_client
-from auth import hash_password
+from src.core.auth_utils import get_password_hash
 
 def create_admin_user():
     """Cria um usuário administrador padrão"""

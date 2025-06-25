@@ -176,7 +176,7 @@ Formato: {formato} (ex: post para blog, roteiro para vídeo curto, legenda para 
 Palavras-chave: {palavras_chave}
 """
 
-@router.post("/api/chatbot/pre-venda")
+@router.post("/chatbot/pre-venda")
 async def chatbot_pre_venda(request: ChatMessage):
     """Endpoint para chatbot de pré-venda"""
     try:
@@ -199,7 +199,7 @@ async def chatbot_pre_venda(request: ChatMessage):
         logger.error(f"Erro no chatbot de pré-venda: {str(e)}")
         raise HTTPException(status_code=500, detail="Erro interno do servidor")
 
-@router.post("/api/training/generate-plan")
+@router.post("/training/generate-plan")
 async def generate_training_plan(request: TrainingPlanRequest):
     """Endpoint para geração de planos de treino"""
     try:
@@ -223,7 +223,7 @@ async def generate_training_plan(request: TrainingPlanRequest):
         logger.error(f"Erro na geração de plano de treino: {str(e)}")
         raise HTTPException(status_code=500, detail="Erro interno do servidor")
 
-@router.post("/api/training/performance-feedback")
+@router.post("/training/performance-feedback")
 async def performance_feedback(request: PerformanceFeedbackRequest):
     """Endpoint para análise de desempenho e feedback"""
     try:
@@ -243,7 +243,7 @@ async def performance_feedback(request: PerformanceFeedbackRequest):
         logger.error(f"Erro na análise de desempenho: {str(e)}")
         raise HTTPException(status_code=500, detail="Erro interno do servidor")
 
-@router.post("/api/training/alternative-exercises")
+@router.post("/training/alternative-exercises")
 async def alternative_exercises(request: AlternativeExerciseRequest):
     """Endpoint para sugestão de exercícios alternativos"""
     try:
@@ -264,7 +264,7 @@ async def alternative_exercises(request: AlternativeExerciseRequest):
         logger.error(f"Erro na sugestão de exercícios alternativos: {str(e)}")
         raise HTTPException(status_code=500, detail="Erro interno do servidor")
 
-@router.post("/api/nutrition/meal-recommendations")
+@router.post("/nutrition/meal-recommendations")
 async def meal_recommendations(request: MealRecommendationRequest):
     """Endpoint para recomendações de refeições"""
     try:
@@ -285,7 +285,7 @@ async def meal_recommendations(request: MealRecommendationRequest):
         logger.error(f"Erro nas recomendações de refeições: {str(e)}")
         raise HTTPException(status_code=500, detail="Erro interno do servidor")
 
-@router.post("/api/admin/sentiment-analysis")
+@router.post("/admin/sentiment-analysis")
 async def sentiment_analysis(request: SentimentAnalysisRequest):
     """Endpoint para análise de sentimento (uso interno)"""
     try:
@@ -304,7 +304,7 @@ async def sentiment_analysis(request: SentimentAnalysisRequest):
         logger.error(f"Erro na análise de sentimento: {str(e)}")
         raise HTTPException(status_code=500, detail="Erro interno do servidor")
 
-@router.post("/api/admin/content-generation")
+@router.post("/admin/content-generation")
 async def content_generation(request: ContentGenerationRequest):
     """Endpoint para geração de conteúdo (uso interno)"""
     try:
@@ -325,7 +325,7 @@ async def content_generation(request: ContentGenerationRequest):
         logger.error(f"Erro na geração de conteúdo: {str(e)}")
         raise HTTPException(status_code=500, detail="Erro interno do servidor")
 
-@router.post("/api/chatbot/support")
+@router.post("/chatbot/support")
 async def chatbot_support(request: ChatMessage):
     """Endpoint para chatbot de suporte ao cliente"""
     try:
