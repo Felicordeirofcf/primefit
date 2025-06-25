@@ -21,8 +21,7 @@ from src.core.database import create_tables
 from src.core.models import Base
 
 # Modelos com títulos únicos (para evitar conflito no Swagger)
-from src.schemas.user import UserCreate # Corrigido: Importando UserCreate do local correto
-# from routes.cliente import ClienteRead # Removido: ClienteRead não é mais usado
+from src.schemas.user import UserCreate
 
 # Rotas
 from routes import (
@@ -63,16 +62,16 @@ app = FastAPI(
 # Middleware CORS (em produção, especifique domínios confiáveis)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://renewed-miracle-production.up.railway.app"],  # 🔒 RECOMENDADO restringir isso em produção
+    allow_origins=["https://renewed-miracle-production.up.railway.app"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Arquivos estáticos (PDFs, imagens, etc)
+# Arquivos estáticos
 app.mount("/storage", StaticFiles(directory="./storage"), name="storage")
 
-# Rota raiz pública (não requer autenticação)
+# Rota raiz
 @app.get("/", include_in_schema=False)
 async def root():
     return {
@@ -82,15 +81,15 @@ async def root():
         "health": "/health"
     }
 
-# Rota favicon.ico pública
+# Favicon
 @app.get("/favicon.ico", include_in_schema=False)
 async def favicon():
     favicon_path = os.path.join("static", "favicon.ico")
     if os.path.exists(favicon_path):
         return FileResponse(favicon_path)
-    return Response(status_code=204) # Corrigido para usar Response com status_code=204
+    return Response(status_code=204)
 
-# Rota de verificação de status
+# Health check
 @app.get("/health", include_in_schema=True, tags=["Sistema"])
 async def health_check():
     return {
@@ -99,14 +98,14 @@ async def health_check():
         "version": app.version
     }
 
-# Inclusão das rotas organizadas por funcionalidade
+# Inclusão das rotas com prefixos corretos
 app.include_router(auth.router, prefix="/auth", tags=["Autenticação"])
 app.include_router(cadastro.router, prefix="/api", tags=["Cadastro"])
 app.include_router(cliente.router, prefix="/api", tags=["Cliente"])
 app.include_router(upload_pdf.router, prefix="/api", tags=["Upload"])
-app.include_router(trainings.router, tags=["Treinos"])
-app.include_router(assessments.router, tags=["Avaliações"])
-app.include_router(progress.router, tags=["Progresso"])
+app.include_router(trainings.router, prefix="/api", tags=["Treinos"])         # ✅ corrigido
+app.include_router(assessments.router, prefix="/api", tags=["Avaliações"])    # ✅ corrigido
+app.include_router(progress.router, prefix="/api", tags=["Progresso"])        # ✅ corrigido
 app.include_router(messages.router, prefix="/messages", tags=["Mensagens"])
 app.include_router(profiles.router, prefix="/profiles", tags=["Perfis"])
 app.include_router(gemini.router, prefix="/gemini", tags=["IA Gemini"])
@@ -119,7 +118,7 @@ app.include_router(users.router, prefix="/api", tags=["Usuários"])
 if HAS_CHATBOT:
     app.include_router(chatbot.router, prefix="/api", tags=["Chatbot"])
 
-# Tratamento global de erros (útil em produção para logs centralizados)
+# Tratamento global de erros
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     logger.error(f"Erro não tratado: {exc}", exc_info=True)
@@ -128,7 +127,7 @@ async def global_exception_handler(request: Request, exc: Exception):
         content={"detail": "Erro interno no servidor."}
     )
 
-# Inicialização automática das tabelas ao iniciar a API
+# Inicialização automática das tabelas
 @app.on_event("startup")
 async def startup_event():
     logger.info("Iniciando aplicação PrimeFit API")
@@ -137,5 +136,3 @@ async def startup_event():
         logger.info("✅ Tabelas criadas com sucesso.")
     except Exception as e:
         logger.error(f"❌ Erro ao criar tabelas: {e}", exc_info=True)
-
-
