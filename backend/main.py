@@ -20,9 +20,6 @@ load_dotenv()
 from src.core.database import create_tables
 from src.core.models import Base
 
-# Modelos com títulos únicos (para evitar conflito no Swagger)
-from src.schemas.user import UserCreate
-
 # Rotas
 from routes import (
     auth,
@@ -59,7 +56,7 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
-# Middleware CORS (em produção, especifique domínios confiáveis)
+# Middleware CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["https://renewed-miracle-production.up.railway.app"],
@@ -90,7 +87,7 @@ async def favicon():
     return Response(status_code=204)
 
 # Health check
-@app.get("/health", include_in_schema=True, tags=["Sistema"])
+@app.get("/health", tags=["Sistema"])
 async def health_check():
     return {
         "status": "ok",
@@ -98,17 +95,17 @@ async def health_check():
         "version": app.version
     }
 
-# Inclusão das rotas com prefixos corretos
+# Inclusão das rotas (prefixos consistentes com frontend)
 app.include_router(auth.router, prefix="/auth", tags=["Autenticação"])
 app.include_router(cadastro.router, prefix="/api", tags=["Cadastro"])
 app.include_router(cliente.router, prefix="/api", tags=["Cliente"])
 app.include_router(upload_pdf.router, prefix="/api", tags=["Upload"])
-app.include_router(trainings.router, prefix="/api", tags=["Treinos"])         # ✅ corrigido
-app.include_router(assessments.router, prefix="/api", tags=["Avaliações"])    # ✅ corrigido
-app.include_router(progress.router, prefix="/api", tags=["Progresso"])        # ✅ corrigido
+app.include_router(trainings.router, prefix="/api", tags=["Treinos"])
+app.include_router(assessments.router, prefix="/api", tags=["Avaliações"])
+app.include_router(progress.router, prefix="/api", tags=["Progresso"])
 app.include_router(messages.router, prefix="/api", tags=["Mensagens"])
-app.include_router(profiles.router, prefix="/profiles", tags=["Perfis"])
-app.include_router(gemini.router, prefix="/gemini", tags=["IA Gemini"])
+app.include_router(profiles.router, prefix="/api", tags=["Perfis"])  # <- corrigido para coerência com outras rotas
+app.include_router(gemini.router, prefix="/api", tags=["IA Gemini"])
 app.include_router(admin.router, prefix="/api", tags=["Admin"])
 app.include_router(content.router, prefix="/api", tags=["Conteúdo"])
 app.include_router(dashboard.router, prefix="/api", tags=["Dashboard"])
