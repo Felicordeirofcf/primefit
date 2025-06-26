@@ -1,34 +1,33 @@
 import React from 'react';
 import { Link, NavLink } from 'react-router-dom';
-import { useAuth } from '../../hooks/useAuth';
-import logo from '../../assets/primelogo.png'; // Import logo image
-import { FiLogIn, FiUserPlus, FiGrid, FiLogOut } from 'react-icons/fi'; // Import icons
+import { AuthContext } from '../../hooks/useAuth';
+import { useContext } from 'react';
+import logo from '../../assets/primelogo.png';
+import { FiLogIn, FiUserPlus, FiGrid, FiLogOut } from 'react-icons/fi';
 
 const Header = () => {
-  // Use signOut from the context, not logout
-  const { isAuthenticated, userProfile, signOut } = useAuth();
+  const { token, user, signOut } = useContext(AuthContext);
 
   const handleLogout = async () => {
     try {
       await signOut();
-      // Navigation is handled by ProtectedRoute/AuthProvider
       console.log('Logout successful from Header');
     } catch (error) {
       console.error('Error during logout from Header:', error);
     }
   };
 
+  const isAuthenticated = !!token;
+
   return (
-    <header className="bg-white shadow-sm sticky top-0 z-40"> {/* Make header sticky */}
+    <header className="bg-white shadow-sm sticky top-0 z-40">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
-          {/* Logo */}
           <Link to="/" className="flex items-center space-x-2 flex-shrink-0">
             <img src={logo} alt="Prime Fit Logo" className="h-8 w-auto" />
             <span className="text-xl font-bold text-blue-600 hidden sm:inline">PrimeFit</span>
           </Link>
 
-          {/* Navigation Menu (ensure consistency with Navbar.jsx if both are used) */}
           <nav className="hidden md:flex space-x-6 lg:space-x-8">
             <NavLink to="/" className={({ isActive }) => `text-sm font-medium transition-colors ${isActive ? 'text-blue-600' : 'text-gray-600 hover:text-blue-600'}`} end>Início</NavLink>
             <NavLink to="/sobre" className={({ isActive }) => `text-sm font-medium transition-colors ${isActive ? 'text-blue-600' : 'text-gray-600 hover:text-blue-600'}`}>Sobre</NavLink>
@@ -38,7 +37,6 @@ const Header = () => {
             <NavLink to="/contato" className={({ isActive }) => `text-sm font-medium transition-colors ${isActive ? 'text-blue-600' : 'text-gray-600 hover:text-blue-600'}`}>Contato</NavLink>
           </nav>
 
-          {/* Authentication Buttons */}
           <div className="flex items-center space-x-3">
             {isAuthenticated ? (
               <>
@@ -54,7 +52,7 @@ const Header = () => {
                   className="flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md text-gray-700 hover:bg-red-50 hover:text-red-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
                   title="Sair"
                 >
-                   <FiLogOut className="mr-1.5 h-4 w-4" />
+                  <FiLogOut className="mr-1.5 h-4 w-4" />
                   Sair
                 </button>
               </>
@@ -78,13 +76,11 @@ const Header = () => {
             )}
           </div>
 
-          {/* Mobile Menu Button (Placeholder - Add logic if needed) */}
           <div className="-mr-2 flex md:hidden ml-3">
-             <button type="button" className="inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500" aria-controls="mobile-menu" aria-expanded="false">
-               <span className="sr-only">Abrir menu</span>
-               {/* Icon logic needed */}
-             </button>
-           </div>
+            <button type="button" className="inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500" aria-controls="mobile-menu" aria-expanded="false">
+              <span className="sr-only">Abrir menu</span>
+            </button>
+          </div>
 
         </div>
       </div>
@@ -93,4 +89,3 @@ const Header = () => {
 };
 
 export default Header;
-

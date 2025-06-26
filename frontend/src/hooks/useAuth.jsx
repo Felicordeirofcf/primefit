@@ -19,7 +19,7 @@ export const AuthProvider = ({ children }) => {
       const token = response.data.access_token;
       localStorage.setItem('token', token);
       setToken(token);
-      await fetchUser(token); // buscar dados do perfil após login
+      await fetchUser(token);
 
       return true;
     } catch (err) {
@@ -48,12 +48,11 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Carregar token do localStorage na inicialização
   useEffect(() => {
     if (token) {
       fetchUser(token);
     }
-  }, []);
+  }, [token]);
 
   return (
     <AuthContext.Provider value={{ user, token, signIn, signOut }}>
