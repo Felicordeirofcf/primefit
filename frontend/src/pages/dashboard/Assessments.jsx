@@ -48,7 +48,7 @@ const Assessments = () => {
         }
       }
       
-      const response = await fetch(`${API_URL}/assessments/`, config)
+      const response = await fetch(`${API_URL}/api/assessments/`, config)
       
       if (response.ok) {
         const data = await response.json()
@@ -74,7 +74,7 @@ const Assessments = () => {
         return
       }
       
-      const response = await fetch(`${API_URL}/assessments/`, {
+      const response = await fetch(`${API_URL}/api/assessments/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

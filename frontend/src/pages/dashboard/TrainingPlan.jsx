@@ -44,7 +44,7 @@ const TrainingPlan = () => {
 
       try {
         const config = { headers: { Authorization: `Bearer ${token}` } };
-        const response = await fetch(`${API_URL}/trainings/`, config);
+        const response = await fetch(`${API_URL}/api/trainings/`, config);
 
         if (response.ok) {
           const data = await response.json();

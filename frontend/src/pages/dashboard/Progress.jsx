@@ -87,7 +87,7 @@ const Progress = () => {
 
     try {
       const config = { headers: { Authorization: `Bearer ${token}` } };
-      const response = await fetch(`${API_URL}/progress/`, config);
+      const response = await fetch(`${API_URL}/api/progress/`, config);
 
       if (response.ok) {
         const data = await response.json();
@@ -118,7 +118,7 @@ const Progress = () => {
 
     try {
       const config = { headers: { Authorization: `Bearer ${token}` } };
-      const response = await fetch(`${API_URL}/progress/stats/summary`, config);
+      const response = await fetch(`${API_URL}/api/progress/stats/summary`, config);
 
       if (response.ok) {
         const data = await response.json();
@@ -167,7 +167,7 @@ const Progress = () => {
     // Add more validation as needed
 
     try {
-      const response = await fetch(`${API_URL}/progress/`, {
+      const response = await fetch(`${API_URL}/api/progress/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

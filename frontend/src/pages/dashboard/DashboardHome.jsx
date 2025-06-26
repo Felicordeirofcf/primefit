@@ -5,7 +5,7 @@ import {
   Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle 
 } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
-import { Progress } from '../../components/ui/progress';
+import { Progress } from '../../components/ui/api/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
 import { Calendar } from '../../components/ui/calendar';
 import { 
