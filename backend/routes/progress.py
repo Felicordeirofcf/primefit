@@ -9,7 +9,8 @@ from routes.auth import get_current_user
 from src.schemas.models import Progresso, ProgressoCreate, ProgressoResponse
 from src.core.models import Usuario
 
-router = APIRouter()
+# ✅ Adiciona prefixo "/progress" para funcionar com o frontend
+router = APIRouter(prefix="/progress", tags=["Progresso"])
 
 @router.get("/", response_model=List[ProgressoResponse])
 async def get_my_progress(
@@ -24,16 +25,12 @@ async def get_my_progress(
     try:
         query = db.query(Progresso).filter(Progresso.usuario_id == current_user.id)
         
-        # Filtros opcionais por data
         if data_inicio:
             query = query.filter(Progresso.data_medicao >= data_inicio)
         if data_fim:
             query = query.filter(Progresso.data_medicao <= data_fim)
         
-        # Ordena por data de medição (mais recente primeiro)
         query = query.order_by(Progresso.data_medicao.desc())
-        
-        # Aplica paginação
         progress_entries = query.offset(skip).limit(limit).all()
         
         return progress_entries
@@ -79,7 +76,6 @@ async def get_progress_entry(
                 detail="Entrada de progresso não encontrada"
             )
         
-        # Verifica se o usuário tem permissão para ver esta entrada
         if progress_entry.usuario_id != current_user.id and current_user.role != "admin":
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -104,7 +100,6 @@ async def update_progress_entry(
 ):
     """Atualiza uma entrada de progresso"""
     try:
-        # Verifica se a entrada existe e pertence ao usuário
         progress_entry = db.query(Progresso).filter(Progresso.id == progress_id).first()
         
         if not progress_entry:
@@ -119,7 +114,6 @@ async def update_progress_entry(
                 detail="Sem permissão para atualizar esta entrada de progresso"
             )
         
-        # Prepara dados para atualização
         for key, value in progress_update.dict(exclude_unset=True).items():
             setattr(progress_entry, key, value)
         
@@ -143,7 +137,6 @@ async def delete_progress_entry(
 ):
     """Exclui uma entrada de progresso"""
     try:
-        # Verifica se a entrada existe e pertence ao usuário
         progress_entry = db.query(Progresso).filter(Progresso.id == progress_id).first()
         
         if not progress_entry:
@@ -158,10 +151,8 @@ async def delete_progress_entry(
                 detail="Sem permissão para excluir esta entrada de progresso"
             )
         
-        # Exclui entrada
         db.delete(progress_entry)
         db.commit()
-        
         return None
     except HTTPException:
         raise
@@ -172,15 +163,15 @@ async def delete_progress_entry(
         )
 
 @router.get("/stats/summary")
-async def get_progress_summary(current_user: Usuario = Depends(get_current_user), db: Session = Depends(get_db)):
-    """
-    Obtém um resumo estatístico do progresso do usuário
-    """
+async def get_progress_summary(
+    current_user: Usuario = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Obtém um resumo estatístico do progresso do usuário"""
     try:
-        # Busca todas as entradas de progresso do usuário
         medicoes = db.query(Progresso).filter(Progresso.usuario_id == current_user.id).order_by(Progresso.data_medicao.asc()).all()
         
-        if not medicoes or len(medicoes) == 0:
+        if not medicoes:
             return {
                 "total_medicoes": 0,
                 "primeira_medicao": None,
@@ -192,14 +183,14 @@ async def get_progress_summary(current_user: Usuario = Depends(get_current_user)
         primeira = medicoes[0]
         ultima = medicoes[-1]
         
-        # Calcula evoluções
-        evolucao_peso = None
-        if primeira.peso is not None and ultima.peso is not None:
-            evolucao_peso = ultima.peso - primeira.peso
-        
-        evolucao_gordura = None
-        if primeira.percentual_gordura is not None and ultima.percentual_gordura is not None:
-            evolucao_gordura = ultima.percentual_gordura - primeira.percentual_gordura
+        evolucao_peso = (
+            ultima.peso - primeira.peso
+            if primeira.peso is not None and ultima.peso is not None else None
+        )
+        evolucao_gordura = (
+            ultima.percentual_gordura - primeira.percentual_gordura
+            if primeira.percentual_gordura is not None and ultima.percentual_gordura is not None else None
+        )
         
         return {
             "total_medicoes": len(medicoes),
@@ -215,5 +206,3 @@ async def get_progress_summary(current_user: Usuario = Depends(get_current_user)
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Erro ao calcular resumo de progresso: {str(e)}"
         )
-
-

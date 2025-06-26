@@ -6,7 +6,8 @@ from routes.auth import get_current_user
 from src.schemas.models import Avaliacao, AvaliacaoCreate, AvaliacaoResponse
 from src.core.models import Usuario
 
-router = APIRouter()
+# ✅ Adiciona prefixo "/assessments" e tag para documentação
+router = APIRouter(prefix="/assessments", tags=["Avaliações"])
 
 @router.get("/", response_model=List[AvaliacaoResponse])
 async def get_my_assessments(
