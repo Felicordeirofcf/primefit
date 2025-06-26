@@ -2,7 +2,12 @@ from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
 
-class Message(BaseModel):
+class MessageCreate(BaseModel):
+    sender: str
+    receiver: str
+    content: str
+
+class MessageResponse(BaseModel):
     id: Optional[str] = None
     sender: str
     receiver: str
@@ -11,6 +16,3 @@ class Message(BaseModel):
 
     class Config:
         from_attributes = True
-
-
-
