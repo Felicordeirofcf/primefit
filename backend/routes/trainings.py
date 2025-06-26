@@ -3,7 +3,8 @@ from typing import List, Optional
 from sqlalchemy.orm import Session
 from src.core.database import get_db
 from routes.auth import get_current_user
-from src.schemas.models import TreinoEnviado, TreinoCreate, TreinoResponse, Profile
+from src.schemas.models import TreinoEnviado, TreinoCreate, TreinoResponse
+from src.core.models import Usuario
 
 router = APIRouter()
 
@@ -12,12 +13,12 @@ async def get_my_trainings(
     skip: int = 0,
     limit: int = 100,
     apenas_ativos: bool = True,
-    current_user: dict = Depends(get_current_user),
+    current_user: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Obtém os treinos do usuário autenticado"""
     try:
-        query = db.query(TreinoEnviado).filter(TreinoEnviado.usuario_id == current_user["id"])
+        query = db.query(TreinoEnviado).filter(TreinoEnviado.usuario_id == current_user.id)
         
         # Filtro opcional para apenas treinos ativos
         if apenas_ativos:
@@ -39,7 +40,7 @@ async def get_my_trainings(
 @router.get("/{training_id}", response_model=TreinoResponse)
 async def get_training(
     training_id: str,
-    current_user: dict = Depends(get_current_user),
+    current_user: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Obtém um treino específico"""
@@ -53,7 +54,7 @@ async def get_training(
             )
         
         # Verifica se o usuário tem permissão para ver este treino
-        if training.usuario_id != current_user["id"] and current_user.get("role") != "admin":
+        if training.usuario_id != current_user.id and current_user.role != "admin":
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Sem permissão para acessar este treino"
@@ -71,12 +72,12 @@ async def get_training(
 @router.post("/", response_model=TreinoResponse)
 async def create_training(
     training_data: TreinoCreate,
-    current_user: dict = Depends(get_current_user),
+    current_user: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Cria um novo treino (apenas para admins)"""
     # Verifica se o usuário tem permissão de administrador
-    if current_user.get("role") != "admin":
+    if current_user.role != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Sem permissão para criar treinos"
@@ -84,7 +85,7 @@ async def create_training(
     
     try:
         # Verifica se o cliente existe
-        client_profile = db.query(Profile).filter(Profile.id == training_data.usuario_id).first()
+        client_profile = db.query(Usuario).filter(Usuario.id == training_data.usuario_id).first()
         
         if not client_profile:
             raise HTTPException(
@@ -110,12 +111,12 @@ async def create_training(
 async def update_training(
     training_id: str,
     training_update: TreinoCreate,
-    current_user: dict = Depends(get_current_user),
+    current_user: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Atualiza um treino (apenas para admins)"""
     # Verifica se o usuário tem permissão de administrador
-    if current_user.get("role") != "admin":
+    if current_user.role != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Sem permissão para atualizar treinos"
@@ -150,12 +151,12 @@ async def update_training(
 @router.delete("/{training_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_training(
     training_id: str,
-    current_user: dict = Depends(get_current_user),
+    current_user: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Exclui um treino (apenas para admins)"""
     # Verifica se o usuário tem permissão de administrador
-    if current_user.get("role") != "admin":
+    if current_user.role != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Sem permissão para excluir treinos"
@@ -190,12 +191,12 @@ async def get_all_trainings(
     skip: int = 0,
     limit: int = 100,
     usuario_id: Optional[str] = None,
-    current_user: dict = Depends(get_current_user),
+    current_user: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Obtém todos os treinos (apenas para admins)"""
     # Verifica se o usuário tem permissão de administrador
-    if current_user.get("role") != "admin":
+    if current_user.role != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Sem permissão para acessar esta funcionalidade"

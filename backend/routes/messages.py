@@ -8,7 +8,8 @@ from sqlalchemy import or_
 
 from routes.auth import get_current_user, get_admin_user
 from src.core.database import get_db
-from src.schemas.models import Mensagem, MessageCreate, MessageResponse, Profile # Import Profile for checking receiver existence
+from src.schemas.models import Mensagem, Usuario # Importar Usuario ao invés de Profile
+from src.schemas.message import MessageCreate, MessageResponse # Importar os schemas de mensagem
 
 router = APIRouter()
 
@@ -37,10 +38,10 @@ manager = ConnectionManager()
 
 # Helper function to get admin profile
 async def get_admin_profile(db: Session = Depends(get_db)):
-    admin_user = db.query(Profile).filter(Profile.role == "admin").first()
+    admin_user = db.query(Usuario).filter(Usuario.role == "admin").first()
     if not admin_user:
-        # Fallback to specific email if no user with role \'admin\'
-        admin_user = db.query(Profile).filter(Profile.email == "felpcordeirofcf@gmail.com").first()
+        # Fallback to specific email if no user with role 'admin'
+        admin_user = db.query(Usuario).filter(Usuario.email == "felpcordeirofcf@gmail.com").first()
     if not admin_user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -49,12 +50,12 @@ async def get_admin_profile(db: Session = Depends(get_db)):
     return admin_user
 
 @router.post("/", response_model=MessageResponse)
-async def create_message(message: MessageCreate, current_user: Profile = Depends(get_current_user), db: Session = Depends(get_db)):
+async def create_message(message: MessageCreate, current_user: Usuario = Depends(get_current_user), db: Session = Depends(get_db)):
     """
     Cria uma nova mensagem.
     """
     # Verificar se o destinatário existe
-    receiver = db.query(Profile).filter(Profile.id == message.usuario_id).first()
+    receiver = db.query(Usuario).filter(Usuario.id == message.usuario_id).first()
     
     if not receiver:
         raise HTTPException(
@@ -95,7 +96,7 @@ async def create_message(message: MessageCreate, current_user: Profile = Depends
     return db_message
 
 @router.get("/", response_model=List[MessageResponse])
-async def get_my_messages(current_user: Profile = Depends(get_current_user), db: Session = Depends(get_db)):
+async def get_my_messages(current_user: Usuario = Depends(get_current_user), db: Session = Depends(get_db)):
     """
     Obtém todas as mensagens do usuário atual.
     """
@@ -106,16 +107,16 @@ async def get_my_messages(current_user: Profile = Depends(get_current_user), db:
 @router.get("/api/conversation/{other_user_id}", response_model=List[MessageResponse])
 async def get_conversation(
     other_user_id: str,
-    current_user: Profile = Depends(get_current_user),
+    current_user: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
     Obtém a conversa entre o usuário atual e outro usuário.
     
-    NOTA: O modelo Mensagem atual (com apenas \'usuario_id\' como destinatário)
+    NOTA: O modelo Mensagem atual (com apenas 'usuario_id' como destinatário)
     não permite uma representação completa de uma conversa bidirecional (remetente/destinatário).
     Esta implementação retorna todas as mensagens onde o usuário atual OU o outro usuário
-    é o destinatário. Para uma conversa completa, o modelo Mensagem precisaria de \'sender_id\' e \'receiver_id\'.
+    é o destinatário. Para uma conversa completa, o modelo Mensagem precisaria de 'sender_id' e 'receiver_id'.
     """
     target_user_id = other_user_id
 
@@ -124,7 +125,7 @@ async def get_conversation(
         target_user_id = admin_profile.id
     
     # Verificar se o usuário alvo existe (seja o ID original ou o ID do admin resolvido)
-    other_user = db.query(Profile).filter(Profile.id == target_user_id).first()
+    other_user = db.query(Usuario).filter(Usuario.id == target_user_id).first()
     
     if not other_user:
         raise HTTPException(
@@ -144,7 +145,7 @@ async def get_conversation(
     return messages or []
 
 @router.put("/read/{message_id}")
-async def mark_message_as_read(message_id: str, current_user: Profile = Depends(get_current_user), db: Session = Depends(get_db)):
+async def mark_message_as_read(message_id: str, current_user: Usuario = Depends(get_current_user), db: Session = Depends(get_db)):
     """
     Marca uma mensagem como lida.
     """
@@ -157,7 +158,7 @@ async def mark_message_as_read(message_id: str, current_user: Profile = Depends(
             detail="Mensagem não encontrada ou você não tem permissão para acessá-la"
         )
     
-    # Marcar como lida (assuming a field like \'is_read\' exists in Mensagem model)
+    # Marcar como lida (assuming a field like 'is_read' exists in Mensagem model)
     # message.is_read = True
     # db.commit()
     # db.refresh(message)
@@ -236,3 +237,5 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, db: Session = D
     except Exception as e:
         print(f"Erro no WebSocket: {e}")
         manager.disconnect(user_id)
+
+

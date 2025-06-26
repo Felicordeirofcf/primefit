@@ -4,7 +4,8 @@ from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 from src.core.database import get_db
 from routes.auth import get_current_user
-from src.schemas.models import PerfilResponse as UserProfile, Profile, TreinoEnviado, Progresso, Avaliacao, Mensagem, Assinatura
+from src.schemas.user import UsuarioResponse as UserProfile
+from src.core.models import Usuario, TreinoEnviado, Progresso, Avaliacao, Mensagem, Assinatura
 
 router = APIRouter()
 
@@ -22,11 +23,11 @@ async def get_admin_overview(current_user: UserProfile = Depends(get_current_use
     
     try:
         # Total de usuários
-        total_users = db.query(Profile).count()
+        total_users = db.query(Usuario).count()
         
         # Usuários ativos (logaram nos últimos 30 dias)
         thirty_days_ago = datetime.now() - timedelta(days=30)
-        active_users = db.query(Profile).filter(Profile.ultimo_login >= thirty_days_ago).count()
+        active_users = db.query(Usuario).filter(Usuario.ultimo_login >= thirty_days_ago).count()
         
         # Total de treinos enviados
         total_trainings = db.query(TreinoEnviado).count()
@@ -87,17 +88,17 @@ async def get_all_users(
         offset = (page - 1) * limit
         
         # Construir query base
-        query = db.query(Profile)
+        query = db.query(Usuario)
         
         # Aplicar filtro de busca se fornecido
         if search:
-            query = query.filter(Profile.nome.ilike(f'%{search}%') | Profile.email.ilike(f'%{search}%'))
+            query = query.filter(Usuario.nome.ilike(f'%{search}%') | Usuario.email.ilike(f'%{search}%'))
         
         # Buscar total de registros para paginação
         total_count = query.count()
 
         # Aplicar paginação e ordenação
-        users = query.order_by(Profile.criado_em.desc()).offset(offset).limit(limit).all()
+        users = query.order_by(Usuario.criado_em.desc()).offset(offset).limit(limit).all()
         
         return {
             "users": users,
@@ -132,13 +133,7 @@ async def get_user_details(
     
     try:
         # Buscar dados do usuário
-        user = db.query(Profile).filter(Profile.id == user_id).first()
-        
-        if not user:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Usuário não encontrado"
-            )
+        user = db.query(Usuario).filter(Usuario.id == user_id).first()
         
         # Buscar treinos do usuário
         trainings = db.query(TreinoEnviado).filter(TreinoEnviado.usuario_id == user_id).all()
@@ -200,7 +195,7 @@ async def get_recent_activity(
         # Buscar registros recentes de diferentes tabelas
         
         # Novos usuários
-        users = db.query(Profile).order_by(Profile.criado_em.desc()).limit(10).all()
+        users = db.query(Usuario).order_by(Usuario.criado_em.desc()).limit(10).all()
         for user in users:
             activities.append({
                 "type": "new_user",
@@ -327,7 +322,7 @@ async def update_user_role(
         )
     
     try:
-        user = db.query(Profile).filter(Profile.id == user_id).first()
+        user = db.query(Usuario).filter(Usuario.id == user_id).first()
         if not user:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,

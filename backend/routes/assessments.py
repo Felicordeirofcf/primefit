@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from src.core.database import get_db
 from routes.auth import get_current_user
 from src.schemas.models import Avaliacao, AvaliacaoCreate, AvaliacaoResponse
+from src.core.models import Usuario
 
 router = APIRouter()
 
@@ -12,12 +13,12 @@ async def get_my_assessments(
     skip: int = 0,
     limit: int = 100,
     status_filter: Optional[str] = None,
-    current_user: dict = Depends(get_current_user),
+    current_user: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Obtém as avaliações do usuário autenticado"""
     try:
-        query = db.query(Avaliacao).filter(Avaliacao.usuario_id == current_user["id"])
+        query = db.query(Avaliacao).filter(Avaliacao.usuario_id == current_user.id)
         
         # Filtro opcional por status
         if status_filter:
@@ -39,12 +40,12 @@ async def get_my_assessments(
 @router.post("/", response_model=AvaliacaoResponse)
 async def create_assessment(
     assessment_data: AvaliacaoCreate,
-    current_user: dict = Depends(get_current_user),
+    current_user: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Cria uma nova avaliação para o usuário autenticado"""
     try:
-        db_assessment = Avaliacao(**assessment_data.dict(), usuario_id=current_user["id"])
+        db_assessment = Avaliacao(**assessment_data.dict(), usuario_id=current_user.id)
         db.add(db_assessment)
         db.commit()
         db.refresh(db_assessment)
@@ -59,7 +60,7 @@ async def create_assessment(
 @router.get("/{assessment_id}", response_model=AvaliacaoResponse)
 async def get_assessment(
     assessment_id: str,
-    current_user: dict = Depends(get_current_user),
+    current_user: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Obtém uma avaliação específica"""
@@ -73,9 +74,9 @@ async def get_assessment(
             )
         
         # Verifica se o usuário tem permissão para ver esta avaliação
-        if (assessment.usuario_id != current_user["id"] and 
-            assessment.avaliador_id != current_user["id"] and 
-            current_user.get("role") != "admin"):
+        if (assessment.usuario_id != current_user.id and 
+            assessment.avaliador_id != current_user.id and 
+            current_user.role != "admin"):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Sem permissão para acessar esta avaliação"
@@ -94,7 +95,7 @@ async def get_assessment(
 async def update_assessment(
     assessment_id: str,
     assessment_update: AvaliacaoCreate,
-    current_user: dict = Depends(get_current_user),
+    current_user: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Atualiza uma avaliação"""
@@ -109,9 +110,9 @@ async def update_assessment(
             )
         
         # Verifica permissões
-        if (assessment.usuario_id != current_user["id"] and 
-            assessment.avaliador_id != current_user["id"] and 
-            current_user.get("role") != "admin"):
+        if (assessment.usuario_id != current_user.id and 
+            assessment.avaliador_id != current_user.id and 
+            current_user.role != "admin"):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Sem permissão para atualizar esta avaliação"
@@ -137,7 +138,7 @@ async def update_assessment(
 async def update_assessment_status(
     assessment_id: str,
     new_status: str,
-    current_user: dict = Depends(get_current_user),
+    current_user: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Atualiza o status de uma avaliação (apenas para avaliadores e admins)"""
@@ -152,8 +153,8 @@ async def update_assessment_status(
             )
         
         # Verifica permissões (apenas avaliador ou admin)
-        if (assessment.avaliador_id != current_user["id"] and 
-            current_user.get("role") != "admin"):
+        if (assessment.avaliador_id != current_user.id and 
+            current_user.role != "admin"):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Sem permissão para atualizar o status desta avaliação"
@@ -164,7 +165,7 @@ async def update_assessment_status(
         if new_status not in valid_statuses:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Status inválido. Valores aceitos: {', '.join(valid_statuses)}"
+                detail=f"Status inválido. Valores aceitos: {", ".join(valid_statuses)}"
             )
         
         # Atualiza status
@@ -187,12 +188,12 @@ async def get_all_assessments(
     limit: int = 100,
     usuario_id: Optional[str] = None,
     status_filter: Optional[str] = None,
-    current_user: dict = Depends(get_current_user),
+    current_user: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Obtém todas as avaliações (apenas para admins)"""
     # Verifica se o usuário tem permissão de administrador
-    if current_user.get("role") != "admin":
+    if current_user.role != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Sem permissão para acessar esta funcionalidade"
@@ -223,12 +224,12 @@ async def get_all_assessments(
 @router.delete("/{assessment_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_assessment(
     assessment_id: str,
-    current_user: dict = Depends(get_current_user),
+    current_user: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Exclui uma avaliação (apenas para admins)"""
     # Verifica se o usuário tem permissão de administrador
-    if current_user.get("role") != "admin":
+    if current_user.role != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Sem permissão para excluir avaliações"

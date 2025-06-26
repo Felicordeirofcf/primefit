@@ -400,42 +400,16 @@ async def get_quick_stats(current_user: Usuario = Depends(get_current_user), db:
             detail=f"Erro ao buscar estatísticas rápidas: {str(e)}"
         )
 
-async def get_admin_quick_stats(db: Session) -> Dict[str, int]:
+async def get_admin_quick_stats(db: Session):
     """
-    Obtém estatísticas rápidas para administradores
+    Função auxiliar para obter estatísticas rápidas para admins.
     """
     try:
-        logger.info("Obtendo estatísticas rápidas para admin")
-        
-        # Novos usuários este mês
-        try:
-            inicio_mes = datetime.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-            novos_usuarios = db.query(Usuario).filter(Usuario.created_at >= inicio_mes).count()
-        except Exception as e:
-            logger.warning(f"Erro ao contar novos usuários: {str(e)}")
-            novos_usuarios = 0
-        
-        # Treinos enviados este mês
-        try:
-            treinos_enviados = db.query(TreinoEnviado).filter(TreinoEnviado.enviado_em >= inicio_mes).count()
-        except Exception as e:
-            logger.warning(f"Erro ao contar treinos enviados: {str(e)}")
-            treinos_enviados = 0
-        
-        # Mensagens não respondidas
-        try:
-            mensagens_pendentes = db.query(Mensagem).filter(Mensagem.respondida == False).count()
-        except Exception as e:
-            logger.warning(f"Erro ao contar mensagens pendentes: {str(e)}")
-            mensagens_pendentes = 0
-        
-        # Avaliações pendentes
-        try:
-            avaliacoes_pendentes = db.query(Avaliacao).filter(Avaliacao.status == "pendente").count()
-        except Exception as e:
-            logger.warning(f"Erro ao contar avaliações pendentes: {str(e)}")
-            avaliacoes_pendentes = 0
-        
+        novos_usuarios = db.query(Usuario).filter(Usuario.created_at >= (datetime.now() - timedelta(days=30))).count()
+        treinos_enviados = db.query(TreinoEnviado).filter(TreinoEnviado.enviado_em >= (datetime.now() - timedelta(days=30))).count()
+        mensagens_pendentes = db.query(Mensagem).filter(Mensagem.lida == False).count()
+        avaliacoes_pendentes = db.query(Avaliacao).filter(Avaliacao.status == "pendente").count()
+
         return {
             "novos_usuarios": novos_usuarios,
             "treinos_enviados": treinos_enviados,
@@ -449,94 +423,4 @@ async def get_admin_quick_stats(db: Session) -> Dict[str, int]:
             detail=f"Erro ao buscar estatísticas rápidas do admin: {str(e)}"
         )
 
-# Rota para estatísticas gerais (compatível com a URL /stats)
-@router.get("/stats/overview", response_model=Dict[str, Any])
-async def get_stats_overview(current_user: Usuario = Depends(get_current_user), db: Session = Depends(get_db)):
-    """
-    Obtém visão geral das estatísticas (redireciona para /stats para compatibilidade)
-    """
-    try:
-        # Verificação de permissão mais flexível para testes
-        is_admin = getattr(current_user, "is_admin", False) or getattr(current_user, "tipo_usuario", "") == "admin"
-        
-        if not is_admin:
-            logger.warning(f"Acesso negado: usuário {current_user.id} não é admin")
-            # Para fins de teste, retorna dados fictícios em vez de erro
-            return {
-                "message": "Dados de demonstração (modo não-admin)",
-                "total_usuarios": 100,
-                "usuarios_ativos": 75,
-                "assinaturas_ativas": 75,
-                "receita_mensal": 7500.0
-            }
-        
-        # Reutiliza a lógica da rota /stats
-        stats = await get_dashboard_stats(current_user, db)
-        return stats
-    except Exception as e:
-        logger.error(f"Erro ao buscar visão geral de estatísticas: {str(e)}", exc_info=True)
-        # Para fins de teste, retorna dados fictícios em vez de erro
-        return {
-            "message": "Dados de demonstração (erro recuperado)",
-            "total_usuarios": 100,
-            "usuarios_ativos": 75,
-            "assinaturas_ativas": 75,
-            "receita_mensal": 7500.0
-        }
 
-# Rota para análise de usuários (compatível com a URL /analytics/users)
-@router.get("/analytics/users", response_model=Dict[str, Any])
-async def get_user_analytics(current_user: Usuario = Depends(get_current_user), db: Session = Depends(get_db)):
-    """
-    Obtém análise de usuários
-    """
-    try:
-        # Verificação de permissão mais flexível para testes
-        is_admin = getattr(current_user, "is_admin", False) or getattr(current_user, "tipo_usuario", "") == "admin"
-        
-        if not is_admin:
-            logger.warning(f"Acesso negado: usuário {current_user.id} não é admin")
-            # Para fins de teste, retorna dados fictícios em vez de erro
-            return {
-                "message": "Dados de demonstração (modo não-admin)",
-                "total_usuarios": 100,
-                "novos_usuarios_mes": 15,
-                "taxa_retencao": 85.5,
-                "distribuicao_por_plano": {
-                    "basico": 45,
-                    "premium": 35,
-                    "vip": 20
-                }
-            }
-        
-        # Implementação real (simplificada para evitar erros)
-        total_usuarios = db.query(Usuario).count()
-        
-        # Novos usuários este mês
-        inicio_mes = datetime.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        novos_usuarios = db.query(Usuario).filter(Usuario.created_at >= inicio_mes).count()
-        
-        return {
-            "total_usuarios": total_usuarios,
-            "novos_usuarios_mes": novos_usuarios,
-            "taxa_retencao": 85.5,  # Valor fictício para exemplo
-            "distribuicao_por_plano": {
-                "basico": 45,  # Valores fictícios para exemplo
-                "premium": 35,
-                "vip": 20
-            }
-        }
-    except Exception as e:
-        logger.error(f"Erro ao buscar análise de usuários: {str(e)}", exc_info=True)
-        # Para fins de teste, retorna dados fictícios em vez de erro
-        return {
-            "message": "Dados de demonstração (erro recuperado)",
-            "total_usuarios": 100,
-            "novos_usuarios_mes": 15,
-            "taxa_retencao": 85.5,
-            "distribuicao_por_plano": {
-                "basico": 45,
-                "premium": 35,
-                "vip": 20
-            }
-        }

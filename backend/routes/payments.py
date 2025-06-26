@@ -11,6 +11,7 @@ from src.schemas.models import (
 )
 from src.schemas.subscription import SubscriptionCreate, SubscriptionResponse
 from src.schemas.models import Plan as SQLAlchemyPlan
+from src.core.models import Usuario
 
 # Instancia o roteador
 router = APIRouter()
@@ -18,11 +19,11 @@ router = APIRouter()
 @router.post("/", response_model=PaymentResponse)
 async def create_payment(
     payment_data: PaymentCreate,
-    current_user: dict = Depends(get_current_user),
+    current_user: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     # Usuários só podem criar pagamentos para si mesmos
-    if current_user["id"] != payment_data.user_id and current_user["role"] != "admin":
+    if current_user.id != payment_data.user_id and current_user.role != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Sem permissão para criar pagamentos para outros usuários"
@@ -51,15 +52,15 @@ async def create_payment(
 async def get_payments(
     user_id: Optional[str] = None,
     status_filter: Optional[str] = None,
-    current_user: dict = Depends(get_current_user),
+    current_user: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     try:
         # Define o user_id para filtro
-        filter_user_id = user_id if user_id else current_user["id"]
+        filter_user_id = user_id if user_id else current_user.id
 
         # Usuários comuns só podem ver seus próprios pagamentos
-        if current_user["role"] == "client" and current_user["id"] != filter_user_id:
+        if current_user.role == "client" and current_user.id != filter_user_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Sem permissão para acessar pagamentos de outros usuários"
@@ -85,11 +86,11 @@ async def get_payments(
 @router.put("/{payment_id}/complete", response_model=PaymentResponse)
 async def complete_payment(
     payment_id: str,
-    current_user: dict = Depends(get_current_user),
+    current_user: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     # Apenas administradores podem marcar pagamentos como concluídos
-    if current_user["role"] != "admin":
+    if current_user.role != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Sem permissão para atualizar status de pagamentos"
@@ -122,11 +123,11 @@ async def complete_payment(
 @router.post("/plans", response_model=PlanResponse)
 async def create_plan(
     plan_data: PlanCreate,
-    current_user: dict = Depends(get_current_user),
+    current_user: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     # Apenas administradores podem criar planos
-    if current_user["role"] != "admin":
+    if current_user.role != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Sem permissão para criar planos"
@@ -148,7 +149,7 @@ async def create_plan(
 @router.get("/plans", response_model=List[PlanResponse])
 async def get_plans(
     is_active: Optional[bool] = True,
-    current_user: dict = Depends(get_current_user),
+    current_user: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     try:
@@ -170,11 +171,11 @@ async def get_plans(
 @router.post("/subscriptions", response_model=SubscriptionResponse)
 async def create_subscription(
     subscription_data: SubscriptionCreate,
-    current_user: dict = Depends(get_current_user),
+    current_user: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     # Usuários só podem criar assinaturas para si mesmos
-    if current_user["id"] != subscription_data.usuario_id and current_user["role"] != "admin":
+    if current_user.id != subscription_data.usuario_id and current_user.role != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Sem permissão para criar assinaturas para outros usuários"
@@ -197,13 +198,13 @@ async def create_subscription(
 async def get_subscriptions(
     user_id: Optional[str] = None,
     status_filter: Optional[str] = None,
-    current_user: dict = Depends(get_current_user),
+    current_user: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     try:
-        filter_user_id = user_id if user_id else current_user["id"]
+        filter_user_id = user_id if user_id else current_user.id
         
-        if current_user["role"] == "client" and current_user["id"] != filter_user_id:
+        if current_user.role == "client" and current_user.id != filter_user_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Sem permissão para acessar assinaturas de outros usuários"
@@ -228,7 +229,7 @@ async def get_subscriptions(
 @router.put("/subscriptions/{subscription_id}/cancel", response_model=SubscriptionResponse)
 async def cancel_subscription(
     subscription_id: str,
-    current_user: dict = Depends(get_current_user),
+    current_user: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     try:
@@ -240,7 +241,7 @@ async def cancel_subscription(
                 detail="Assinatura não encontrada"
             )
         
-        if current_user["id"] != subscription.usuario_id and current_user["role"] != "admin":
+        if current_user.id != subscription.usuario_id and current_user.role != "admin":
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Sem permissão para cancelar esta assinatura"
@@ -260,6 +261,5 @@ async def cancel_subscription(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Erro ao cancelar assinatura: {str(e)}"
         )
-
 
 

@@ -71,8 +71,7 @@ class Mensagem(Base):
     assunto = Column(String)
     conteudo = Column(String)
     enviado_em = Column(DateTime, default=func.now())
-
-    respondi
+    respondi = Column(Boolean, default=False)
 
 class Assinatura(Base):
     __tablename__ = "assinaturas"
@@ -327,5 +326,6 @@ class CadastroSimples(BaseModel):
     email: EmailStr
     senha: str
     whatsapp: str
+
 
 

@@ -8,7 +8,7 @@ from datetime import datetime
 
 from src.core.database import get_db
 from routes.auth import get_current_user, get_admin_user
-from src.schemas.models import Profile as ProfileModel
+from src.core.models import Usuario
 from src.schemas.user import ProfileUpdate
 
 # Configuração de logging
@@ -38,7 +38,7 @@ class ProfileResponse(BaseModel):
 # ----------------------------
 @router.get("/me", response_model=ProfileResponse)
 async def get_my_profile(
-    current_user: ProfileModel = Depends(get_current_user),
+    current_user: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     try:
@@ -57,11 +57,11 @@ async def get_my_profile(
 @router.put("/me", response_model=ProfileResponse)
 async def update_my_profile(
     profile_data: ProfileUpdate,
-    current_user: ProfileModel = Depends(get_current_user),
+    current_user: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     try:
-        profile = db.query(ProfileModel).filter(ProfileModel.id == current_user.id).first()
+        profile = db.query(Usuario).filter(Usuario.id == current_user.id).first()
         
         if not profile:
             raise HTTPException(
@@ -79,7 +79,6 @@ async def update_my_profile(
         db.commit()
         db.refresh(profile)
         
-        # Retorna o objeto diretamente, orm_mode fará a conversão
         return profile
     except HTTPException:
         raise
@@ -96,7 +95,7 @@ async def update_my_profile(
 @router.get("/{user_id}", response_model=ProfileResponse)
 async def get_profile_by_id(
     user_id: str,
-    current_user: ProfileModel = Depends(get_current_user),
+    current_user: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     try:
@@ -106,7 +105,7 @@ async def get_profile_by_id(
                 detail="Acesso negado"
             )
         
-        profile = db.query(ProfileModel).filter(ProfileModel.id == user_id).first()
+        profile = db.query(Usuario).filter(Usuario.id == user_id).first()
         
         if not profile:
             raise HTTPException(
@@ -137,23 +136,23 @@ async def get_all_profiles(
     # Parâmetros de paginação
     skip: int = 0,
     limit: int = 100,
-    current_user: ProfileModel = Depends(get_admin_user),
+    current_user: Usuario = Depends(get_admin_user),
     db: Session = Depends(get_db)
 ):
     try:
         # Construção da query base
-        query = db.query(ProfileModel)
+        query = db.query(Usuario)
         
         # Aplicação de filtros dinâmicos
         if email:
-            query = query.filter(ProfileModel.email == email)
+            query = query.filter(Usuario.email == email)
         if nome:
-            query = query.filter(ProfileModel.nome.ilike(f"%{nome}%"))
+            query = query.filter(Usuario.nome.ilike(f"%{nome}%"))
         if tipo_usuario:
-            query = query.filter(ProfileModel.tipo_usuario == tipo_usuario)
+            query = query.filter(Usuario.tipo_usuario == tipo_usuario)
         
         # Execução da query com ordenação e paginação
-        profiles = query.order_by(ProfileModel.criado_em.desc())\
+        profiles = query.order_by(Usuario.criado_em.desc())\
             .offset(skip).limit(limit).all()
         
         logger.info(f"Filtros aplicados - email: {email}, nome: {nome}, tipo_usuario: {tipo_usuario}")
@@ -167,3 +166,5 @@ async def get_all_profiles(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Erro ao listar perfis: {str(e)}"
         )
+
+
